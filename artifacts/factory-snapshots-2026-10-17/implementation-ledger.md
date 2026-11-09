@@ -1,0 +1,26 @@
+# SDD ledger — plan: docs/superpowers/plans/2026-10-16-factory-task-snapshots-intake.md
+Native execution approved. Existing isolated dashboard worktree verified. No commits/pushes authorized.
+Pre-flight: Tasks 1→2/3/4/5/6 share immutable snapshot store and board identity; consistent.
+Pre-flight: Tasks 2→3 creation-before-eligibility and submission idempotency; core currently checks idempotency outside write transaction. Ruling: recheck inside transaction for all keyed creates — required to prevent concurrent duplicate tickets — small generic correction covered by concurrency regression.
+Pre-flight: Tasks 5→6/8 activation gate; mutations remain disabled until migration+enforcement verified.
+Pre-flight: Tasks 6→7 API and recorded/requested separation; consistent.
+Ruling: retain uncommitted worktrees, ledger, and immutable source backups instead of commit-based artifacts — user forbids commits without permission — delivery must include source archives.
+Task 1: complete — store/identity tests RED→GREEN, 4 tests pass. Frozen snapshots, revision conflicts, board isolation, duplicate payload rejection, and immutable mappings verified.
+Task 3: Ruling: use a structured v2 JSON ticket body, retaining v1 parsing for existing channels — header-like prompt lines otherwise override project routing — requires installing the shared intake parser before enabling submissions.
+Task 2/3: Ruling: bind reserved task snapshots before insertion, but finalize submission ticket ID after board commit — rollback otherwise prevents retry with a new reserved ID — inert orphan bindings remain for audit. Regression observed failing then passing.
+Task 4 progress: frozen resolver root A/late Fixer/retry A/root B test RED→GREEN; native conflicts and missing roles fail closed. Hermes effort+snapshot capture test RED→GREEN (5 tests pass). Plugin snapshot mode wired; legacy policy mode retained solely for prior compatibility tests. Full dashboard suite 83 pass before duplicate test-fixture cleanup. Tasks 2–4 still require end-to-end coverage and lint.
+Final review: fresh gpt-6-astra reviewer completed (82 dashboard tests passed); two Important findings reproduced and fixed with RED→GREEN tests: deleted-project prepared request recovery, and native task-ID references misidentified as Factory.
+Final: Ruling: upgrade missing provider in review and missing requested-settings display from Minor to Important — both are explicitly promised user review/evidence surfaces — implemented during the same fix pass, browser verification pending.
+Final: minor (deferred): CLI intake ticket association kind may be reported as root_id in requested dispatch metadata; immutable snapshot, model/effort selection and actual board/task identity are unaffected. Repair provenance association kind in follow-up.
+Final: Ruling: pending installed activation, mobile/disposable browser QA, and packaging are required deployment work, not waived review findings — perform before completion. Live provider acceptance remains untested because the plan forbids paid QA calls.
+Task 5 progress: migration tests RED→GREEN; actual board inventory has zero unfinished roots and running workers, no blockers. Migration does not enable activation.
+Tasks 6/7 progress: new API/gate/retired endpoint tests and read-only lane render test RED→GREEN. Dashboard suite 82 passed before final review fixes. Browser preview confirms defaults and new-task forms with submission disabled.
+Task 2: complete — preinsert/idempotency/rollback/error and real concurrent-connection tests pass; CLI kanban.py:364 and tools/kanban_tools.py:1133 converge on kb.create_task. Installed plugin discovery verified in 12 homes.
+Task 3: complete — queue/recovery/header isolation/cancel tests pass; real disposable board inheritance and browser lost-response/project-removal recovery pass. One disposable ticket, no production QA submissions.
+Task 4: complete — frozen root/late-stage/retry tests, effort metadata and actual launch argv assertions pass; installed-source smoke verified original/medium after defaults edit, no workers launched.
+Task 5: complete — migration idempotence/overrides/inventory/orphan/native tests pass; live inventory zero unfinished roots/running workers. Scoped new-work pause, migration, backend supervisor restart and activation verified.
+Task 6: complete — API authentication/revision/retired mutation and immutable history tests pass in full 86-test dashboard suite.
+Task 7: complete — recorded-only lane test passes; browser desktop dialogs, 390×844 form, recovery paths and live activation verified. Screenshots saved in project artifacts.
+Task 8: complete — independent review and one fix pass, 86 dashboard tests + 26 focused Hermes tests, 12 lint checks, exact installed base verified; backups and rollback documentation prepared. No commits/pushes or paid QA tasks.
+Ruling: preserve branches/worktrees as-is without merge/commit menu — the user authorized local implementation and deployment, not Git writes — source archives and installed backups are the recovery record.
+Final: fixed deleted-project recovery — two submission regressions RED→GREEN and real cancellation lock integration; fixed native task references — resolver/migration regressions RED→GREEN; suite 86/86.

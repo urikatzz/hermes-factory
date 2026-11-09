@@ -1,0 +1,18 @@
+▶ not activated — using HERMES_PYTHON: /private/tmp/hermes-factory-sandbox-testenv/bin/python
+▶ running per-file parallel test suite via run_tests_parallel.py
+  (TZ=UTC LANG=C.UTF-8 PYTHONHASHSEED=0; clean env)
+▶ pre-compiling bytecode cache
+▶ launching test runner
+Discovered 1 test files (~1 tests) under ['/private/tmp/test_factory_workflow_installed.py']; running with -j 10
+[100.0% |     1/~1 | ✓12 | ✗ 0] ✓ /private/tmp/test_factory_workflow_installed.py (12✓, 9.2s)
+
+=== Summary: 1 files, 12 tests passed, 0 failed (100% complete) in 9.2s (10 workers) ===
+  Durations cached to test_durations.json (1 files)
+
+=== Per-file subprocess time distribution ===
+  Files:   1
+  Total subprocess CPU-wall: 9.2s  (runner wall: 9.2s, parallelism: 10x)
+  P50: 9.21s  P90: 9.21s  P95: 9.21s  P99: 9.21s  Max: 9.21s
+  <1s: 0 files (0%)  <2s: 0 files (0%)
+  Top 10 slowest:
+      9.21s  /private/tmp/test_factory_workflow_installed.py

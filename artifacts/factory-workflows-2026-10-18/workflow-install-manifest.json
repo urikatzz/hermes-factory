@@ -1,0 +1,2033 @@
+{
+  "home": "/Users/example/.hermes",
+  "homes": [
+    "/Users/example/.hermes",
+    "/Users/example/.hermes/profiles/architect",
+    "/Users/example/.hermes/profiles/claude-reviewer",
+    "/Users/example/.hermes/profiles/codex-reviewer",
+    "/Users/example/.hermes/profiles/developer",
+    "/Users/example/.hermes/profiles/factory-orchestrator",
+    "/Users/example/.hermes/profiles/fixer",
+    "/Users/example/.hermes/profiles/security-reviewer",
+    "/Users/example/.hermes/profiles/trailz",
+    "/Users/example/.hermes/profiles/ui-reviewer",
+    "/Users/example/.hermes/profiles/ux-reviewer",
+    "/Users/example/.hermes/profiles/verifier"
+  ],
+  "files": [
+    {
+      "source": "/private/tmp/hermes-timeline-integration/hermes_cli/kanban_db.py",
+      "destination": "/Users/example/.hermes/hermes-agent/hermes_cli/kanban_db.py",
+      "source_sha256": "a2646694989986673a45e9642530526fdb4a7ce32307a25b7f7f7b498945dd93",
+      "expected_sha256": "20d0409aa7037c6bee8f751007a29e9563eb3ec427a7e3ea59dab978b1344fae"
+    },
+    {
+      "source": "/private/tmp/hermes-timeline-integration/hermes_cli/kanban_db_dispatch.py",
+      "destination": "/Users/example/.hermes/hermes-agent/hermes_cli/kanban_db_dispatch.py",
+      "source_sha256": "f0344cb6ad65a2888033f8f1afcc626c9b256d1d6057e38b1594f713c6800a4b",
+      "expected_sha256": "f0344cb6ad65a2888033f8f1afcc626c9b256d1d6057e38b1594f713c6800a4b"
+    },
+    {
+      "source": "/private/tmp/hermes-timeline-integration/hermes_cli/kanban_db_graph.py",
+      "destination": "/Users/example/.hermes/hermes-agent/hermes_cli/kanban_db_graph.py",
+      "source_sha256": "b58fcfedc8f91084268b1ca823229aa5c439ed599a055e002d512cab35c57af5",
+      "expected_sha256": "b3aada2c8ec77fa0b4bcdcd6be084e2e91b9c9d57c68f7200b872232b94360ed"
+    },
+    {
+      "source": "/private/tmp/hermes-timeline-integration/hermes_cli/kanban_swarm.py",
+      "destination": "/Users/example/.hermes/hermes-agent/hermes_cli/kanban_swarm.py",
+      "source_sha256": "9f6e19c5e813f543d8ccb0e418e8e6007491beee952a07c647d11e349799e0ef",
+      "expected_sha256": "d1f3725265358ec7783d39f7f4fe59f38ec6054600974b156d97b29c03f306c0"
+    },
+    {
+      "source": "/private/tmp/hermes-timeline-integration/hermes_cli/kanban_transfer.py",
+      "destination": "/Users/example/.hermes/hermes-agent/hermes_cli/kanban_transfer.py",
+      "source_sha256": "ea612f9da2f180d68d57c0f19b87e44e80f575ec82c6a60165d196de2731085f",
+      "expected_sha256": "de0659e8864fba08dc2b2469bbb19ebb38c5edf7fb0516baa3bb6adfda92c9f4"
+    },
+    {
+      "source": "/private/tmp/hermes-timeline-integration/hermes_cli/plugins.py",
+      "destination": "/Users/example/.hermes/hermes-agent/hermes_cli/plugins.py",
+      "source_sha256": "9e639ca18e0b0d79b815219d6fbac19901a19f41c57d1a2febfea119396f37b7",
+      "expected_sha256": "11fa1a8d1d478ffd8591c4a10ebacb0b0f01313868bbe3e0ccdd68e456d68945"
+    },
+    {
+      "source": "/private/tmp/hermes-timeline-integration/plugins/kanban/dashboard/plugin_api.py",
+      "destination": "/Users/example/.hermes/hermes-agent/plugins/kanban/dashboard/plugin_api.py",
+      "source_sha256": "fd1b832c504653c02b4738e8df763a89c84c3d9ae21d3703d28ba0e0edfb241c",
+      "expected_sha256": "22985675c9402fcefaa84f9cc1ad2530f0d9ec9b68e3a5e6034d8c4e9b8035f5"
+    },
+    {
+      "source": "/private/tmp/hermes-timeline-integration/hermes_cli/kanban_db_mutation_guard.py",
+      "destination": "/Users/example/.hermes/hermes-agent/hermes_cli/kanban_db_mutation_guard.py",
+      "source_sha256": "91e04a3ede76334050bf938929b5de09d8a947df5cea697b53acd18f67814b49",
+      "expected_sha256": null
+    },
+    {
+      "source": "/private/tmp/hermes-timeline-integration/hermes_cli/kanban_db_task_creation.py",
+      "destination": "/Users/example/.hermes/hermes-agent/hermes_cli/kanban_db_task_creation.py",
+      "source_sha256": "5cd6f2d1660302c58633d6f0925e8ec096d17898b04e6e9c2a46e4ed1ee0ee01",
+      "expected_sha256": "118b9b3f0b26b036d8384497e840fee1ee1ce247b56620453b85b28d6a9f4936"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/workflow_capture.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/workflow_capture.py",
+      "source_sha256": "c31f023623a637a60f1f04b6c5dc192fd4b80dc593269903352864099843399a",
+      "expected_sha256": null
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/workflow_cards.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/workflow_cards.py",
+      "source_sha256": "77a21d36f31baeccf5b5a47a98e729151adab91d894fec2580f7cfb73ef7dd0e",
+      "expected_sha256": null
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/profile_settings.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/profile_settings.py",
+      "source_sha256": "39dedb7154dc3199579e6a5bee072b7489f2a719cfaf960281379b8e812e261b",
+      "expected_sha256": "39dedb7154dc3199579e6a5bee072b7489f2a719cfaf960281379b8e812e261b"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/workflow_gate.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/workflow_gate.py",
+      "source_sha256": "1a4057f6ba3bade21d43dbd97e218bf01e0838063889c44c9f2d1e5df84f8e53",
+      "expected_sha256": null
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/workflow_types.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/workflow_types.py",
+      "source_sha256": "020443ef0138171e947f1f52f4392d3949795d312e07f8b186a7a08152c5c959",
+      "expected_sha256": null
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/workflow_http.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/workflow_http.py",
+      "source_sha256": "b8eb4004a4823eb1b763cdd1a008f8b12bd5c953848632886a94c0bf8a104dea",
+      "expected_sha256": null
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/models.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/models.py",
+      "source_sha256": "e94c64168b785f6645ebe7be8e9febfdfe4034a013baf552be9cbd25db13d097",
+      "expected_sha256": "e94c64168b785f6645ebe7be8e9febfdfe4034a013baf552be9cbd25db13d097"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/catalog_export.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/catalog_export.py",
+      "source_sha256": "fe86f0e14cd6f6bc479176de0af0b9411d635c1ad48a5f997715ab7f2fa61c8a",
+      "expected_sha256": "fe86f0e14cd6f6bc479176de0af0b9411d635c1ad48a5f997715ab7f2fa61c8a"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/workflow_controller.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/workflow_controller.py",
+      "source_sha256": "a4f67177b6c5cff1cbbdfee69302c50eb6902cfe4b8fc47d89cce1baf9f55124",
+      "expected_sha256": null
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/renderer.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/renderer.py",
+      "source_sha256": "cdf90cf31f00ecab08353ed0c7de887b3173c1adea17e204a3462585576d273b",
+      "expected_sha256": "cdf90cf31f00ecab08353ed0c7de887b3173c1adea17e204a3462585576d273b"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/live_service.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/live_service.py",
+      "source_sha256": "48fdd2350550131ae2f96143006924d58c8e94afb6d759a80fc26ff30f0082e2",
+      "expected_sha256": "48fdd2350550131ae2f96143006924d58c8e94afb6d759a80fc26ff30f0082e2"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/collector.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/collector.py",
+      "source_sha256": "9d9741626af95fad5cd04b227b8af2ee44099d43e8d88fcbb71235d0508692b0",
+      "expected_sha256": "9d9741626af95fad5cd04b227b8af2ee44099d43e8d88fcbb71235d0508692b0"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/settings_migration.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/settings_migration.py",
+      "source_sha256": "03065209d73c6b86e634a26901088aa7cee261e8c44170b694a4b115a20a1345",
+      "expected_sha256": "03065209d73c6b86e634a26901088aa7cee261e8c44170b694a4b115a20a1345"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/factory_creation.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/factory_creation.py",
+      "source_sha256": "e92b1e36fd5ae4436d72da266f1ec7824068be3a3290f3be1b2ef790182336c5",
+      "expected_sha256": "ece00bb03721d9362577cebbc078b6838133370509add1bcbf2059cd60248cb8"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/__init__.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/__init__.py",
+      "source_sha256": "40b03b7876bcc33bc9ed522f12aa076183bf85ddfcc8430218a20b9ed82b432f",
+      "expected_sha256": "40b03b7876bcc33bc9ed522f12aa076183bf85ddfcc8430218a20b9ed82b432f"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/policy_store.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/policy_store.py",
+      "source_sha256": "c1c42ecf66ab26fa50f6b771db4eb2ddf1abc01230af5710ebb0347084934177",
+      "expected_sha256": "c1c42ecf66ab26fa50f6b771db4eb2ddf1abc01230af5710ebb0347084934177"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/http_server.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/http_server.py",
+      "source_sha256": "5dd1094e24ff9199ba35e79471fe2dfcd3f0e1c8719bab4f350b7c6ba751849a",
+      "expected_sha256": "6bc51d1396e4ca51f438c41bb2f07c0acfe2f9c22b1b66575179476c350300a9"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/task_submission.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/task_submission.py",
+      "source_sha256": "7c549946f7985f0a0f3d04f8d7054e5257a68710168e99ddebb1cfc46ea37afb",
+      "expected_sha256": "c1a56d28920ab8c847d62d01d099d542ce9a862a76567231d7943b7acab53fd9"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/model_policy.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/model_policy.py",
+      "source_sha256": "73bf3692bdd7a32989ccdd7bcbe3d8c704e9f4faf1448b16e71207e17c926b99",
+      "expected_sha256": "73bf3692bdd7a32989ccdd7bcbe3d8c704e9f4faf1448b16e71207e17c926b99"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/hermes_intake.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/hermes_intake.py",
+      "source_sha256": "c7397e4d372368ca1b25b3ed95f5e49808a3a69e57aa3c53fc1bf1d763932e08",
+      "expected_sha256": "6db58ffac8278ae023be6045a2f5daf7c70e80536064ab02d181953809c961ef"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/snapshot_service.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/snapshot_service.py",
+      "source_sha256": "188b590ec5b327d5da9edbad94726b267ad1cfa16ecf65cd7a5f17f2cff0c24e",
+      "expected_sha256": "188b590ec5b327d5da9edbad94726b267ad1cfa16ecf65cd7a5f17f2cff0c24e"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/workflow_service.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/workflow_service.py",
+      "source_sha256": "78b8481df776e294492d7a30785e040735fb2c326631f23f7294a3e840d57951",
+      "expected_sha256": null
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/migration_sources.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/migration_sources.py",
+      "source_sha256": "bff839e2745d8f25cf5a424b18516c4a91f4b823da56721f4ec09abd57e26f97",
+      "expected_sha256": "bff839e2745d8f25cf5a424b18516c4a91f4b823da56721f4ec09abd57e26f97"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/workflow_guards.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/workflow_guards.py",
+      "source_sha256": "1618327b8f410fe6fa161d82b7d0e0d98b55345b3c93e16aa550a1fa5491e40e",
+      "expected_sha256": null
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/factory_model_resolver.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/factory_model_resolver.py",
+      "source_sha256": "d14079ebff27057133606e80064a3ef553c8cb120d2a9cef6599d939dfd37dac",
+      "expected_sha256": "d14079ebff27057133606e80064a3ef553c8cb120d2a9cef6599d939dfd37dac"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/model_catalog.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/model_catalog.py",
+      "source_sha256": "a9c64b554f37a61396ae37534325ce43cb352659183ed2d1ac2cad046e078bcf",
+      "expected_sha256": "a9c64b554f37a61396ae37534325ce43cb352659183ed2d1ac2cad046e078bcf"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/task_settings_store.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/task_settings_store.py",
+      "source_sha256": "e6e513d30071658541fb1e25ced04931e6e3ff9597b91f168a64cdf0c579e7ee",
+      "expected_sha256": "1b926c887d4a0bb9b6a4ff21cb4644b7ce9ec1e7b406f834304e2640c8faff73"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/workflow_state.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/workflow_state.py",
+      "source_sha256": "8b7cea0ad19e1b9996dbe5d88c72f4396814cba17dd509c2f1da3a16ca03942d",
+      "expected_sha256": null
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/task_identity.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/task_identity.py",
+      "source_sha256": "a8f8172f19dc78087ed08f2ae726e18e6d7623220bddec940e9b22ff9c17c787",
+      "expected_sha256": "a8f8172f19dc78087ed08f2ae726e18e6d7623220bddec940e9b22ff9c17c787"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/demo.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/demo.py",
+      "source_sha256": "26cfd388b254caed113db6fa7b48c2db54c99b31c903bd4d142a378b6a8c3961",
+      "expected_sha256": "26cfd388b254caed113db6fa7b48c2db54c99b31c903bd4d142a378b6a8c3961"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/profile_service.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/profile_service.py",
+      "source_sha256": "fa84ee0a33b3521db790091351a109ed4648e9dc9e2cfe4be2c18cc0af8d7d63",
+      "expected_sha256": "fa84ee0a33b3521db790091351a109ed4648e9dc9e2cfe4be2c18cc0af8d7d63"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/workflow_handoffs.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/workflow_handoffs.py",
+      "source_sha256": "d6776fdac066784f474f342d98e506ac85be107136a03c9bf97088e601d4b2a4",
+      "expected_sha256": null
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/workflow_templates.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/workflow_templates.py",
+      "source_sha256": "eba9cdd2c318dcff9b9e7debca2df7c5cdf2804c8f8ce3fa7479300e20d36a1f",
+      "expected_sha256": null
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/frozen_resolver.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/frozen_resolver.py",
+      "source_sha256": "14bd88445f327097a8b2d4e89caf9ae9180d6315c2648a476a691285aee5c1de",
+      "expected_sha256": "f7abbadbb1232f67b981e342b1a0cfaa80ada8a099d0673fbd89d298d3ff42e0"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/workflow_runtime.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/workflow_runtime.py",
+      "source_sha256": "8a214695e48efe2fb8b8fc445bed5fb7b72b8d4b372bba34bee94ef79bcc7217",
+      "expected_sha256": null
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/report.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/report.py",
+      "source_sha256": "8244fcc1701dc492d833b8d41cb2ef3e0f40b2c4e34908068eebb4475222e487",
+      "expected_sha256": "8244fcc1701dc492d833b8d41cb2ef3e0f40b2c4e34908068eebb4475222e487"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/task_settings.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/task_settings.py",
+      "source_sha256": "e3d1ce1675ef25aadb4322173645e6dd6ded4bded69568474b7d5fdd570a8634",
+      "expected_sha256": "ae53d70d8957f02be58e66138f8f2db79a5a7011859a73557693b3cdb2c718f2"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/assets/formatters.js",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/assets/formatters.js",
+      "source_sha256": "dba16aee31f328c8a1fb57f1005f340c9401386370aa20ed98bd505c77d6bcbc",
+      "expected_sha256": "dba16aee31f328c8a1fb57f1005f340c9401386370aa20ed98bd505c77d6bcbc"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/assets/timeline.js",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/assets/timeline.js",
+      "source_sha256": "cf869b854b86c65e5106c253ecf6c4c91fc91d0bf42b11374682b9bf4117d4bc",
+      "expected_sha256": "cf869b854b86c65e5106c253ecf6c4c91fc91d0bf42b11374682b9bf4117d4bc"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/assets/workflow_forms.js",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/assets/workflow_forms.js",
+      "source_sha256": "9b995567f11299008957770a88616ea1f5e9e62d5f587060abc18d9842b6b883",
+      "expected_sha256": null
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/assets/report.css",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/assets/report.css",
+      "source_sha256": "af3e6ce4a1ebeb23300bd5de6805a3251bb36258517870646fd0f509d6358ed4",
+      "expected_sha256": "af3e6ce4a1ebeb23300bd5de6805a3251bb36258517870646fd0f509d6358ed4"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/assets/live.html",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/assets/live.html",
+      "source_sha256": "e4443f8cd386aa20ef39cf53d4c9b4001f47221fd1696aaa01c0ccb64023c890",
+      "expected_sha256": "bb5c807a7ef00c391ffc6aeecc2f4797d03235f4cfc8d2f41146c28d4ec89f7b"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/assets/report.js",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/assets/report.js",
+      "source_sha256": "f5b5516d4a2ea92d8b1fb034874b94087b942db693832c7e91186c8ac874cbd1",
+      "expected_sha256": "f5b5516d4a2ea92d8b1fb034874b94087b942db693832c7e91186c8ac874cbd1"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/assets/report.html",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/assets/report.html",
+      "source_sha256": "ec277e2355a7c605a4cbf516ca88ee5f8aa97951279950687eb27df93a3f19e0",
+      "expected_sha256": "ec277e2355a7c605a4cbf516ca88ee5f8aa97951279950687eb27df93a3f19e0"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/assets/timeline.css",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/assets/timeline.css",
+      "source_sha256": "b947ee8ab53b24a5eae1f61b4dfa8a5df511f9a63a87d3d6b3d3a5f287ebfbcb",
+      "expected_sha256": "c150f5cbf78cae66775f274a67293148125117c6a033f5f23360237e10f9d540"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/assets/live.js",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/assets/live.js",
+      "source_sha256": "edb939c3afce370a44087efd8b0661ad4063af43cc2013b4af917a0eda7eeb37",
+      "expected_sha256": "ae669eb613a0a37bd8ee4f96dedb0818aaf0f58ace9832a670fc0b927424d71b"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/factory_dashboard/assets/task_forms.js",
+      "destination": "/Users/example/.hermes/factory-dashboard/factory_dashboard/assets/task_forms.js",
+      "source_sha256": "1ebc7c798c26025f500779b80d9f088a6f52fc847d2fd007d1a400f0f6dfa460",
+      "expected_sha256": "e4624f8944cf32c7daf4aa52d7eaba28b35217818c468966d54a2debdf209d2f"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/scripts/serve_factory_dashboard.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/scripts/serve_factory_dashboard.py",
+      "source_sha256": "e13f845eae0b40495c537736d0782b3200f98d9c29e6327ee2079687e6cb65a7",
+      "expected_sha256": "ba7ec5f0e7781bf56f1bac5a97d6987da59de2e2187c211c80770cf3848ae2a8"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/scripts/export_factory_model_catalog.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/scripts/export_factory_model_catalog.py",
+      "source_sha256": "a284f3f7e9c499f84fbc3890878a328bd79e2d9c50d619c102a22d4212f61d71",
+      "expected_sha256": "a284f3f7e9c499f84fbc3890878a328bd79e2d9c50d619c102a22d4212f61d71"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/scripts/bundle_factory_plugin.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/scripts/bundle_factory_plugin.py",
+      "source_sha256": "b72acd70919572bc24ae8b945b872d84a9edbc40d0d267c654d05c6e6f74f923",
+      "expected_sha256": "3d48a32324ecaec0cfefa4f8d7bbe36bf9ebc51387be1f0e2466171f14f0592a"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/scripts/resume_factory_workflow.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/scripts/resume_factory_workflow.py",
+      "source_sha256": "4ffe22619f69a2d321bcbc72378f7a63a22fae8cd14ec232639591969b75b06b",
+      "expected_sha256": null
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/scripts/migrate_factory_task_settings.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/scripts/migrate_factory_task_settings.py",
+      "source_sha256": "c47ab8741682ef513ec97dacf72a49f2cb10e0db278a5c12c60b11207c9e1979",
+      "expected_sha256": "c47ab8741682ef513ec97dacf72a49f2cb10e0db278a5c12c60b11207c9e1979"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/scripts/generate_factory_dashboard.py",
+      "destination": "/Users/example/.hermes/factory-dashboard/scripts/generate_factory_dashboard.py",
+      "source_sha256": "7d7654400abe4eda52d96fbbefe59731b645de74f84c238862c9a071e2ec99a9",
+      "expected_sha256": "7d7654400abe4eda52d96fbbefe59731b645de74f84c238862c9a071e2ec99a9"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/docs/workflow-mutation-coverage.md",
+      "destination": "/Users/example/.hermes/factory-dashboard/docs/workflow-mutation-coverage.md",
+      "source_sha256": "967616c01800c4ad2e36e1f1770b139cbca35da1bc2ef93e53f6eae52bae1eca",
+      "expected_sha256": null
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/docs/factory-timeline-controls.md",
+      "destination": "/Users/example/.hermes/factory-dashboard/docs/factory-timeline-controls.md",
+      "source_sha256": "cf506a44d09ddc922a9c98acd6c4e626a72cbc69f6479b3c3c1fafee7999ba58",
+      "expected_sha256": null
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/docs/factory-timeline-controls-results.md",
+      "destination": "/Users/example/.hermes/factory-dashboard/docs/factory-timeline-controls-results.md",
+      "source_sha256": "92e0fc4c152f9f54da581f80331b0e89b8b9e4449071025f704da55362b35aa3",
+      "expected_sha256": null
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/docs/factory-dashboard.md",
+      "destination": "/Users/example/.hermes/factory-dashboard/docs/factory-dashboard.md",
+      "source_sha256": "fe3ac69881b902828fc8e16964b060647c52223c54d1a33a9c926f54ac1d3f46",
+      "expected_sha256": null
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/docs/factory-workflows.md",
+      "destination": "/Users/example/.hermes/factory-dashboard/docs/factory-workflows.md",
+      "source_sha256": "d47581025db55673fa03ac3d791073cfc348a346c174d0174c45dfc7027b81b1",
+      "expected_sha256": null
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/docs/factory-task-snapshots-results.md",
+      "destination": "/Users/example/.hermes/factory-dashboard/docs/factory-task-snapshots-results.md",
+      "source_sha256": "526346757a373f292c9b7c2aa0260eb43c0cebb1f19b5ba969be734e76b1d968",
+      "expected_sha256": null
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/docs/factory-dashboard-results.md",
+      "destination": "/Users/example/.hermes/factory-dashboard/docs/factory-dashboard-results.md",
+      "source_sha256": "45c0f501bf466190f64d41adf98c0758df59a3e978b7fa0ecec9afce90eac272",
+      "expected_sha256": null
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/docs/superpowers/plans/2026-10-16-factory-dashboard.md",
+      "destination": "/Users/example/.hermes/factory-dashboard/docs/superpowers/plans/2026-10-16-factory-dashboard.md",
+      "source_sha256": "217557b31b40b98286668496393b0d192c9fbb9b8a8b083e39e799ab36d9fb3a",
+      "expected_sha256": null
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/docs/superpowers/plans/2026-10-16-factory-task-snapshots-intake.md",
+      "destination": "/Users/example/.hermes/factory-dashboard/docs/superpowers/plans/2026-10-16-factory-task-snapshots-intake.md",
+      "source_sha256": "1632febbf5a75ee947fc0e6a9aa339d7c5f178387ce9bdb3a1cd6d45d9705e4d",
+      "expected_sha256": null
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/docs/superpowers/plans/2026-10-16-factory-timeline-controls.md",
+      "destination": "/Users/example/.hermes/factory-dashboard/docs/superpowers/plans/2026-10-16-factory-timeline-controls.md",
+      "source_sha256": "99d8165f17df6f7c7ecfd24bf779c82116b71494a11883ba8c952c83995e1adb",
+      "expected_sha256": null
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/docs/superpowers/plans/2026-10-18-factory-workflow-templates.md",
+      "destination": "/Users/example/.hermes/factory-dashboard/docs/superpowers/plans/2026-10-18-factory-workflow-templates.md",
+      "source_sha256": "1c9329d0d20563be2fb6ee62f532b7c541f0cc7552abf176d4bbcd0cdaccc961",
+      "expected_sha256": null
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/docs/superpowers/specs/2026-10-16-factory-task-snapshots-intake-design.md",
+      "destination": "/Users/example/.hermes/factory-dashboard/docs/superpowers/specs/2026-10-16-factory-task-snapshots-intake-design.md",
+      "source_sha256": "9405883c39f86f161834f8afc3e9a4c16509e238cb4e5a09b73f7100ca04f179",
+      "expected_sha256": null
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/docs/superpowers/specs/2026-10-18-factory-workflow-templates-design.md",
+      "destination": "/Users/example/.hermes/factory-dashboard/docs/superpowers/specs/2026-10-18-factory-workflow-templates-design.md",
+      "source_sha256": "983b60d8e4229928629b6967d3c2ea8e2c2d75182e40f9f7d04a5695494e9724",
+      "expected_sha256": null
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/docs/superpowers/specs/2026-10-16-factory-timeline-controls-design.md",
+      "destination": "/Users/example/.hermes/factory-dashboard/docs/superpowers/specs/2026-10-16-factory-timeline-controls-design.md",
+      "source_sha256": "1256284d0642bf3ef617b23eae4dc5f0e1220795599eae37af20136a13636575",
+      "expected_sha256": null
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/docs/superpowers/specs/2026-10-16-factory-dashboard-design.md",
+      "destination": "/Users/example/.hermes/factory-dashboard/docs/superpowers/specs/2026-10-16-factory-dashboard-design.md",
+      "source_sha256": "cf9df614dda3e6c58925ca23f21acc2a14d539442f935dfa1cbf68ac03b86025",
+      "expected_sha256": null
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/integrations/factory_intake/factory_lib.py",
+      "destination": "/Users/example/.hermes/scripts/factory_lib.py",
+      "source_sha256": "eaf80e57d9df225c0ad38eddebcc5d1414133cf99a3902f79f033955b40dc6b1",
+      "expected_sha256": "026bb7838d9cbb91a709a0868fc04ce8195604c6f6475ce69efc25770d6fbd31"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/integrations/factory_intake/factory_intake.py",
+      "destination": "/Users/example/.hermes/scripts/factory_intake.py",
+      "source_sha256": "b4971ed6de16c8d686dac4d6efe59ef99b1327ddbabe6a076705adbf00016af4",
+      "expected_sha256": "baac01966ff0cfe26da6a6b7ad152dac500bf9a8531fda6cb8445e226fa71099"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/integrations/factory_workflows/orchestrator/software-factory/SKILL.md",
+      "destination": "/Users/example/.hermes/factory-skills/orchestrator/software-factory/SKILL.md",
+      "source_sha256": "eb7938c73639f5baca8ba160f1ed8d586d963594111275042da8ccc4ccc7fd8e",
+      "expected_sha256": "510dc353cf6e2ec5a8ccb343e00c7eb067c2d174401ac4748877f591a62c8b06"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/integrations/factory_workflows/worker/factory-worker/SKILL.md",
+      "destination": "/Users/example/.hermes/factory-skills/worker/factory-worker/SKILL.md",
+      "source_sha256": "7e2af9f4423bebc281c34c06c377176883e359b1a77d21b0a36c5f37933e11c3",
+      "expected_sha256": "48bc8c52dc30deb45e1fe1920329d2b7cb77646d6622c6d356e46fce203d46ff"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/integrations/factory_workflows/profiles/developer/SOUL.md",
+      "destination": "/Users/example/.hermes/profiles/developer/SOUL.md",
+      "source_sha256": "396edef5dd4ff35971a6da154d0611e6ba20de5befd6ff587a7c046a5388761d",
+      "expected_sha256": "259977f9f0f94c2c03d8f84a7c20b22cd79b155bd679428577a514a2bf12408d"
+    },
+    {
+      "source": "/private/tmp/hermes-factory-dashboard/integrations/factory_workflows/profiles/fixer/SOUL.md",
+      "destination": "/Users/example/.hermes/profiles/fixer/SOUL.md",
+      "source_sha256": "376735aebf5d7ef9f91d6f4d8fc1596ccd3678e0848467b9484ec0ef9d410b15",
+      "expected_sha256": "5344c531a9f9e8f77ac5c60c76ffcd19897f4279269a71e0e683ff37ebf5e622"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/plugin.yaml",
+      "destination": "/Users/example/.hermes/plugins/factory-models/plugin.yaml",
+      "source_sha256": "20267aa3260e3345c94fef4487ad270097471a248df0e8c9dd96f6ca89255a89",
+      "expected_sha256": "92add68aaef5dcc44dc421f61fb2d52c08abec2f4a67e421720cb549c03c7a1c"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/__init__.py",
+      "destination": "/Users/example/.hermes/plugins/factory-models/__init__.py",
+      "source_sha256": "a220f7c85ad75ae4892d38cef3d55394bd9888cc55c676974eebd97c9a0b79ca",
+      "expected_sha256": "dd4c85ca1558743462fb44a6b38f79ccf102d57945843fe588cc9bcc264a7184"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_capture.py",
+      "destination": "/Users/example/.hermes/plugins/factory-models/factory_dashboard/workflow_capture.py",
+      "source_sha256": "c31f023623a637a60f1f04b6c5dc192fd4b80dc593269903352864099843399a",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_cards.py",
+      "destination": "/Users/example/.hermes/plugins/factory-models/factory_dashboard/workflow_cards.py",
+      "source_sha256": "77a21d36f31baeccf5b5a47a98e729151adab91d894fec2580f7cfb73ef7dd0e",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_gate.py",
+      "destination": "/Users/example/.hermes/plugins/factory-models/factory_dashboard/workflow_gate.py",
+      "source_sha256": "1a4057f6ba3bade21d43dbd97e218bf01e0838063889c44c9f2d1e5df84f8e53",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_types.py",
+      "destination": "/Users/example/.hermes/plugins/factory-models/factory_dashboard/workflow_types.py",
+      "source_sha256": "020443ef0138171e947f1f52f4392d3949795d312e07f8b186a7a08152c5c959",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_controller.py",
+      "destination": "/Users/example/.hermes/plugins/factory-models/factory_dashboard/workflow_controller.py",
+      "source_sha256": "a4f67177b6c5cff1cbbdfee69302c50eb6902cfe4b8fc47d89cce1baf9f55124",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/factory_creation.py",
+      "destination": "/Users/example/.hermes/plugins/factory-models/factory_dashboard/factory_creation.py",
+      "source_sha256": "e92b1e36fd5ae4436d72da266f1ec7824068be3a3290f3be1b2ef790182336c5",
+      "expected_sha256": "ece00bb03721d9362577cebbc078b6838133370509add1bcbf2059cd60248cb8"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/__init__.py",
+      "destination": "/Users/example/.hermes/plugins/factory-models/factory_dashboard/__init__.py",
+      "source_sha256": "40b03b7876bcc33bc9ed522f12aa076183bf85ddfcc8430218a20b9ed82b432f",
+      "expected_sha256": "40b03b7876bcc33bc9ed522f12aa076183bf85ddfcc8430218a20b9ed82b432f"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/policy_store.py",
+      "destination": "/Users/example/.hermes/plugins/factory-models/factory_dashboard/policy_store.py",
+      "source_sha256": "c1c42ecf66ab26fa50f6b771db4eb2ddf1abc01230af5710ebb0347084934177",
+      "expected_sha256": "c1c42ecf66ab26fa50f6b771db4eb2ddf1abc01230af5710ebb0347084934177"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/model_policy.py",
+      "destination": "/Users/example/.hermes/plugins/factory-models/factory_dashboard/model_policy.py",
+      "source_sha256": "73bf3692bdd7a32989ccdd7bcbe3d8c704e9f4faf1448b16e71207e17c926b99",
+      "expected_sha256": "73bf3692bdd7a32989ccdd7bcbe3d8c704e9f4faf1448b16e71207e17c926b99"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_guards.py",
+      "destination": "/Users/example/.hermes/plugins/factory-models/factory_dashboard/workflow_guards.py",
+      "source_sha256": "1618327b8f410fe6fa161d82b7d0e0d98b55345b3c93e16aa550a1fa5491e40e",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/factory_model_resolver.py",
+      "destination": "/Users/example/.hermes/plugins/factory-models/factory_dashboard/factory_model_resolver.py",
+      "source_sha256": "d14079ebff27057133606e80064a3ef553c8cb120d2a9cef6599d939dfd37dac",
+      "expected_sha256": "d14079ebff27057133606e80064a3ef553c8cb120d2a9cef6599d939dfd37dac"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/model_catalog.py",
+      "destination": "/Users/example/.hermes/plugins/factory-models/factory_dashboard/model_catalog.py",
+      "source_sha256": "a9c64b554f37a61396ae37534325ce43cb352659183ed2d1ac2cad046e078bcf",
+      "expected_sha256": "a9c64b554f37a61396ae37534325ce43cb352659183ed2d1ac2cad046e078bcf"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/task_settings_store.py",
+      "destination": "/Users/example/.hermes/plugins/factory-models/factory_dashboard/task_settings_store.py",
+      "source_sha256": "e6e513d30071658541fb1e25ced04931e6e3ff9597b91f168a64cdf0c579e7ee",
+      "expected_sha256": "1b926c887d4a0bb9b6a4ff21cb4644b7ce9ec1e7b406f834304e2640c8faff73"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_state.py",
+      "destination": "/Users/example/.hermes/plugins/factory-models/factory_dashboard/workflow_state.py",
+      "source_sha256": "8b7cea0ad19e1b9996dbe5d88c72f4396814cba17dd509c2f1da3a16ca03942d",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/task_identity.py",
+      "destination": "/Users/example/.hermes/plugins/factory-models/factory_dashboard/task_identity.py",
+      "source_sha256": "a8f8172f19dc78087ed08f2ae726e18e6d7623220bddec940e9b22ff9c17c787",
+      "expected_sha256": "a8f8172f19dc78087ed08f2ae726e18e6d7623220bddec940e9b22ff9c17c787"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_handoffs.py",
+      "destination": "/Users/example/.hermes/plugins/factory-models/factory_dashboard/workflow_handoffs.py",
+      "source_sha256": "d6776fdac066784f474f342d98e506ac85be107136a03c9bf97088e601d4b2a4",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_templates.py",
+      "destination": "/Users/example/.hermes/plugins/factory-models/factory_dashboard/workflow_templates.py",
+      "source_sha256": "eba9cdd2c318dcff9b9e7debca2df7c5cdf2804c8f8ce3fa7479300e20d36a1f",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/frozen_resolver.py",
+      "destination": "/Users/example/.hermes/plugins/factory-models/factory_dashboard/frozen_resolver.py",
+      "source_sha256": "14bd88445f327097a8b2d4e89caf9ae9180d6315c2648a476a691285aee5c1de",
+      "expected_sha256": "f7abbadbb1232f67b981e342b1a0cfaa80ada8a099d0673fbd89d298d3ff42e0"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/task_settings.py",
+      "destination": "/Users/example/.hermes/plugins/factory-models/factory_dashboard/task_settings.py",
+      "source_sha256": "e3d1ce1675ef25aadb4322173645e6dd6ded4bded69568474b7d5fdd570a8634",
+      "expected_sha256": "ae53d70d8957f02be58e66138f8f2db79a5a7011859a73557693b3cdb2c718f2"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/plugin.yaml",
+      "destination": "/Users/example/.hermes/profiles/architect/plugins/factory-models/plugin.yaml",
+      "source_sha256": "20267aa3260e3345c94fef4487ad270097471a248df0e8c9dd96f6ca89255a89",
+      "expected_sha256": "92add68aaef5dcc44dc421f61fb2d52c08abec2f4a67e421720cb549c03c7a1c"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/__init__.py",
+      "destination": "/Users/example/.hermes/profiles/architect/plugins/factory-models/__init__.py",
+      "source_sha256": "a220f7c85ad75ae4892d38cef3d55394bd9888cc55c676974eebd97c9a0b79ca",
+      "expected_sha256": "dd4c85ca1558743462fb44a6b38f79ccf102d57945843fe588cc9bcc264a7184"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_capture.py",
+      "destination": "/Users/example/.hermes/profiles/architect/plugins/factory-models/factory_dashboard/workflow_capture.py",
+      "source_sha256": "c31f023623a637a60f1f04b6c5dc192fd4b80dc593269903352864099843399a",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_cards.py",
+      "destination": "/Users/example/.hermes/profiles/architect/plugins/factory-models/factory_dashboard/workflow_cards.py",
+      "source_sha256": "77a21d36f31baeccf5b5a47a98e729151adab91d894fec2580f7cfb73ef7dd0e",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_gate.py",
+      "destination": "/Users/example/.hermes/profiles/architect/plugins/factory-models/factory_dashboard/workflow_gate.py",
+      "source_sha256": "1a4057f6ba3bade21d43dbd97e218bf01e0838063889c44c9f2d1e5df84f8e53",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_types.py",
+      "destination": "/Users/example/.hermes/profiles/architect/plugins/factory-models/factory_dashboard/workflow_types.py",
+      "source_sha256": "020443ef0138171e947f1f52f4392d3949795d312e07f8b186a7a08152c5c959",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_controller.py",
+      "destination": "/Users/example/.hermes/profiles/architect/plugins/factory-models/factory_dashboard/workflow_controller.py",
+      "source_sha256": "a4f67177b6c5cff1cbbdfee69302c50eb6902cfe4b8fc47d89cce1baf9f55124",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/factory_creation.py",
+      "destination": "/Users/example/.hermes/profiles/architect/plugins/factory-models/factory_dashboard/factory_creation.py",
+      "source_sha256": "e92b1e36fd5ae4436d72da266f1ec7824068be3a3290f3be1b2ef790182336c5",
+      "expected_sha256": "ece00bb03721d9362577cebbc078b6838133370509add1bcbf2059cd60248cb8"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/__init__.py",
+      "destination": "/Users/example/.hermes/profiles/architect/plugins/factory-models/factory_dashboard/__init__.py",
+      "source_sha256": "40b03b7876bcc33bc9ed522f12aa076183bf85ddfcc8430218a20b9ed82b432f",
+      "expected_sha256": "40b03b7876bcc33bc9ed522f12aa076183bf85ddfcc8430218a20b9ed82b432f"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/policy_store.py",
+      "destination": "/Users/example/.hermes/profiles/architect/plugins/factory-models/factory_dashboard/policy_store.py",
+      "source_sha256": "c1c42ecf66ab26fa50f6b771db4eb2ddf1abc01230af5710ebb0347084934177",
+      "expected_sha256": "c1c42ecf66ab26fa50f6b771db4eb2ddf1abc01230af5710ebb0347084934177"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/model_policy.py",
+      "destination": "/Users/example/.hermes/profiles/architect/plugins/factory-models/factory_dashboard/model_policy.py",
+      "source_sha256": "73bf3692bdd7a32989ccdd7bcbe3d8c704e9f4faf1448b16e71207e17c926b99",
+      "expected_sha256": "73bf3692bdd7a32989ccdd7bcbe3d8c704e9f4faf1448b16e71207e17c926b99"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_guards.py",
+      "destination": "/Users/example/.hermes/profiles/architect/plugins/factory-models/factory_dashboard/workflow_guards.py",
+      "source_sha256": "1618327b8f410fe6fa161d82b7d0e0d98b55345b3c93e16aa550a1fa5491e40e",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/factory_model_resolver.py",
+      "destination": "/Users/example/.hermes/profiles/architect/plugins/factory-models/factory_dashboard/factory_model_resolver.py",
+      "source_sha256": "d14079ebff27057133606e80064a3ef553c8cb120d2a9cef6599d939dfd37dac",
+      "expected_sha256": "d14079ebff27057133606e80064a3ef553c8cb120d2a9cef6599d939dfd37dac"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/model_catalog.py",
+      "destination": "/Users/example/.hermes/profiles/architect/plugins/factory-models/factory_dashboard/model_catalog.py",
+      "source_sha256": "a9c64b554f37a61396ae37534325ce43cb352659183ed2d1ac2cad046e078bcf",
+      "expected_sha256": "a9c64b554f37a61396ae37534325ce43cb352659183ed2d1ac2cad046e078bcf"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/task_settings_store.py",
+      "destination": "/Users/example/.hermes/profiles/architect/plugins/factory-models/factory_dashboard/task_settings_store.py",
+      "source_sha256": "e6e513d30071658541fb1e25ced04931e6e3ff9597b91f168a64cdf0c579e7ee",
+      "expected_sha256": "1b926c887d4a0bb9b6a4ff21cb4644b7ce9ec1e7b406f834304e2640c8faff73"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_state.py",
+      "destination": "/Users/example/.hermes/profiles/architect/plugins/factory-models/factory_dashboard/workflow_state.py",
+      "source_sha256": "8b7cea0ad19e1b9996dbe5d88c72f4396814cba17dd509c2f1da3a16ca03942d",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/task_identity.py",
+      "destination": "/Users/example/.hermes/profiles/architect/plugins/factory-models/factory_dashboard/task_identity.py",
+      "source_sha256": "a8f8172f19dc78087ed08f2ae726e18e6d7623220bddec940e9b22ff9c17c787",
+      "expected_sha256": "a8f8172f19dc78087ed08f2ae726e18e6d7623220bddec940e9b22ff9c17c787"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_handoffs.py",
+      "destination": "/Users/example/.hermes/profiles/architect/plugins/factory-models/factory_dashboard/workflow_handoffs.py",
+      "source_sha256": "d6776fdac066784f474f342d98e506ac85be107136a03c9bf97088e601d4b2a4",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_templates.py",
+      "destination": "/Users/example/.hermes/profiles/architect/plugins/factory-models/factory_dashboard/workflow_templates.py",
+      "source_sha256": "eba9cdd2c318dcff9b9e7debca2df7c5cdf2804c8f8ce3fa7479300e20d36a1f",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/frozen_resolver.py",
+      "destination": "/Users/example/.hermes/profiles/architect/plugins/factory-models/factory_dashboard/frozen_resolver.py",
+      "source_sha256": "14bd88445f327097a8b2d4e89caf9ae9180d6315c2648a476a691285aee5c1de",
+      "expected_sha256": "f7abbadbb1232f67b981e342b1a0cfaa80ada8a099d0673fbd89d298d3ff42e0"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/task_settings.py",
+      "destination": "/Users/example/.hermes/profiles/architect/plugins/factory-models/factory_dashboard/task_settings.py",
+      "source_sha256": "e3d1ce1675ef25aadb4322173645e6dd6ded4bded69568474b7d5fdd570a8634",
+      "expected_sha256": "ae53d70d8957f02be58e66138f8f2db79a5a7011859a73557693b3cdb2c718f2"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/plugin.yaml",
+      "destination": "/Users/example/.hermes/profiles/claude-reviewer/plugins/factory-models/plugin.yaml",
+      "source_sha256": "20267aa3260e3345c94fef4487ad270097471a248df0e8c9dd96f6ca89255a89",
+      "expected_sha256": "92add68aaef5dcc44dc421f61fb2d52c08abec2f4a67e421720cb549c03c7a1c"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/__init__.py",
+      "destination": "/Users/example/.hermes/profiles/claude-reviewer/plugins/factory-models/__init__.py",
+      "source_sha256": "a220f7c85ad75ae4892d38cef3d55394bd9888cc55c676974eebd97c9a0b79ca",
+      "expected_sha256": "dd4c85ca1558743462fb44a6b38f79ccf102d57945843fe588cc9bcc264a7184"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_capture.py",
+      "destination": "/Users/example/.hermes/profiles/claude-reviewer/plugins/factory-models/factory_dashboard/workflow_capture.py",
+      "source_sha256": "c31f023623a637a60f1f04b6c5dc192fd4b80dc593269903352864099843399a",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_cards.py",
+      "destination": "/Users/example/.hermes/profiles/claude-reviewer/plugins/factory-models/factory_dashboard/workflow_cards.py",
+      "source_sha256": "77a21d36f31baeccf5b5a47a98e729151adab91d894fec2580f7cfb73ef7dd0e",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_gate.py",
+      "destination": "/Users/example/.hermes/profiles/claude-reviewer/plugins/factory-models/factory_dashboard/workflow_gate.py",
+      "source_sha256": "1a4057f6ba3bade21d43dbd97e218bf01e0838063889c44c9f2d1e5df84f8e53",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_types.py",
+      "destination": "/Users/example/.hermes/profiles/claude-reviewer/plugins/factory-models/factory_dashboard/workflow_types.py",
+      "source_sha256": "020443ef0138171e947f1f52f4392d3949795d312e07f8b186a7a08152c5c959",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_controller.py",
+      "destination": "/Users/example/.hermes/profiles/claude-reviewer/plugins/factory-models/factory_dashboard/workflow_controller.py",
+      "source_sha256": "a4f67177b6c5cff1cbbdfee69302c50eb6902cfe4b8fc47d89cce1baf9f55124",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/factory_creation.py",
+      "destination": "/Users/example/.hermes/profiles/claude-reviewer/plugins/factory-models/factory_dashboard/factory_creation.py",
+      "source_sha256": "e92b1e36fd5ae4436d72da266f1ec7824068be3a3290f3be1b2ef790182336c5",
+      "expected_sha256": "ece00bb03721d9362577cebbc078b6838133370509add1bcbf2059cd60248cb8"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/__init__.py",
+      "destination": "/Users/example/.hermes/profiles/claude-reviewer/plugins/factory-models/factory_dashboard/__init__.py",
+      "source_sha256": "40b03b7876bcc33bc9ed522f12aa076183bf85ddfcc8430218a20b9ed82b432f",
+      "expected_sha256": "40b03b7876bcc33bc9ed522f12aa076183bf85ddfcc8430218a20b9ed82b432f"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/policy_store.py",
+      "destination": "/Users/example/.hermes/profiles/claude-reviewer/plugins/factory-models/factory_dashboard/policy_store.py",
+      "source_sha256": "c1c42ecf66ab26fa50f6b771db4eb2ddf1abc01230af5710ebb0347084934177",
+      "expected_sha256": "c1c42ecf66ab26fa50f6b771db4eb2ddf1abc01230af5710ebb0347084934177"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/model_policy.py",
+      "destination": "/Users/example/.hermes/profiles/claude-reviewer/plugins/factory-models/factory_dashboard/model_policy.py",
+      "source_sha256": "73bf3692bdd7a32989ccdd7bcbe3d8c704e9f4faf1448b16e71207e17c926b99",
+      "expected_sha256": "73bf3692bdd7a32989ccdd7bcbe3d8c704e9f4faf1448b16e71207e17c926b99"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_guards.py",
+      "destination": "/Users/example/.hermes/profiles/claude-reviewer/plugins/factory-models/factory_dashboard/workflow_guards.py",
+      "source_sha256": "1618327b8f410fe6fa161d82b7d0e0d98b55345b3c93e16aa550a1fa5491e40e",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/factory_model_resolver.py",
+      "destination": "/Users/example/.hermes/profiles/claude-reviewer/plugins/factory-models/factory_dashboard/factory_model_resolver.py",
+      "source_sha256": "d14079ebff27057133606e80064a3ef553c8cb120d2a9cef6599d939dfd37dac",
+      "expected_sha256": "d14079ebff27057133606e80064a3ef553c8cb120d2a9cef6599d939dfd37dac"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/model_catalog.py",
+      "destination": "/Users/example/.hermes/profiles/claude-reviewer/plugins/factory-models/factory_dashboard/model_catalog.py",
+      "source_sha256": "a9c64b554f37a61396ae37534325ce43cb352659183ed2d1ac2cad046e078bcf",
+      "expected_sha256": "a9c64b554f37a61396ae37534325ce43cb352659183ed2d1ac2cad046e078bcf"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/task_settings_store.py",
+      "destination": "/Users/example/.hermes/profiles/claude-reviewer/plugins/factory-models/factory_dashboard/task_settings_store.py",
+      "source_sha256": "e6e513d30071658541fb1e25ced04931e6e3ff9597b91f168a64cdf0c579e7ee",
+      "expected_sha256": "1b926c887d4a0bb9b6a4ff21cb4644b7ce9ec1e7b406f834304e2640c8faff73"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_state.py",
+      "destination": "/Users/example/.hermes/profiles/claude-reviewer/plugins/factory-models/factory_dashboard/workflow_state.py",
+      "source_sha256": "8b7cea0ad19e1b9996dbe5d88c72f4396814cba17dd509c2f1da3a16ca03942d",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/task_identity.py",
+      "destination": "/Users/example/.hermes/profiles/claude-reviewer/plugins/factory-models/factory_dashboard/task_identity.py",
+      "source_sha256": "a8f8172f19dc78087ed08f2ae726e18e6d7623220bddec940e9b22ff9c17c787",
+      "expected_sha256": "a8f8172f19dc78087ed08f2ae726e18e6d7623220bddec940e9b22ff9c17c787"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_handoffs.py",
+      "destination": "/Users/example/.hermes/profiles/claude-reviewer/plugins/factory-models/factory_dashboard/workflow_handoffs.py",
+      "source_sha256": "d6776fdac066784f474f342d98e506ac85be107136a03c9bf97088e601d4b2a4",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_templates.py",
+      "destination": "/Users/example/.hermes/profiles/claude-reviewer/plugins/factory-models/factory_dashboard/workflow_templates.py",
+      "source_sha256": "eba9cdd2c318dcff9b9e7debca2df7c5cdf2804c8f8ce3fa7479300e20d36a1f",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/frozen_resolver.py",
+      "destination": "/Users/example/.hermes/profiles/claude-reviewer/plugins/factory-models/factory_dashboard/frozen_resolver.py",
+      "source_sha256": "14bd88445f327097a8b2d4e89caf9ae9180d6315c2648a476a691285aee5c1de",
+      "expected_sha256": "f7abbadbb1232f67b981e342b1a0cfaa80ada8a099d0673fbd89d298d3ff42e0"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/task_settings.py",
+      "destination": "/Users/example/.hermes/profiles/claude-reviewer/plugins/factory-models/factory_dashboard/task_settings.py",
+      "source_sha256": "e3d1ce1675ef25aadb4322173645e6dd6ded4bded69568474b7d5fdd570a8634",
+      "expected_sha256": "ae53d70d8957f02be58e66138f8f2db79a5a7011859a73557693b3cdb2c718f2"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/plugin.yaml",
+      "destination": "/Users/example/.hermes/profiles/codex-reviewer/plugins/factory-models/plugin.yaml",
+      "source_sha256": "20267aa3260e3345c94fef4487ad270097471a248df0e8c9dd96f6ca89255a89",
+      "expected_sha256": "92add68aaef5dcc44dc421f61fb2d52c08abec2f4a67e421720cb549c03c7a1c"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/__init__.py",
+      "destination": "/Users/example/.hermes/profiles/codex-reviewer/plugins/factory-models/__init__.py",
+      "source_sha256": "a220f7c85ad75ae4892d38cef3d55394bd9888cc55c676974eebd97c9a0b79ca",
+      "expected_sha256": "dd4c85ca1558743462fb44a6b38f79ccf102d57945843fe588cc9bcc264a7184"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_capture.py",
+      "destination": "/Users/example/.hermes/profiles/codex-reviewer/plugins/factory-models/factory_dashboard/workflow_capture.py",
+      "source_sha256": "c31f023623a637a60f1f04b6c5dc192fd4b80dc593269903352864099843399a",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_cards.py",
+      "destination": "/Users/example/.hermes/profiles/codex-reviewer/plugins/factory-models/factory_dashboard/workflow_cards.py",
+      "source_sha256": "77a21d36f31baeccf5b5a47a98e729151adab91d894fec2580f7cfb73ef7dd0e",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_gate.py",
+      "destination": "/Users/example/.hermes/profiles/codex-reviewer/plugins/factory-models/factory_dashboard/workflow_gate.py",
+      "source_sha256": "1a4057f6ba3bade21d43dbd97e218bf01e0838063889c44c9f2d1e5df84f8e53",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_types.py",
+      "destination": "/Users/example/.hermes/profiles/codex-reviewer/plugins/factory-models/factory_dashboard/workflow_types.py",
+      "source_sha256": "020443ef0138171e947f1f52f4392d3949795d312e07f8b186a7a08152c5c959",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_controller.py",
+      "destination": "/Users/example/.hermes/profiles/codex-reviewer/plugins/factory-models/factory_dashboard/workflow_controller.py",
+      "source_sha256": "a4f67177b6c5cff1cbbdfee69302c50eb6902cfe4b8fc47d89cce1baf9f55124",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/factory_creation.py",
+      "destination": "/Users/example/.hermes/profiles/codex-reviewer/plugins/factory-models/factory_dashboard/factory_creation.py",
+      "source_sha256": "e92b1e36fd5ae4436d72da266f1ec7824068be3a3290f3be1b2ef790182336c5",
+      "expected_sha256": "ece00bb03721d9362577cebbc078b6838133370509add1bcbf2059cd60248cb8"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/__init__.py",
+      "destination": "/Users/example/.hermes/profiles/codex-reviewer/plugins/factory-models/factory_dashboard/__init__.py",
+      "source_sha256": "40b03b7876bcc33bc9ed522f12aa076183bf85ddfcc8430218a20b9ed82b432f",
+      "expected_sha256": "40b03b7876bcc33bc9ed522f12aa076183bf85ddfcc8430218a20b9ed82b432f"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/policy_store.py",
+      "destination": "/Users/example/.hermes/profiles/codex-reviewer/plugins/factory-models/factory_dashboard/policy_store.py",
+      "source_sha256": "c1c42ecf66ab26fa50f6b771db4eb2ddf1abc01230af5710ebb0347084934177",
+      "expected_sha256": "c1c42ecf66ab26fa50f6b771db4eb2ddf1abc01230af5710ebb0347084934177"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/model_policy.py",
+      "destination": "/Users/example/.hermes/profiles/codex-reviewer/plugins/factory-models/factory_dashboard/model_policy.py",
+      "source_sha256": "73bf3692bdd7a32989ccdd7bcbe3d8c704e9f4faf1448b16e71207e17c926b99",
+      "expected_sha256": "73bf3692bdd7a32989ccdd7bcbe3d8c704e9f4faf1448b16e71207e17c926b99"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_guards.py",
+      "destination": "/Users/example/.hermes/profiles/codex-reviewer/plugins/factory-models/factory_dashboard/workflow_guards.py",
+      "source_sha256": "1618327b8f410fe6fa161d82b7d0e0d98b55345b3c93e16aa550a1fa5491e40e",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/factory_model_resolver.py",
+      "destination": "/Users/example/.hermes/profiles/codex-reviewer/plugins/factory-models/factory_dashboard/factory_model_resolver.py",
+      "source_sha256": "d14079ebff27057133606e80064a3ef553c8cb120d2a9cef6599d939dfd37dac",
+      "expected_sha256": "d14079ebff27057133606e80064a3ef553c8cb120d2a9cef6599d939dfd37dac"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/model_catalog.py",
+      "destination": "/Users/example/.hermes/profiles/codex-reviewer/plugins/factory-models/factory_dashboard/model_catalog.py",
+      "source_sha256": "a9c64b554f37a61396ae37534325ce43cb352659183ed2d1ac2cad046e078bcf",
+      "expected_sha256": "a9c64b554f37a61396ae37534325ce43cb352659183ed2d1ac2cad046e078bcf"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/task_settings_store.py",
+      "destination": "/Users/example/.hermes/profiles/codex-reviewer/plugins/factory-models/factory_dashboard/task_settings_store.py",
+      "source_sha256": "e6e513d30071658541fb1e25ced04931e6e3ff9597b91f168a64cdf0c579e7ee",
+      "expected_sha256": "1b926c887d4a0bb9b6a4ff21cb4644b7ce9ec1e7b406f834304e2640c8faff73"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_state.py",
+      "destination": "/Users/example/.hermes/profiles/codex-reviewer/plugins/factory-models/factory_dashboard/workflow_state.py",
+      "source_sha256": "8b7cea0ad19e1b9996dbe5d88c72f4396814cba17dd509c2f1da3a16ca03942d",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/task_identity.py",
+      "destination": "/Users/example/.hermes/profiles/codex-reviewer/plugins/factory-models/factory_dashboard/task_identity.py",
+      "source_sha256": "a8f8172f19dc78087ed08f2ae726e18e6d7623220bddec940e9b22ff9c17c787",
+      "expected_sha256": "a8f8172f19dc78087ed08f2ae726e18e6d7623220bddec940e9b22ff9c17c787"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_handoffs.py",
+      "destination": "/Users/example/.hermes/profiles/codex-reviewer/plugins/factory-models/factory_dashboard/workflow_handoffs.py",
+      "source_sha256": "d6776fdac066784f474f342d98e506ac85be107136a03c9bf97088e601d4b2a4",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_templates.py",
+      "destination": "/Users/example/.hermes/profiles/codex-reviewer/plugins/factory-models/factory_dashboard/workflow_templates.py",
+      "source_sha256": "eba9cdd2c318dcff9b9e7debca2df7c5cdf2804c8f8ce3fa7479300e20d36a1f",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/frozen_resolver.py",
+      "destination": "/Users/example/.hermes/profiles/codex-reviewer/plugins/factory-models/factory_dashboard/frozen_resolver.py",
+      "source_sha256": "14bd88445f327097a8b2d4e89caf9ae9180d6315c2648a476a691285aee5c1de",
+      "expected_sha256": "f7abbadbb1232f67b981e342b1a0cfaa80ada8a099d0673fbd89d298d3ff42e0"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/task_settings.py",
+      "destination": "/Users/example/.hermes/profiles/codex-reviewer/plugins/factory-models/factory_dashboard/task_settings.py",
+      "source_sha256": "e3d1ce1675ef25aadb4322173645e6dd6ded4bded69568474b7d5fdd570a8634",
+      "expected_sha256": "ae53d70d8957f02be58e66138f8f2db79a5a7011859a73557693b3cdb2c718f2"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/plugin.yaml",
+      "destination": "/Users/example/.hermes/profiles/developer/plugins/factory-models/plugin.yaml",
+      "source_sha256": "20267aa3260e3345c94fef4487ad270097471a248df0e8c9dd96f6ca89255a89",
+      "expected_sha256": "92add68aaef5dcc44dc421f61fb2d52c08abec2f4a67e421720cb549c03c7a1c"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/__init__.py",
+      "destination": "/Users/example/.hermes/profiles/developer/plugins/factory-models/__init__.py",
+      "source_sha256": "a220f7c85ad75ae4892d38cef3d55394bd9888cc55c676974eebd97c9a0b79ca",
+      "expected_sha256": "dd4c85ca1558743462fb44a6b38f79ccf102d57945843fe588cc9bcc264a7184"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_capture.py",
+      "destination": "/Users/example/.hermes/profiles/developer/plugins/factory-models/factory_dashboard/workflow_capture.py",
+      "source_sha256": "c31f023623a637a60f1f04b6c5dc192fd4b80dc593269903352864099843399a",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_cards.py",
+      "destination": "/Users/example/.hermes/profiles/developer/plugins/factory-models/factory_dashboard/workflow_cards.py",
+      "source_sha256": "77a21d36f31baeccf5b5a47a98e729151adab91d894fec2580f7cfb73ef7dd0e",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_gate.py",
+      "destination": "/Users/example/.hermes/profiles/developer/plugins/factory-models/factory_dashboard/workflow_gate.py",
+      "source_sha256": "1a4057f6ba3bade21d43dbd97e218bf01e0838063889c44c9f2d1e5df84f8e53",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_types.py",
+      "destination": "/Users/example/.hermes/profiles/developer/plugins/factory-models/factory_dashboard/workflow_types.py",
+      "source_sha256": "020443ef0138171e947f1f52f4392d3949795d312e07f8b186a7a08152c5c959",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_controller.py",
+      "destination": "/Users/example/.hermes/profiles/developer/plugins/factory-models/factory_dashboard/workflow_controller.py",
+      "source_sha256": "a4f67177b6c5cff1cbbdfee69302c50eb6902cfe4b8fc47d89cce1baf9f55124",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/factory_creation.py",
+      "destination": "/Users/example/.hermes/profiles/developer/plugins/factory-models/factory_dashboard/factory_creation.py",
+      "source_sha256": "e92b1e36fd5ae4436d72da266f1ec7824068be3a3290f3be1b2ef790182336c5",
+      "expected_sha256": "ece00bb03721d9362577cebbc078b6838133370509add1bcbf2059cd60248cb8"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/__init__.py",
+      "destination": "/Users/example/.hermes/profiles/developer/plugins/factory-models/factory_dashboard/__init__.py",
+      "source_sha256": "40b03b7876bcc33bc9ed522f12aa076183bf85ddfcc8430218a20b9ed82b432f",
+      "expected_sha256": "40b03b7876bcc33bc9ed522f12aa076183bf85ddfcc8430218a20b9ed82b432f"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/policy_store.py",
+      "destination": "/Users/example/.hermes/profiles/developer/plugins/factory-models/factory_dashboard/policy_store.py",
+      "source_sha256": "c1c42ecf66ab26fa50f6b771db4eb2ddf1abc01230af5710ebb0347084934177",
+      "expected_sha256": "c1c42ecf66ab26fa50f6b771db4eb2ddf1abc01230af5710ebb0347084934177"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/model_policy.py",
+      "destination": "/Users/example/.hermes/profiles/developer/plugins/factory-models/factory_dashboard/model_policy.py",
+      "source_sha256": "73bf3692bdd7a32989ccdd7bcbe3d8c704e9f4faf1448b16e71207e17c926b99",
+      "expected_sha256": "73bf3692bdd7a32989ccdd7bcbe3d8c704e9f4faf1448b16e71207e17c926b99"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_guards.py",
+      "destination": "/Users/example/.hermes/profiles/developer/plugins/factory-models/factory_dashboard/workflow_guards.py",
+      "source_sha256": "1618327b8f410fe6fa161d82b7d0e0d98b55345b3c93e16aa550a1fa5491e40e",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/factory_model_resolver.py",
+      "destination": "/Users/example/.hermes/profiles/developer/plugins/factory-models/factory_dashboard/factory_model_resolver.py",
+      "source_sha256": "d14079ebff27057133606e80064a3ef553c8cb120d2a9cef6599d939dfd37dac",
+      "expected_sha256": "d14079ebff27057133606e80064a3ef553c8cb120d2a9cef6599d939dfd37dac"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/model_catalog.py",
+      "destination": "/Users/example/.hermes/profiles/developer/plugins/factory-models/factory_dashboard/model_catalog.py",
+      "source_sha256": "a9c64b554f37a61396ae37534325ce43cb352659183ed2d1ac2cad046e078bcf",
+      "expected_sha256": "a9c64b554f37a61396ae37534325ce43cb352659183ed2d1ac2cad046e078bcf"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/task_settings_store.py",
+      "destination": "/Users/example/.hermes/profiles/developer/plugins/factory-models/factory_dashboard/task_settings_store.py",
+      "source_sha256": "e6e513d30071658541fb1e25ced04931e6e3ff9597b91f168a64cdf0c579e7ee",
+      "expected_sha256": "1b926c887d4a0bb9b6a4ff21cb4644b7ce9ec1e7b406f834304e2640c8faff73"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_state.py",
+      "destination": "/Users/example/.hermes/profiles/developer/plugins/factory-models/factory_dashboard/workflow_state.py",
+      "source_sha256": "8b7cea0ad19e1b9996dbe5d88c72f4396814cba17dd509c2f1da3a16ca03942d",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/task_identity.py",
+      "destination": "/Users/example/.hermes/profiles/developer/plugins/factory-models/factory_dashboard/task_identity.py",
+      "source_sha256": "a8f8172f19dc78087ed08f2ae726e18e6d7623220bddec940e9b22ff9c17c787",
+      "expected_sha256": "a8f8172f19dc78087ed08f2ae726e18e6d7623220bddec940e9b22ff9c17c787"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_handoffs.py",
+      "destination": "/Users/example/.hermes/profiles/developer/plugins/factory-models/factory_dashboard/workflow_handoffs.py",
+      "source_sha256": "d6776fdac066784f474f342d98e506ac85be107136a03c9bf97088e601d4b2a4",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_templates.py",
+      "destination": "/Users/example/.hermes/profiles/developer/plugins/factory-models/factory_dashboard/workflow_templates.py",
+      "source_sha256": "eba9cdd2c318dcff9b9e7debca2df7c5cdf2804c8f8ce3fa7479300e20d36a1f",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/frozen_resolver.py",
+      "destination": "/Users/example/.hermes/profiles/developer/plugins/factory-models/factory_dashboard/frozen_resolver.py",
+      "source_sha256": "14bd88445f327097a8b2d4e89caf9ae9180d6315c2648a476a691285aee5c1de",
+      "expected_sha256": "f7abbadbb1232f67b981e342b1a0cfaa80ada8a099d0673fbd89d298d3ff42e0"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/task_settings.py",
+      "destination": "/Users/example/.hermes/profiles/developer/plugins/factory-models/factory_dashboard/task_settings.py",
+      "source_sha256": "e3d1ce1675ef25aadb4322173645e6dd6ded4bded69568474b7d5fdd570a8634",
+      "expected_sha256": "ae53d70d8957f02be58e66138f8f2db79a5a7011859a73557693b3cdb2c718f2"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/plugin.yaml",
+      "destination": "/Users/example/.hermes/profiles/factory-orchestrator/plugins/factory-models/plugin.yaml",
+      "source_sha256": "20267aa3260e3345c94fef4487ad270097471a248df0e8c9dd96f6ca89255a89",
+      "expected_sha256": "92add68aaef5dcc44dc421f61fb2d52c08abec2f4a67e421720cb549c03c7a1c"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/__init__.py",
+      "destination": "/Users/example/.hermes/profiles/factory-orchestrator/plugins/factory-models/__init__.py",
+      "source_sha256": "a220f7c85ad75ae4892d38cef3d55394bd9888cc55c676974eebd97c9a0b79ca",
+      "expected_sha256": "dd4c85ca1558743462fb44a6b38f79ccf102d57945843fe588cc9bcc264a7184"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_capture.py",
+      "destination": "/Users/example/.hermes/profiles/factory-orchestrator/plugins/factory-models/factory_dashboard/workflow_capture.py",
+      "source_sha256": "c31f023623a637a60f1f04b6c5dc192fd4b80dc593269903352864099843399a",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_cards.py",
+      "destination": "/Users/example/.hermes/profiles/factory-orchestrator/plugins/factory-models/factory_dashboard/workflow_cards.py",
+      "source_sha256": "77a21d36f31baeccf5b5a47a98e729151adab91d894fec2580f7cfb73ef7dd0e",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_gate.py",
+      "destination": "/Users/example/.hermes/profiles/factory-orchestrator/plugins/factory-models/factory_dashboard/workflow_gate.py",
+      "source_sha256": "1a4057f6ba3bade21d43dbd97e218bf01e0838063889c44c9f2d1e5df84f8e53",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_types.py",
+      "destination": "/Users/example/.hermes/profiles/factory-orchestrator/plugins/factory-models/factory_dashboard/workflow_types.py",
+      "source_sha256": "020443ef0138171e947f1f52f4392d3949795d312e07f8b186a7a08152c5c959",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_controller.py",
+      "destination": "/Users/example/.hermes/profiles/factory-orchestrator/plugins/factory-models/factory_dashboard/workflow_controller.py",
+      "source_sha256": "a4f67177b6c5cff1cbbdfee69302c50eb6902cfe4b8fc47d89cce1baf9f55124",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/factory_creation.py",
+      "destination": "/Users/example/.hermes/profiles/factory-orchestrator/plugins/factory-models/factory_dashboard/factory_creation.py",
+      "source_sha256": "e92b1e36fd5ae4436d72da266f1ec7824068be3a3290f3be1b2ef790182336c5",
+      "expected_sha256": "ece00bb03721d9362577cebbc078b6838133370509add1bcbf2059cd60248cb8"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/__init__.py",
+      "destination": "/Users/example/.hermes/profiles/factory-orchestrator/plugins/factory-models/factory_dashboard/__init__.py",
+      "source_sha256": "40b03b7876bcc33bc9ed522f12aa076183bf85ddfcc8430218a20b9ed82b432f",
+      "expected_sha256": "40b03b7876bcc33bc9ed522f12aa076183bf85ddfcc8430218a20b9ed82b432f"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/policy_store.py",
+      "destination": "/Users/example/.hermes/profiles/factory-orchestrator/plugins/factory-models/factory_dashboard/policy_store.py",
+      "source_sha256": "c1c42ecf66ab26fa50f6b771db4eb2ddf1abc01230af5710ebb0347084934177",
+      "expected_sha256": "c1c42ecf66ab26fa50f6b771db4eb2ddf1abc01230af5710ebb0347084934177"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/model_policy.py",
+      "destination": "/Users/example/.hermes/profiles/factory-orchestrator/plugins/factory-models/factory_dashboard/model_policy.py",
+      "source_sha256": "73bf3692bdd7a32989ccdd7bcbe3d8c704e9f4faf1448b16e71207e17c926b99",
+      "expected_sha256": "73bf3692bdd7a32989ccdd7bcbe3d8c704e9f4faf1448b16e71207e17c926b99"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_guards.py",
+      "destination": "/Users/example/.hermes/profiles/factory-orchestrator/plugins/factory-models/factory_dashboard/workflow_guards.py",
+      "source_sha256": "1618327b8f410fe6fa161d82b7d0e0d98b55345b3c93e16aa550a1fa5491e40e",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/factory_model_resolver.py",
+      "destination": "/Users/example/.hermes/profiles/factory-orchestrator/plugins/factory-models/factory_dashboard/factory_model_resolver.py",
+      "source_sha256": "d14079ebff27057133606e80064a3ef553c8cb120d2a9cef6599d939dfd37dac",
+      "expected_sha256": "d14079ebff27057133606e80064a3ef553c8cb120d2a9cef6599d939dfd37dac"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/model_catalog.py",
+      "destination": "/Users/example/.hermes/profiles/factory-orchestrator/plugins/factory-models/factory_dashboard/model_catalog.py",
+      "source_sha256": "a9c64b554f37a61396ae37534325ce43cb352659183ed2d1ac2cad046e078bcf",
+      "expected_sha256": "a9c64b554f37a61396ae37534325ce43cb352659183ed2d1ac2cad046e078bcf"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/task_settings_store.py",
+      "destination": "/Users/example/.hermes/profiles/factory-orchestrator/plugins/factory-models/factory_dashboard/task_settings_store.py",
+      "source_sha256": "e6e513d30071658541fb1e25ced04931e6e3ff9597b91f168a64cdf0c579e7ee",
+      "expected_sha256": "1b926c887d4a0bb9b6a4ff21cb4644b7ce9ec1e7b406f834304e2640c8faff73"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_state.py",
+      "destination": "/Users/example/.hermes/profiles/factory-orchestrator/plugins/factory-models/factory_dashboard/workflow_state.py",
+      "source_sha256": "8b7cea0ad19e1b9996dbe5d88c72f4396814cba17dd509c2f1da3a16ca03942d",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/task_identity.py",
+      "destination": "/Users/example/.hermes/profiles/factory-orchestrator/plugins/factory-models/factory_dashboard/task_identity.py",
+      "source_sha256": "a8f8172f19dc78087ed08f2ae726e18e6d7623220bddec940e9b22ff9c17c787",
+      "expected_sha256": "a8f8172f19dc78087ed08f2ae726e18e6d7623220bddec940e9b22ff9c17c787"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_handoffs.py",
+      "destination": "/Users/example/.hermes/profiles/factory-orchestrator/plugins/factory-models/factory_dashboard/workflow_handoffs.py",
+      "source_sha256": "d6776fdac066784f474f342d98e506ac85be107136a03c9bf97088e601d4b2a4",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_templates.py",
+      "destination": "/Users/example/.hermes/profiles/factory-orchestrator/plugins/factory-models/factory_dashboard/workflow_templates.py",
+      "source_sha256": "eba9cdd2c318dcff9b9e7debca2df7c5cdf2804c8f8ce3fa7479300e20d36a1f",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/frozen_resolver.py",
+      "destination": "/Users/example/.hermes/profiles/factory-orchestrator/plugins/factory-models/factory_dashboard/frozen_resolver.py",
+      "source_sha256": "14bd88445f327097a8b2d4e89caf9ae9180d6315c2648a476a691285aee5c1de",
+      "expected_sha256": "f7abbadbb1232f67b981e342b1a0cfaa80ada8a099d0673fbd89d298d3ff42e0"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/task_settings.py",
+      "destination": "/Users/example/.hermes/profiles/factory-orchestrator/plugins/factory-models/factory_dashboard/task_settings.py",
+      "source_sha256": "e3d1ce1675ef25aadb4322173645e6dd6ded4bded69568474b7d5fdd570a8634",
+      "expected_sha256": "ae53d70d8957f02be58e66138f8f2db79a5a7011859a73557693b3cdb2c718f2"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/plugin.yaml",
+      "destination": "/Users/example/.hermes/profiles/fixer/plugins/factory-models/plugin.yaml",
+      "source_sha256": "20267aa3260e3345c94fef4487ad270097471a248df0e8c9dd96f6ca89255a89",
+      "expected_sha256": "92add68aaef5dcc44dc421f61fb2d52c08abec2f4a67e421720cb549c03c7a1c"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/__init__.py",
+      "destination": "/Users/example/.hermes/profiles/fixer/plugins/factory-models/__init__.py",
+      "source_sha256": "a220f7c85ad75ae4892d38cef3d55394bd9888cc55c676974eebd97c9a0b79ca",
+      "expected_sha256": "dd4c85ca1558743462fb44a6b38f79ccf102d57945843fe588cc9bcc264a7184"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_capture.py",
+      "destination": "/Users/example/.hermes/profiles/fixer/plugins/factory-models/factory_dashboard/workflow_capture.py",
+      "source_sha256": "c31f023623a637a60f1f04b6c5dc192fd4b80dc593269903352864099843399a",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_cards.py",
+      "destination": "/Users/example/.hermes/profiles/fixer/plugins/factory-models/factory_dashboard/workflow_cards.py",
+      "source_sha256": "77a21d36f31baeccf5b5a47a98e729151adab91d894fec2580f7cfb73ef7dd0e",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_gate.py",
+      "destination": "/Users/example/.hermes/profiles/fixer/plugins/factory-models/factory_dashboard/workflow_gate.py",
+      "source_sha256": "1a4057f6ba3bade21d43dbd97e218bf01e0838063889c44c9f2d1e5df84f8e53",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_types.py",
+      "destination": "/Users/example/.hermes/profiles/fixer/plugins/factory-models/factory_dashboard/workflow_types.py",
+      "source_sha256": "020443ef0138171e947f1f52f4392d3949795d312e07f8b186a7a08152c5c959",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_controller.py",
+      "destination": "/Users/example/.hermes/profiles/fixer/plugins/factory-models/factory_dashboard/workflow_controller.py",
+      "source_sha256": "a4f67177b6c5cff1cbbdfee69302c50eb6902cfe4b8fc47d89cce1baf9f55124",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/factory_creation.py",
+      "destination": "/Users/example/.hermes/profiles/fixer/plugins/factory-models/factory_dashboard/factory_creation.py",
+      "source_sha256": "e92b1e36fd5ae4436d72da266f1ec7824068be3a3290f3be1b2ef790182336c5",
+      "expected_sha256": "ece00bb03721d9362577cebbc078b6838133370509add1bcbf2059cd60248cb8"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/__init__.py",
+      "destination": "/Users/example/.hermes/profiles/fixer/plugins/factory-models/factory_dashboard/__init__.py",
+      "source_sha256": "40b03b7876bcc33bc9ed522f12aa076183bf85ddfcc8430218a20b9ed82b432f",
+      "expected_sha256": "40b03b7876bcc33bc9ed522f12aa076183bf85ddfcc8430218a20b9ed82b432f"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/policy_store.py",
+      "destination": "/Users/example/.hermes/profiles/fixer/plugins/factory-models/factory_dashboard/policy_store.py",
+      "source_sha256": "c1c42ecf66ab26fa50f6b771db4eb2ddf1abc01230af5710ebb0347084934177",
+      "expected_sha256": "c1c42ecf66ab26fa50f6b771db4eb2ddf1abc01230af5710ebb0347084934177"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/model_policy.py",
+      "destination": "/Users/example/.hermes/profiles/fixer/plugins/factory-models/factory_dashboard/model_policy.py",
+      "source_sha256": "73bf3692bdd7a32989ccdd7bcbe3d8c704e9f4faf1448b16e71207e17c926b99",
+      "expected_sha256": "73bf3692bdd7a32989ccdd7bcbe3d8c704e9f4faf1448b16e71207e17c926b99"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_guards.py",
+      "destination": "/Users/example/.hermes/profiles/fixer/plugins/factory-models/factory_dashboard/workflow_guards.py",
+      "source_sha256": "1618327b8f410fe6fa161d82b7d0e0d98b55345b3c93e16aa550a1fa5491e40e",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/factory_model_resolver.py",
+      "destination": "/Users/example/.hermes/profiles/fixer/plugins/factory-models/factory_dashboard/factory_model_resolver.py",
+      "source_sha256": "d14079ebff27057133606e80064a3ef553c8cb120d2a9cef6599d939dfd37dac",
+      "expected_sha256": "d14079ebff27057133606e80064a3ef553c8cb120d2a9cef6599d939dfd37dac"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/model_catalog.py",
+      "destination": "/Users/example/.hermes/profiles/fixer/plugins/factory-models/factory_dashboard/model_catalog.py",
+      "source_sha256": "a9c64b554f37a61396ae37534325ce43cb352659183ed2d1ac2cad046e078bcf",
+      "expected_sha256": "a9c64b554f37a61396ae37534325ce43cb352659183ed2d1ac2cad046e078bcf"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/task_settings_store.py",
+      "destination": "/Users/example/.hermes/profiles/fixer/plugins/factory-models/factory_dashboard/task_settings_store.py",
+      "source_sha256": "e6e513d30071658541fb1e25ced04931e6e3ff9597b91f168a64cdf0c579e7ee",
+      "expected_sha256": "1b926c887d4a0bb9b6a4ff21cb4644b7ce9ec1e7b406f834304e2640c8faff73"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_state.py",
+      "destination": "/Users/example/.hermes/profiles/fixer/plugins/factory-models/factory_dashboard/workflow_state.py",
+      "source_sha256": "8b7cea0ad19e1b9996dbe5d88c72f4396814cba17dd509c2f1da3a16ca03942d",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/task_identity.py",
+      "destination": "/Users/example/.hermes/profiles/fixer/plugins/factory-models/factory_dashboard/task_identity.py",
+      "source_sha256": "a8f8172f19dc78087ed08f2ae726e18e6d7623220bddec940e9b22ff9c17c787",
+      "expected_sha256": "a8f8172f19dc78087ed08f2ae726e18e6d7623220bddec940e9b22ff9c17c787"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_handoffs.py",
+      "destination": "/Users/example/.hermes/profiles/fixer/plugins/factory-models/factory_dashboard/workflow_handoffs.py",
+      "source_sha256": "d6776fdac066784f474f342d98e506ac85be107136a03c9bf97088e601d4b2a4",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_templates.py",
+      "destination": "/Users/example/.hermes/profiles/fixer/plugins/factory-models/factory_dashboard/workflow_templates.py",
+      "source_sha256": "eba9cdd2c318dcff9b9e7debca2df7c5cdf2804c8f8ce3fa7479300e20d36a1f",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/frozen_resolver.py",
+      "destination": "/Users/example/.hermes/profiles/fixer/plugins/factory-models/factory_dashboard/frozen_resolver.py",
+      "source_sha256": "14bd88445f327097a8b2d4e89caf9ae9180d6315c2648a476a691285aee5c1de",
+      "expected_sha256": "f7abbadbb1232f67b981e342b1a0cfaa80ada8a099d0673fbd89d298d3ff42e0"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/task_settings.py",
+      "destination": "/Users/example/.hermes/profiles/fixer/plugins/factory-models/factory_dashboard/task_settings.py",
+      "source_sha256": "e3d1ce1675ef25aadb4322173645e6dd6ded4bded69568474b7d5fdd570a8634",
+      "expected_sha256": "ae53d70d8957f02be58e66138f8f2db79a5a7011859a73557693b3cdb2c718f2"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/plugin.yaml",
+      "destination": "/Users/example/.hermes/profiles/security-reviewer/plugins/factory-models/plugin.yaml",
+      "source_sha256": "20267aa3260e3345c94fef4487ad270097471a248df0e8c9dd96f6ca89255a89",
+      "expected_sha256": "92add68aaef5dcc44dc421f61fb2d52c08abec2f4a67e421720cb549c03c7a1c"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/__init__.py",
+      "destination": "/Users/example/.hermes/profiles/security-reviewer/plugins/factory-models/__init__.py",
+      "source_sha256": "a220f7c85ad75ae4892d38cef3d55394bd9888cc55c676974eebd97c9a0b79ca",
+      "expected_sha256": "dd4c85ca1558743462fb44a6b38f79ccf102d57945843fe588cc9bcc264a7184"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_capture.py",
+      "destination": "/Users/example/.hermes/profiles/security-reviewer/plugins/factory-models/factory_dashboard/workflow_capture.py",
+      "source_sha256": "c31f023623a637a60f1f04b6c5dc192fd4b80dc593269903352864099843399a",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_cards.py",
+      "destination": "/Users/example/.hermes/profiles/security-reviewer/plugins/factory-models/factory_dashboard/workflow_cards.py",
+      "source_sha256": "77a21d36f31baeccf5b5a47a98e729151adab91d894fec2580f7cfb73ef7dd0e",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_gate.py",
+      "destination": "/Users/example/.hermes/profiles/security-reviewer/plugins/factory-models/factory_dashboard/workflow_gate.py",
+      "source_sha256": "1a4057f6ba3bade21d43dbd97e218bf01e0838063889c44c9f2d1e5df84f8e53",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_types.py",
+      "destination": "/Users/example/.hermes/profiles/security-reviewer/plugins/factory-models/factory_dashboard/workflow_types.py",
+      "source_sha256": "020443ef0138171e947f1f52f4392d3949795d312e07f8b186a7a08152c5c959",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_controller.py",
+      "destination": "/Users/example/.hermes/profiles/security-reviewer/plugins/factory-models/factory_dashboard/workflow_controller.py",
+      "source_sha256": "a4f67177b6c5cff1cbbdfee69302c50eb6902cfe4b8fc47d89cce1baf9f55124",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/factory_creation.py",
+      "destination": "/Users/example/.hermes/profiles/security-reviewer/plugins/factory-models/factory_dashboard/factory_creation.py",
+      "source_sha256": "e92b1e36fd5ae4436d72da266f1ec7824068be3a3290f3be1b2ef790182336c5",
+      "expected_sha256": "ece00bb03721d9362577cebbc078b6838133370509add1bcbf2059cd60248cb8"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/__init__.py",
+      "destination": "/Users/example/.hermes/profiles/security-reviewer/plugins/factory-models/factory_dashboard/__init__.py",
+      "source_sha256": "40b03b7876bcc33bc9ed522f12aa076183bf85ddfcc8430218a20b9ed82b432f",
+      "expected_sha256": "40b03b7876bcc33bc9ed522f12aa076183bf85ddfcc8430218a20b9ed82b432f"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/policy_store.py",
+      "destination": "/Users/example/.hermes/profiles/security-reviewer/plugins/factory-models/factory_dashboard/policy_store.py",
+      "source_sha256": "c1c42ecf66ab26fa50f6b771db4eb2ddf1abc01230af5710ebb0347084934177",
+      "expected_sha256": "c1c42ecf66ab26fa50f6b771db4eb2ddf1abc01230af5710ebb0347084934177"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/model_policy.py",
+      "destination": "/Users/example/.hermes/profiles/security-reviewer/plugins/factory-models/factory_dashboard/model_policy.py",
+      "source_sha256": "73bf3692bdd7a32989ccdd7bcbe3d8c704e9f4faf1448b16e71207e17c926b99",
+      "expected_sha256": "73bf3692bdd7a32989ccdd7bcbe3d8c704e9f4faf1448b16e71207e17c926b99"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_guards.py",
+      "destination": "/Users/example/.hermes/profiles/security-reviewer/plugins/factory-models/factory_dashboard/workflow_guards.py",
+      "source_sha256": "1618327b8f410fe6fa161d82b7d0e0d98b55345b3c93e16aa550a1fa5491e40e",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/factory_model_resolver.py",
+      "destination": "/Users/example/.hermes/profiles/security-reviewer/plugins/factory-models/factory_dashboard/factory_model_resolver.py",
+      "source_sha256": "d14079ebff27057133606e80064a3ef553c8cb120d2a9cef6599d939dfd37dac",
+      "expected_sha256": "d14079ebff27057133606e80064a3ef553c8cb120d2a9cef6599d939dfd37dac"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/model_catalog.py",
+      "destination": "/Users/example/.hermes/profiles/security-reviewer/plugins/factory-models/factory_dashboard/model_catalog.py",
+      "source_sha256": "a9c64b554f37a61396ae37534325ce43cb352659183ed2d1ac2cad046e078bcf",
+      "expected_sha256": "a9c64b554f37a61396ae37534325ce43cb352659183ed2d1ac2cad046e078bcf"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/task_settings_store.py",
+      "destination": "/Users/example/.hermes/profiles/security-reviewer/plugins/factory-models/factory_dashboard/task_settings_store.py",
+      "source_sha256": "e6e513d30071658541fb1e25ced04931e6e3ff9597b91f168a64cdf0c579e7ee",
+      "expected_sha256": "1b926c887d4a0bb9b6a4ff21cb4644b7ce9ec1e7b406f834304e2640c8faff73"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_state.py",
+      "destination": "/Users/example/.hermes/profiles/security-reviewer/plugins/factory-models/factory_dashboard/workflow_state.py",
+      "source_sha256": "8b7cea0ad19e1b9996dbe5d88c72f4396814cba17dd509c2f1da3a16ca03942d",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/task_identity.py",
+      "destination": "/Users/example/.hermes/profiles/security-reviewer/plugins/factory-models/factory_dashboard/task_identity.py",
+      "source_sha256": "a8f8172f19dc78087ed08f2ae726e18e6d7623220bddec940e9b22ff9c17c787",
+      "expected_sha256": "a8f8172f19dc78087ed08f2ae726e18e6d7623220bddec940e9b22ff9c17c787"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_handoffs.py",
+      "destination": "/Users/example/.hermes/profiles/security-reviewer/plugins/factory-models/factory_dashboard/workflow_handoffs.py",
+      "source_sha256": "d6776fdac066784f474f342d98e506ac85be107136a03c9bf97088e601d4b2a4",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_templates.py",
+      "destination": "/Users/example/.hermes/profiles/security-reviewer/plugins/factory-models/factory_dashboard/workflow_templates.py",
+      "source_sha256": "eba9cdd2c318dcff9b9e7debca2df7c5cdf2804c8f8ce3fa7479300e20d36a1f",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/frozen_resolver.py",
+      "destination": "/Users/example/.hermes/profiles/security-reviewer/plugins/factory-models/factory_dashboard/frozen_resolver.py",
+      "source_sha256": "14bd88445f327097a8b2d4e89caf9ae9180d6315c2648a476a691285aee5c1de",
+      "expected_sha256": "f7abbadbb1232f67b981e342b1a0cfaa80ada8a099d0673fbd89d298d3ff42e0"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/task_settings.py",
+      "destination": "/Users/example/.hermes/profiles/security-reviewer/plugins/factory-models/factory_dashboard/task_settings.py",
+      "source_sha256": "e3d1ce1675ef25aadb4322173645e6dd6ded4bded69568474b7d5fdd570a8634",
+      "expected_sha256": "ae53d70d8957f02be58e66138f8f2db79a5a7011859a73557693b3cdb2c718f2"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/plugin.yaml",
+      "destination": "/Users/example/.hermes/profiles/trailz/plugins/factory-models/plugin.yaml",
+      "source_sha256": "20267aa3260e3345c94fef4487ad270097471a248df0e8c9dd96f6ca89255a89",
+      "expected_sha256": "92add68aaef5dcc44dc421f61fb2d52c08abec2f4a67e421720cb549c03c7a1c"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/__init__.py",
+      "destination": "/Users/example/.hermes/profiles/trailz/plugins/factory-models/__init__.py",
+      "source_sha256": "a220f7c85ad75ae4892d38cef3d55394bd9888cc55c676974eebd97c9a0b79ca",
+      "expected_sha256": "dd4c85ca1558743462fb44a6b38f79ccf102d57945843fe588cc9bcc264a7184"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_capture.py",
+      "destination": "/Users/example/.hermes/profiles/trailz/plugins/factory-models/factory_dashboard/workflow_capture.py",
+      "source_sha256": "c31f023623a637a60f1f04b6c5dc192fd4b80dc593269903352864099843399a",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_cards.py",
+      "destination": "/Users/example/.hermes/profiles/trailz/plugins/factory-models/factory_dashboard/workflow_cards.py",
+      "source_sha256": "77a21d36f31baeccf5b5a47a98e729151adab91d894fec2580f7cfb73ef7dd0e",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_gate.py",
+      "destination": "/Users/example/.hermes/profiles/trailz/plugins/factory-models/factory_dashboard/workflow_gate.py",
+      "source_sha256": "1a4057f6ba3bade21d43dbd97e218bf01e0838063889c44c9f2d1e5df84f8e53",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_types.py",
+      "destination": "/Users/example/.hermes/profiles/trailz/plugins/factory-models/factory_dashboard/workflow_types.py",
+      "source_sha256": "020443ef0138171e947f1f52f4392d3949795d312e07f8b186a7a08152c5c959",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_controller.py",
+      "destination": "/Users/example/.hermes/profiles/trailz/plugins/factory-models/factory_dashboard/workflow_controller.py",
+      "source_sha256": "a4f67177b6c5cff1cbbdfee69302c50eb6902cfe4b8fc47d89cce1baf9f55124",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/factory_creation.py",
+      "destination": "/Users/example/.hermes/profiles/trailz/plugins/factory-models/factory_dashboard/factory_creation.py",
+      "source_sha256": "e92b1e36fd5ae4436d72da266f1ec7824068be3a3290f3be1b2ef790182336c5",
+      "expected_sha256": "ece00bb03721d9362577cebbc078b6838133370509add1bcbf2059cd60248cb8"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/__init__.py",
+      "destination": "/Users/example/.hermes/profiles/trailz/plugins/factory-models/factory_dashboard/__init__.py",
+      "source_sha256": "40b03b7876bcc33bc9ed522f12aa076183bf85ddfcc8430218a20b9ed82b432f",
+      "expected_sha256": "40b03b7876bcc33bc9ed522f12aa076183bf85ddfcc8430218a20b9ed82b432f"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/policy_store.py",
+      "destination": "/Users/example/.hermes/profiles/trailz/plugins/factory-models/factory_dashboard/policy_store.py",
+      "source_sha256": "c1c42ecf66ab26fa50f6b771db4eb2ddf1abc01230af5710ebb0347084934177",
+      "expected_sha256": "c1c42ecf66ab26fa50f6b771db4eb2ddf1abc01230af5710ebb0347084934177"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/model_policy.py",
+      "destination": "/Users/example/.hermes/profiles/trailz/plugins/factory-models/factory_dashboard/model_policy.py",
+      "source_sha256": "73bf3692bdd7a32989ccdd7bcbe3d8c704e9f4faf1448b16e71207e17c926b99",
+      "expected_sha256": "73bf3692bdd7a32989ccdd7bcbe3d8c704e9f4faf1448b16e71207e17c926b99"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_guards.py",
+      "destination": "/Users/example/.hermes/profiles/trailz/plugins/factory-models/factory_dashboard/workflow_guards.py",
+      "source_sha256": "1618327b8f410fe6fa161d82b7d0e0d98b55345b3c93e16aa550a1fa5491e40e",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/factory_model_resolver.py",
+      "destination": "/Users/example/.hermes/profiles/trailz/plugins/factory-models/factory_dashboard/factory_model_resolver.py",
+      "source_sha256": "d14079ebff27057133606e80064a3ef553c8cb120d2a9cef6599d939dfd37dac",
+      "expected_sha256": "d14079ebff27057133606e80064a3ef553c8cb120d2a9cef6599d939dfd37dac"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/model_catalog.py",
+      "destination": "/Users/example/.hermes/profiles/trailz/plugins/factory-models/factory_dashboard/model_catalog.py",
+      "source_sha256": "a9c64b554f37a61396ae37534325ce43cb352659183ed2d1ac2cad046e078bcf",
+      "expected_sha256": "a9c64b554f37a61396ae37534325ce43cb352659183ed2d1ac2cad046e078bcf"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/task_settings_store.py",
+      "destination": "/Users/example/.hermes/profiles/trailz/plugins/factory-models/factory_dashboard/task_settings_store.py",
+      "source_sha256": "e6e513d30071658541fb1e25ced04931e6e3ff9597b91f168a64cdf0c579e7ee",
+      "expected_sha256": "1b926c887d4a0bb9b6a4ff21cb4644b7ce9ec1e7b406f834304e2640c8faff73"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_state.py",
+      "destination": "/Users/example/.hermes/profiles/trailz/plugins/factory-models/factory_dashboard/workflow_state.py",
+      "source_sha256": "8b7cea0ad19e1b9996dbe5d88c72f4396814cba17dd509c2f1da3a16ca03942d",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/task_identity.py",
+      "destination": "/Users/example/.hermes/profiles/trailz/plugins/factory-models/factory_dashboard/task_identity.py",
+      "source_sha256": "a8f8172f19dc78087ed08f2ae726e18e6d7623220bddec940e9b22ff9c17c787",
+      "expected_sha256": "a8f8172f19dc78087ed08f2ae726e18e6d7623220bddec940e9b22ff9c17c787"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_handoffs.py",
+      "destination": "/Users/example/.hermes/profiles/trailz/plugins/factory-models/factory_dashboard/workflow_handoffs.py",
+      "source_sha256": "d6776fdac066784f474f342d98e506ac85be107136a03c9bf97088e601d4b2a4",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_templates.py",
+      "destination": "/Users/example/.hermes/profiles/trailz/plugins/factory-models/factory_dashboard/workflow_templates.py",
+      "source_sha256": "eba9cdd2c318dcff9b9e7debca2df7c5cdf2804c8f8ce3fa7479300e20d36a1f",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/frozen_resolver.py",
+      "destination": "/Users/example/.hermes/profiles/trailz/plugins/factory-models/factory_dashboard/frozen_resolver.py",
+      "source_sha256": "14bd88445f327097a8b2d4e89caf9ae9180d6315c2648a476a691285aee5c1de",
+      "expected_sha256": "f7abbadbb1232f67b981e342b1a0cfaa80ada8a099d0673fbd89d298d3ff42e0"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/task_settings.py",
+      "destination": "/Users/example/.hermes/profiles/trailz/plugins/factory-models/factory_dashboard/task_settings.py",
+      "source_sha256": "e3d1ce1675ef25aadb4322173645e6dd6ded4bded69568474b7d5fdd570a8634",
+      "expected_sha256": "ae53d70d8957f02be58e66138f8f2db79a5a7011859a73557693b3cdb2c718f2"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/plugin.yaml",
+      "destination": "/Users/example/.hermes/profiles/ui-reviewer/plugins/factory-models/plugin.yaml",
+      "source_sha256": "20267aa3260e3345c94fef4487ad270097471a248df0e8c9dd96f6ca89255a89",
+      "expected_sha256": "92add68aaef5dcc44dc421f61fb2d52c08abec2f4a67e421720cb549c03c7a1c"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/__init__.py",
+      "destination": "/Users/example/.hermes/profiles/ui-reviewer/plugins/factory-models/__init__.py",
+      "source_sha256": "a220f7c85ad75ae4892d38cef3d55394bd9888cc55c676974eebd97c9a0b79ca",
+      "expected_sha256": "dd4c85ca1558743462fb44a6b38f79ccf102d57945843fe588cc9bcc264a7184"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_capture.py",
+      "destination": "/Users/example/.hermes/profiles/ui-reviewer/plugins/factory-models/factory_dashboard/workflow_capture.py",
+      "source_sha256": "c31f023623a637a60f1f04b6c5dc192fd4b80dc593269903352864099843399a",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_cards.py",
+      "destination": "/Users/example/.hermes/profiles/ui-reviewer/plugins/factory-models/factory_dashboard/workflow_cards.py",
+      "source_sha256": "77a21d36f31baeccf5b5a47a98e729151adab91d894fec2580f7cfb73ef7dd0e",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_gate.py",
+      "destination": "/Users/example/.hermes/profiles/ui-reviewer/plugins/factory-models/factory_dashboard/workflow_gate.py",
+      "source_sha256": "1a4057f6ba3bade21d43dbd97e218bf01e0838063889c44c9f2d1e5df84f8e53",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_types.py",
+      "destination": "/Users/example/.hermes/profiles/ui-reviewer/plugins/factory-models/factory_dashboard/workflow_types.py",
+      "source_sha256": "020443ef0138171e947f1f52f4392d3949795d312e07f8b186a7a08152c5c959",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_controller.py",
+      "destination": "/Users/example/.hermes/profiles/ui-reviewer/plugins/factory-models/factory_dashboard/workflow_controller.py",
+      "source_sha256": "a4f67177b6c5cff1cbbdfee69302c50eb6902cfe4b8fc47d89cce1baf9f55124",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/factory_creation.py",
+      "destination": "/Users/example/.hermes/profiles/ui-reviewer/plugins/factory-models/factory_dashboard/factory_creation.py",
+      "source_sha256": "e92b1e36fd5ae4436d72da266f1ec7824068be3a3290f3be1b2ef790182336c5",
+      "expected_sha256": "ece00bb03721d9362577cebbc078b6838133370509add1bcbf2059cd60248cb8"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/__init__.py",
+      "destination": "/Users/example/.hermes/profiles/ui-reviewer/plugins/factory-models/factory_dashboard/__init__.py",
+      "source_sha256": "40b03b7876bcc33bc9ed522f12aa076183bf85ddfcc8430218a20b9ed82b432f",
+      "expected_sha256": "40b03b7876bcc33bc9ed522f12aa076183bf85ddfcc8430218a20b9ed82b432f"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/policy_store.py",
+      "destination": "/Users/example/.hermes/profiles/ui-reviewer/plugins/factory-models/factory_dashboard/policy_store.py",
+      "source_sha256": "c1c42ecf66ab26fa50f6b771db4eb2ddf1abc01230af5710ebb0347084934177",
+      "expected_sha256": "c1c42ecf66ab26fa50f6b771db4eb2ddf1abc01230af5710ebb0347084934177"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/model_policy.py",
+      "destination": "/Users/example/.hermes/profiles/ui-reviewer/plugins/factory-models/factory_dashboard/model_policy.py",
+      "source_sha256": "73bf3692bdd7a32989ccdd7bcbe3d8c704e9f4faf1448b16e71207e17c926b99",
+      "expected_sha256": "73bf3692bdd7a32989ccdd7bcbe3d8c704e9f4faf1448b16e71207e17c926b99"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_guards.py",
+      "destination": "/Users/example/.hermes/profiles/ui-reviewer/plugins/factory-models/factory_dashboard/workflow_guards.py",
+      "source_sha256": "1618327b8f410fe6fa161d82b7d0e0d98b55345b3c93e16aa550a1fa5491e40e",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/factory_model_resolver.py",
+      "destination": "/Users/example/.hermes/profiles/ui-reviewer/plugins/factory-models/factory_dashboard/factory_model_resolver.py",
+      "source_sha256": "d14079ebff27057133606e80064a3ef553c8cb120d2a9cef6599d939dfd37dac",
+      "expected_sha256": "d14079ebff27057133606e80064a3ef553c8cb120d2a9cef6599d939dfd37dac"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/model_catalog.py",
+      "destination": "/Users/example/.hermes/profiles/ui-reviewer/plugins/factory-models/factory_dashboard/model_catalog.py",
+      "source_sha256": "a9c64b554f37a61396ae37534325ce43cb352659183ed2d1ac2cad046e078bcf",
+      "expected_sha256": "a9c64b554f37a61396ae37534325ce43cb352659183ed2d1ac2cad046e078bcf"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/task_settings_store.py",
+      "destination": "/Users/example/.hermes/profiles/ui-reviewer/plugins/factory-models/factory_dashboard/task_settings_store.py",
+      "source_sha256": "e6e513d30071658541fb1e25ced04931e6e3ff9597b91f168a64cdf0c579e7ee",
+      "expected_sha256": "1b926c887d4a0bb9b6a4ff21cb4644b7ce9ec1e7b406f834304e2640c8faff73"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_state.py",
+      "destination": "/Users/example/.hermes/profiles/ui-reviewer/plugins/factory-models/factory_dashboard/workflow_state.py",
+      "source_sha256": "8b7cea0ad19e1b9996dbe5d88c72f4396814cba17dd509c2f1da3a16ca03942d",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/task_identity.py",
+      "destination": "/Users/example/.hermes/profiles/ui-reviewer/plugins/factory-models/factory_dashboard/task_identity.py",
+      "source_sha256": "a8f8172f19dc78087ed08f2ae726e18e6d7623220bddec940e9b22ff9c17c787",
+      "expected_sha256": "a8f8172f19dc78087ed08f2ae726e18e6d7623220bddec940e9b22ff9c17c787"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_handoffs.py",
+      "destination": "/Users/example/.hermes/profiles/ui-reviewer/plugins/factory-models/factory_dashboard/workflow_handoffs.py",
+      "source_sha256": "d6776fdac066784f474f342d98e506ac85be107136a03c9bf97088e601d4b2a4",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_templates.py",
+      "destination": "/Users/example/.hermes/profiles/ui-reviewer/plugins/factory-models/factory_dashboard/workflow_templates.py",
+      "source_sha256": "eba9cdd2c318dcff9b9e7debca2df7c5cdf2804c8f8ce3fa7479300e20d36a1f",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/frozen_resolver.py",
+      "destination": "/Users/example/.hermes/profiles/ui-reviewer/plugins/factory-models/factory_dashboard/frozen_resolver.py",
+      "source_sha256": "14bd88445f327097a8b2d4e89caf9ae9180d6315c2648a476a691285aee5c1de",
+      "expected_sha256": "f7abbadbb1232f67b981e342b1a0cfaa80ada8a099d0673fbd89d298d3ff42e0"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/task_settings.py",
+      "destination": "/Users/example/.hermes/profiles/ui-reviewer/plugins/factory-models/factory_dashboard/task_settings.py",
+      "source_sha256": "e3d1ce1675ef25aadb4322173645e6dd6ded4bded69568474b7d5fdd570a8634",
+      "expected_sha256": "ae53d70d8957f02be58e66138f8f2db79a5a7011859a73557693b3cdb2c718f2"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/plugin.yaml",
+      "destination": "/Users/example/.hermes/profiles/ux-reviewer/plugins/factory-models/plugin.yaml",
+      "source_sha256": "20267aa3260e3345c94fef4487ad270097471a248df0e8c9dd96f6ca89255a89",
+      "expected_sha256": "92add68aaef5dcc44dc421f61fb2d52c08abec2f4a67e421720cb549c03c7a1c"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/__init__.py",
+      "destination": "/Users/example/.hermes/profiles/ux-reviewer/plugins/factory-models/__init__.py",
+      "source_sha256": "a220f7c85ad75ae4892d38cef3d55394bd9888cc55c676974eebd97c9a0b79ca",
+      "expected_sha256": "dd4c85ca1558743462fb44a6b38f79ccf102d57945843fe588cc9bcc264a7184"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_capture.py",
+      "destination": "/Users/example/.hermes/profiles/ux-reviewer/plugins/factory-models/factory_dashboard/workflow_capture.py",
+      "source_sha256": "c31f023623a637a60f1f04b6c5dc192fd4b80dc593269903352864099843399a",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_cards.py",
+      "destination": "/Users/example/.hermes/profiles/ux-reviewer/plugins/factory-models/factory_dashboard/workflow_cards.py",
+      "source_sha256": "77a21d36f31baeccf5b5a47a98e729151adab91d894fec2580f7cfb73ef7dd0e",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_gate.py",
+      "destination": "/Users/example/.hermes/profiles/ux-reviewer/plugins/factory-models/factory_dashboard/workflow_gate.py",
+      "source_sha256": "1a4057f6ba3bade21d43dbd97e218bf01e0838063889c44c9f2d1e5df84f8e53",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_types.py",
+      "destination": "/Users/example/.hermes/profiles/ux-reviewer/plugins/factory-models/factory_dashboard/workflow_types.py",
+      "source_sha256": "020443ef0138171e947f1f52f4392d3949795d312e07f8b186a7a08152c5c959",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_controller.py",
+      "destination": "/Users/example/.hermes/profiles/ux-reviewer/plugins/factory-models/factory_dashboard/workflow_controller.py",
+      "source_sha256": "a4f67177b6c5cff1cbbdfee69302c50eb6902cfe4b8fc47d89cce1baf9f55124",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/factory_creation.py",
+      "destination": "/Users/example/.hermes/profiles/ux-reviewer/plugins/factory-models/factory_dashboard/factory_creation.py",
+      "source_sha256": "e92b1e36fd5ae4436d72da266f1ec7824068be3a3290f3be1b2ef790182336c5",
+      "expected_sha256": "ece00bb03721d9362577cebbc078b6838133370509add1bcbf2059cd60248cb8"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/__init__.py",
+      "destination": "/Users/example/.hermes/profiles/ux-reviewer/plugins/factory-models/factory_dashboard/__init__.py",
+      "source_sha256": "40b03b7876bcc33bc9ed522f12aa076183bf85ddfcc8430218a20b9ed82b432f",
+      "expected_sha256": "40b03b7876bcc33bc9ed522f12aa076183bf85ddfcc8430218a20b9ed82b432f"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/policy_store.py",
+      "destination": "/Users/example/.hermes/profiles/ux-reviewer/plugins/factory-models/factory_dashboard/policy_store.py",
+      "source_sha256": "c1c42ecf66ab26fa50f6b771db4eb2ddf1abc01230af5710ebb0347084934177",
+      "expected_sha256": "c1c42ecf66ab26fa50f6b771db4eb2ddf1abc01230af5710ebb0347084934177"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/model_policy.py",
+      "destination": "/Users/example/.hermes/profiles/ux-reviewer/plugins/factory-models/factory_dashboard/model_policy.py",
+      "source_sha256": "73bf3692bdd7a32989ccdd7bcbe3d8c704e9f4faf1448b16e71207e17c926b99",
+      "expected_sha256": "73bf3692bdd7a32989ccdd7bcbe3d8c704e9f4faf1448b16e71207e17c926b99"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_guards.py",
+      "destination": "/Users/example/.hermes/profiles/ux-reviewer/plugins/factory-models/factory_dashboard/workflow_guards.py",
+      "source_sha256": "1618327b8f410fe6fa161d82b7d0e0d98b55345b3c93e16aa550a1fa5491e40e",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/factory_model_resolver.py",
+      "destination": "/Users/example/.hermes/profiles/ux-reviewer/plugins/factory-models/factory_dashboard/factory_model_resolver.py",
+      "source_sha256": "d14079ebff27057133606e80064a3ef553c8cb120d2a9cef6599d939dfd37dac",
+      "expected_sha256": "d14079ebff27057133606e80064a3ef553c8cb120d2a9cef6599d939dfd37dac"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/model_catalog.py",
+      "destination": "/Users/example/.hermes/profiles/ux-reviewer/plugins/factory-models/factory_dashboard/model_catalog.py",
+      "source_sha256": "a9c64b554f37a61396ae37534325ce43cb352659183ed2d1ac2cad046e078bcf",
+      "expected_sha256": "a9c64b554f37a61396ae37534325ce43cb352659183ed2d1ac2cad046e078bcf"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/task_settings_store.py",
+      "destination": "/Users/example/.hermes/profiles/ux-reviewer/plugins/factory-models/factory_dashboard/task_settings_store.py",
+      "source_sha256": "e6e513d30071658541fb1e25ced04931e6e3ff9597b91f168a64cdf0c579e7ee",
+      "expected_sha256": "1b926c887d4a0bb9b6a4ff21cb4644b7ce9ec1e7b406f834304e2640c8faff73"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_state.py",
+      "destination": "/Users/example/.hermes/profiles/ux-reviewer/plugins/factory-models/factory_dashboard/workflow_state.py",
+      "source_sha256": "8b7cea0ad19e1b9996dbe5d88c72f4396814cba17dd509c2f1da3a16ca03942d",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/task_identity.py",
+      "destination": "/Users/example/.hermes/profiles/ux-reviewer/plugins/factory-models/factory_dashboard/task_identity.py",
+      "source_sha256": "a8f8172f19dc78087ed08f2ae726e18e6d7623220bddec940e9b22ff9c17c787",
+      "expected_sha256": "a8f8172f19dc78087ed08f2ae726e18e6d7623220bddec940e9b22ff9c17c787"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_handoffs.py",
+      "destination": "/Users/example/.hermes/profiles/ux-reviewer/plugins/factory-models/factory_dashboard/workflow_handoffs.py",
+      "source_sha256": "d6776fdac066784f474f342d98e506ac85be107136a03c9bf97088e601d4b2a4",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_templates.py",
+      "destination": "/Users/example/.hermes/profiles/ux-reviewer/plugins/factory-models/factory_dashboard/workflow_templates.py",
+      "source_sha256": "eba9cdd2c318dcff9b9e7debca2df7c5cdf2804c8f8ce3fa7479300e20d36a1f",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/frozen_resolver.py",
+      "destination": "/Users/example/.hermes/profiles/ux-reviewer/plugins/factory-models/factory_dashboard/frozen_resolver.py",
+      "source_sha256": "14bd88445f327097a8b2d4e89caf9ae9180d6315c2648a476a691285aee5c1de",
+      "expected_sha256": "f7abbadbb1232f67b981e342b1a0cfaa80ada8a099d0673fbd89d298d3ff42e0"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/task_settings.py",
+      "destination": "/Users/example/.hermes/profiles/ux-reviewer/plugins/factory-models/factory_dashboard/task_settings.py",
+      "source_sha256": "e3d1ce1675ef25aadb4322173645e6dd6ded4bded69568474b7d5fdd570a8634",
+      "expected_sha256": "ae53d70d8957f02be58e66138f8f2db79a5a7011859a73557693b3cdb2c718f2"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/plugin.yaml",
+      "destination": "/Users/example/.hermes/profiles/verifier/plugins/factory-models/plugin.yaml",
+      "source_sha256": "20267aa3260e3345c94fef4487ad270097471a248df0e8c9dd96f6ca89255a89",
+      "expected_sha256": "92add68aaef5dcc44dc421f61fb2d52c08abec2f4a67e421720cb549c03c7a1c"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/__init__.py",
+      "destination": "/Users/example/.hermes/profiles/verifier/plugins/factory-models/__init__.py",
+      "source_sha256": "a220f7c85ad75ae4892d38cef3d55394bd9888cc55c676974eebd97c9a0b79ca",
+      "expected_sha256": "dd4c85ca1558743462fb44a6b38f79ccf102d57945843fe588cc9bcc264a7184"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_capture.py",
+      "destination": "/Users/example/.hermes/profiles/verifier/plugins/factory-models/factory_dashboard/workflow_capture.py",
+      "source_sha256": "c31f023623a637a60f1f04b6c5dc192fd4b80dc593269903352864099843399a",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_cards.py",
+      "destination": "/Users/example/.hermes/profiles/verifier/plugins/factory-models/factory_dashboard/workflow_cards.py",
+      "source_sha256": "77a21d36f31baeccf5b5a47a98e729151adab91d894fec2580f7cfb73ef7dd0e",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_gate.py",
+      "destination": "/Users/example/.hermes/profiles/verifier/plugins/factory-models/factory_dashboard/workflow_gate.py",
+      "source_sha256": "1a4057f6ba3bade21d43dbd97e218bf01e0838063889c44c9f2d1e5df84f8e53",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_types.py",
+      "destination": "/Users/example/.hermes/profiles/verifier/plugins/factory-models/factory_dashboard/workflow_types.py",
+      "source_sha256": "020443ef0138171e947f1f52f4392d3949795d312e07f8b186a7a08152c5c959",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_controller.py",
+      "destination": "/Users/example/.hermes/profiles/verifier/plugins/factory-models/factory_dashboard/workflow_controller.py",
+      "source_sha256": "a4f67177b6c5cff1cbbdfee69302c50eb6902cfe4b8fc47d89cce1baf9f55124",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/factory_creation.py",
+      "destination": "/Users/example/.hermes/profiles/verifier/plugins/factory-models/factory_dashboard/factory_creation.py",
+      "source_sha256": "e92b1e36fd5ae4436d72da266f1ec7824068be3a3290f3be1b2ef790182336c5",
+      "expected_sha256": "ece00bb03721d9362577cebbc078b6838133370509add1bcbf2059cd60248cb8"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/__init__.py",
+      "destination": "/Users/example/.hermes/profiles/verifier/plugins/factory-models/factory_dashboard/__init__.py",
+      "source_sha256": "40b03b7876bcc33bc9ed522f12aa076183bf85ddfcc8430218a20b9ed82b432f",
+      "expected_sha256": "40b03b7876bcc33bc9ed522f12aa076183bf85ddfcc8430218a20b9ed82b432f"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/policy_store.py",
+      "destination": "/Users/example/.hermes/profiles/verifier/plugins/factory-models/factory_dashboard/policy_store.py",
+      "source_sha256": "c1c42ecf66ab26fa50f6b771db4eb2ddf1abc01230af5710ebb0347084934177",
+      "expected_sha256": "c1c42ecf66ab26fa50f6b771db4eb2ddf1abc01230af5710ebb0347084934177"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/model_policy.py",
+      "destination": "/Users/example/.hermes/profiles/verifier/plugins/factory-models/factory_dashboard/model_policy.py",
+      "source_sha256": "73bf3692bdd7a32989ccdd7bcbe3d8c704e9f4faf1448b16e71207e17c926b99",
+      "expected_sha256": "73bf3692bdd7a32989ccdd7bcbe3d8c704e9f4faf1448b16e71207e17c926b99"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_guards.py",
+      "destination": "/Users/example/.hermes/profiles/verifier/plugins/factory-models/factory_dashboard/workflow_guards.py",
+      "source_sha256": "1618327b8f410fe6fa161d82b7d0e0d98b55345b3c93e16aa550a1fa5491e40e",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/factory_model_resolver.py",
+      "destination": "/Users/example/.hermes/profiles/verifier/plugins/factory-models/factory_dashboard/factory_model_resolver.py",
+      "source_sha256": "d14079ebff27057133606e80064a3ef553c8cb120d2a9cef6599d939dfd37dac",
+      "expected_sha256": "d14079ebff27057133606e80064a3ef553c8cb120d2a9cef6599d939dfd37dac"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/model_catalog.py",
+      "destination": "/Users/example/.hermes/profiles/verifier/plugins/factory-models/factory_dashboard/model_catalog.py",
+      "source_sha256": "a9c64b554f37a61396ae37534325ce43cb352659183ed2d1ac2cad046e078bcf",
+      "expected_sha256": "a9c64b554f37a61396ae37534325ce43cb352659183ed2d1ac2cad046e078bcf"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/task_settings_store.py",
+      "destination": "/Users/example/.hermes/profiles/verifier/plugins/factory-models/factory_dashboard/task_settings_store.py",
+      "source_sha256": "e6e513d30071658541fb1e25ced04931e6e3ff9597b91f168a64cdf0c579e7ee",
+      "expected_sha256": "1b926c887d4a0bb9b6a4ff21cb4644b7ce9ec1e7b406f834304e2640c8faff73"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_state.py",
+      "destination": "/Users/example/.hermes/profiles/verifier/plugins/factory-models/factory_dashboard/workflow_state.py",
+      "source_sha256": "8b7cea0ad19e1b9996dbe5d88c72f4396814cba17dd509c2f1da3a16ca03942d",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/task_identity.py",
+      "destination": "/Users/example/.hermes/profiles/verifier/plugins/factory-models/factory_dashboard/task_identity.py",
+      "source_sha256": "a8f8172f19dc78087ed08f2ae726e18e6d7623220bddec940e9b22ff9c17c787",
+      "expected_sha256": "a8f8172f19dc78087ed08f2ae726e18e6d7623220bddec940e9b22ff9c17c787"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_handoffs.py",
+      "destination": "/Users/example/.hermes/profiles/verifier/plugins/factory-models/factory_dashboard/workflow_handoffs.py",
+      "source_sha256": "d6776fdac066784f474f342d98e506ac85be107136a03c9bf97088e601d4b2a4",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/workflow_templates.py",
+      "destination": "/Users/example/.hermes/profiles/verifier/plugins/factory-models/factory_dashboard/workflow_templates.py",
+      "source_sha256": "eba9cdd2c318dcff9b9e7debca2df7c5cdf2804c8f8ce3fa7479300e20d36a1f",
+      "expected_sha256": null
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/frozen_resolver.py",
+      "destination": "/Users/example/.hermes/profiles/verifier/plugins/factory-models/factory_dashboard/frozen_resolver.py",
+      "source_sha256": "14bd88445f327097a8b2d4e89caf9ae9180d6315c2648a476a691285aee5c1de",
+      "expected_sha256": "f7abbadbb1232f67b981e342b1a0cfaa80ada8a099d0673fbd89d298d3ff42e0"
+    },
+    {
+      "source": "/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/factory-workflow-release-b4ohhzyu/factory-models/factory_dashboard/task_settings.py",
+      "destination": "/Users/example/.hermes/profiles/verifier/plugins/factory-models/factory_dashboard/task_settings.py",
+      "source_sha256": "e3d1ce1675ef25aadb4322173645e6dd6ded4bded69568474b7d5fdd570a8634",
+      "expected_sha256": "ae53d70d8957f02be58e66138f8f2db79a5a7011859a73557693b3cdb2c718f2"
+    }
+  ],
+  "source_roots": {
+    "dashboard": "/private/tmp/hermes-factory-dashboard",
+    "hermes": "/private/tmp/hermes-timeline-integration"
+  }
+}

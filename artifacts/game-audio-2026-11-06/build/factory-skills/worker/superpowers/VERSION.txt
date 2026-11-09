@@ -1,0 +1,1 @@
+obra/superpowers 5.1.0 (superpowers-marketplace), subset copied 2026-10-03; skills renamed sp-* to avoid clashing with Hermes built-ins. Only the developer profile is told to use them, under the factory-worker contract.

@@ -1,0 +1,21 @@
+--- a/factory_lib.py
++++ b/factory_lib.py
+@@ -135,6 +135,18 @@
+ 
+ def parse_ticket(body):
+     """FACTORY_TICKET v1 header: single-line fields, then ACCEPTANCE:/REQUEST: blocks run to the next field."""
++    if (body or "").startswith("FACTORY_TICKET v2\n"):
++        fields = json.loads(body.split("\n", 1)[1])
++        allowed = {"PROJECT", "TYPE", "ACCEPTANCE", "REQUEST"}
++        if not isinstance(fields, dict) or set(fields) != allowed:
++            raise ValueError("Invalid structured Factory ticket fields")
++        if any(not isinstance(value, str) for value in fields.values()):
++            raise ValueError("Factory ticket values must be text")
++        if not fields["PROJECT"].strip() or not fields["REQUEST"].strip():
++            raise ValueError("Factory ticket requires project and request")
++        if fields["TYPE"] not in {"feature", "bug", "chore"}:
++            raise ValueError("Invalid Factory ticket type")
++        return fields
+     fields, cur = {}, None
+     for line in (body or "").splitlines():
+         m = FIELD.match(line)

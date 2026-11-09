@@ -1,0 +1,28 @@
+▶ not activated — using HERMES_PYTHON: /private/tmp/hermes-factory-sandbox-testenv/bin/python
+▶ running per-file parallel test suite via run_tests_parallel.py
+  (TZ=UTC LANG=C.UTF-8 PYTHONHASHSEED=0; clean env)
+▶ pre-compiling bytecode cache
+▶ launching test runner
+Discovered 6 test files (~30 tests) under ['/private/tmp/hermes-factory-dashboard/tests/hermes_integration/test_workflow_controller.py', '/private/tmp/hermes-factory-dashboard/tests/hermes_integration/test_workflow_guards.py', '/private/tmp/hermes-factory-dashboard/tests/hermes_integration/test_workflow_capture.py', 'tests/hermes_cli/test_kanban_mutation_guards.py', 'tests/hermes_cli/test_kanban_worker_model_resolution.py', 'tests/hermes_cli/test_kanban_task_settings_creation.py']; running with -j 10
+[  3.3% |     1/~30 | ✓1 | ✗0] ✓ /private/tmp/hermes-factory-dashboard/tests/hermes_integration/test_workflow_capture.py (1✓, 2.4s)
+[ 13.3% |     4/~30 | ✓4 | ✗0] ✓ tests/hermes_cli/test_kanban_task_settings_creation.py (3✓, 2.8s)
+[ 30.0% |     9/~30 | ✓9 | ✗0] ✓ tests/hermes_cli/test_kanban_worker_model_resolution.py (5✓, 3.6s)
+[ 53.3% |    16/~30 | ✓16 | ✗ 0] ✓ /private/tmp/hermes-factory-dashboard/tests/hermes_integration/test_workflow_guards.py (7✓, 4.1s)
+[ 66.7% |    20/~30 | ✓29 | ✗ 0] ✓ tests/hermes_cli/test_kanban_mutation_guards.py (13✓, 6.2s)
+[100.0% |    30/~30 | ✓41 | ✗ 0] ✓ /private/tmp/hermes-factory-dashboard/tests/hermes_integration/test_workflow_controller.py (12✓, 6.6s)
+
+=== Summary: 6 files, 41 tests passed, 0 failed (100% complete) in 6.6s (10 workers) ===
+  Durations cached to test_durations.json (6 files)
+
+=== Per-file subprocess time distribution ===
+  Files:   6
+  Total subprocess CPU-wall: 25.7s  (runner wall: 6.6s, parallelism: 10x)
+  P50: 4.10s  P90: 6.61s  P95: 6.61s  P99: 6.61s  Max: 6.61s
+  <1s: 0 files (0%)  <2s: 0 files (0%)
+  Top 10 slowest:
+      6.61s  /private/tmp/hermes-factory-dashboard/tests/hermes_integration/test_workflow_controller.py
+      6.23s  tests/hermes_cli/test_kanban_mutation_guards.py
+      4.10s  /private/tmp/hermes-factory-dashboard/tests/hermes_integration/test_workflow_guards.py
+      3.59s  tests/hermes_cli/test_kanban_worker_model_resolution.py
+      2.81s  tests/hermes_cli/test_kanban_task_settings_creation.py
+      2.37s  /private/tmp/hermes-factory-dashboard/tests/hermes_integration/test_workflow_capture.py

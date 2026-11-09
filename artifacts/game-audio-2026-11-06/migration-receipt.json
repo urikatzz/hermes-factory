@@ -1,0 +1,16 @@
+{
+  "catalog_added": [
+    "audio-director",
+    "audio-reviewer",
+    "sound-designer"
+  ],
+  "defaults_revision": 3,
+  "roles_added": [
+    "audio-director",
+    "sound-designer",
+    "audio-reviewer"
+  ],
+  "schema": "factory-game-audio-migration/v1",
+  "template_created": "15afc360-5455-4572-b680-b3f3c8c019b5",
+  "type_default_set": "15afc360-5455-4572-b680-b3f3c8c019b5"
+}

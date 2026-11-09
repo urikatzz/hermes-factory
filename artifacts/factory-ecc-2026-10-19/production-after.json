@@ -1,0 +1,62 @@
+{
+  "heads": [
+    {
+      "archived": false,
+      "id": "a6fdbeb7-fd95-43fe-bed4-8f02b66b65bb",
+      "revision": 2
+    },
+    {
+      "archived": false,
+      "id": "2537045b-b3fd-45c5-b316-0de9c7313ef1",
+      "revision": 2
+    },
+    {
+      "archived": false,
+      "id": "349a6484-53f6-4635-a6ed-6f2aa74f611c",
+      "revision": 2
+    }
+  ],
+  "previous_state_preserved": true,
+  "revisions": {
+    "2537045b-b3fd-45c5-b316-0de9c7313ef1:1": "350dfc2dbba7037f0ce4f226b8eb8750a1635a9ab90cab2bad14a27457e5e514",
+    "2537045b-b3fd-45c5-b316-0de9c7313ef1:2": "714f44a0d77f0b871182f7cf9235246357b2da5364307aadbe0d9975f14ca162",
+    "349a6484-53f6-4635-a6ed-6f2aa74f611c:1": "8535fa507ecdb03c9105b1edd032793dfd85de0fd983e37a8ce395d524c4abeb",
+    "349a6484-53f6-4635-a6ed-6f2aa74f611c:2": "09c2133b3be04623f36739d1c3096b5f4b372edcb759b02a3f531adcad704a37",
+    "a6fdbeb7-fd95-43fe-bed4-8f02b66b65bb:1": "8c96d95e226f54e4264ae0f1fed813ce6c69a7e9cba07339a05962000a68f04f",
+    "a6fdbeb7-fd95-43fe-bed4-8f02b66b65bb:2": "f0862d529be9e19e880925053cdceff3b708f0f79eecb6eceb360cae04580e8c"
+  },
+  "tables": {
+    "factory_activation": {
+      "count": 1,
+      "sha256": "693897180985b98b9374f47e754bf66e4bfb65ce547668a046fcdfefbca1f748"
+    },
+    "factory_cancelled": {
+      "count": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "factory_defaults": {
+      "count": 1,
+      "sha256": "dbe16cd91c2fb056cb4095305eedbb6d745e87d872bc3f16137f417614fa2773"
+    },
+    "factory_snapshots": {
+      "count": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "factory_submissions": {
+      "count": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "factory_tasks": {
+      "count": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "factory_workflow_activation": {
+      "count": 1,
+      "sha256": "5cc6a8a697bb6f2fcb468ef02cf2a76e9ad3f5da223682f1ca29288836ee66b3"
+    },
+    "factory_workflow_defaults": {
+      "count": 1,
+      "sha256": "f2e7f4d8d611b886b6d3ebfe22a7259198e21c6661f6e7b2ce6789f7ebfb1431"
+    }
+  }
+}

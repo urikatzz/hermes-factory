@@ -1,0 +1,293 @@
+{
+  "schema": "factory-ecc-results/v1",
+  "synthetic": true,
+  "taskset_digest": "706bca2e5768f19c868b9f02f31c6e83e0b62b496b78c899a900d0dc3a881966",
+  "trials": [
+    {
+      "board": "fixture-board",
+      "candidate_source": "baseline-bug-1/source",
+      "case_id": "bug",
+      "elapsed_seconds": 12.5,
+      "evidence": {
+        "gate": {
+          "path": "baseline-bug-1/gate.json",
+          "sha256": "0d396ad68d1056db63e98ad6233a20cd3d4f8cfa5bd2b8e5bf4a0ae5d19e188a"
+        },
+        "grades": {
+          "path": "baseline-bug-1/grades.json",
+          "sha256": "404cc17ce14e3c158266cc057282123f517ff80acf2c32108ba44a1ab09dad08"
+        }
+      },
+      "manifest_sha256": "ceb22a7cd943ad72b314ee8259edfde0e37cea247b773d31f32db3565c92eaee",
+      "repairs": 0,
+      "root_id": "root-baseline-bug-1",
+      "sessions": [],
+      "terminal_outcome": "completed",
+      "trial_id": "1",
+      "variant_id": "baseline",
+      "writer_run_id": "writer-baseline-bug-1"
+    },
+    {
+      "board": "fixture-board",
+      "candidate_source": "baseline-feature-1/source",
+      "case_id": "feature",
+      "elapsed_seconds": 12.5,
+      "evidence": {
+        "gate": {
+          "path": "baseline-feature-1/gate.json",
+          "sha256": "23cdeccc21248e4984e04fe08ce92ba08de3f3854d3a491f70bb47607a37531c"
+        },
+        "grades": {
+          "path": "baseline-feature-1/grades.json",
+          "sha256": "2b247b18a27b9b6280e68b18067bdefb2d5ed225b2bbee3efeb295c3c60e711f"
+        }
+      },
+      "manifest_sha256": "ceb22a7cd943ad72b314ee8259edfde0e37cea247b773d31f32db3565c92eaee",
+      "repairs": 0,
+      "root_id": "root-baseline-feature-1",
+      "sessions": [],
+      "terminal_outcome": "completed",
+      "trial_id": "1",
+      "variant_id": "baseline",
+      "writer_run_id": "writer-baseline-feature-1"
+    },
+    {
+      "board": "fixture-board",
+      "candidate_source": "baseline-chore-1/source",
+      "case_id": "chore",
+      "elapsed_seconds": 12.5,
+      "evidence": {
+        "gate": {
+          "path": "baseline-chore-1/gate.json",
+          "sha256": "3bb47419b891fcb2e375a8bc4c23ea4ce64b331c436a109c381be3b0315e0a1a"
+        },
+        "grades": {
+          "path": "baseline-chore-1/grades.json",
+          "sha256": "7223422baaea7ca0de4c580f36f52cb6c8c018aa282952a04aa3a0c91f787397"
+        }
+      },
+      "manifest_sha256": "ceb22a7cd943ad72b314ee8259edfde0e37cea247b773d31f32db3565c92eaee",
+      "repairs": 0,
+      "root_id": "root-baseline-chore-1",
+      "sessions": [],
+      "terminal_outcome": "completed",
+      "trial_id": "1",
+      "variant_id": "baseline",
+      "writer_run_id": "writer-baseline-chore-1"
+    },
+    {
+      "board": "fixture-board",
+      "candidate_source": "candidate-bug-1/source",
+      "case_id": "bug",
+      "elapsed_seconds": 12.5,
+      "evidence": {
+        "gate": {
+          "path": "candidate-bug-1/gate.json",
+          "sha256": "c5195f014546df244f836c6cd576ddff7062fdef47c733ac5ba1eed2dd6d3255"
+        },
+        "grades": {
+          "path": "candidate-bug-1/grades.json",
+          "sha256": "404cc17ce14e3c158266cc057282123f517ff80acf2c32108ba44a1ab09dad08"
+        }
+      },
+      "manifest_sha256": "ceb22a7cd943ad72b314ee8259edfde0e37cea247b773d31f32db3565c92eaee",
+      "repairs": 0,
+      "root_id": "root-candidate-bug-1",
+      "sessions": [],
+      "terminal_outcome": "completed",
+      "trial_id": "1",
+      "variant_id": "candidate",
+      "writer_run_id": "writer-candidate-bug-1"
+    },
+    {
+      "board": "fixture-board",
+      "candidate_source": "candidate-feature-1/source",
+      "case_id": "feature",
+      "elapsed_seconds": 12.5,
+      "evidence": {
+        "gate": {
+          "path": "candidate-feature-1/gate.json",
+          "sha256": "07013205ad027594478191fa0a0d6f205558e3b7f8ef8244d5deb0d069a86a19"
+        },
+        "grades": {
+          "path": "candidate-feature-1/grades.json",
+          "sha256": "2b247b18a27b9b6280e68b18067bdefb2d5ed225b2bbee3efeb295c3c60e711f"
+        }
+      },
+      "manifest_sha256": "ceb22a7cd943ad72b314ee8259edfde0e37cea247b773d31f32db3565c92eaee",
+      "repairs": 0,
+      "root_id": "root-candidate-feature-1",
+      "sessions": [],
+      "terminal_outcome": "infrastructure_blocked",
+      "trial_id": "1",
+      "variant_id": "candidate",
+      "writer_run_id": "writer-candidate-feature-1"
+    },
+    {
+      "board": "fixture-board",
+      "candidate_source": "candidate-chore-1/source",
+      "case_id": "chore",
+      "elapsed_seconds": 12.5,
+      "evidence": {
+        "gate": {
+          "path": "candidate-chore-1/gate.json",
+          "sha256": "16044b9ab81cafae6ecb6d60fe6e7627a8e5c63f6b9b9dfca129bdc2ad5b888a"
+        },
+        "grades": {
+          "path": "candidate-chore-1/grades.json",
+          "sha256": "7223422baaea7ca0de4c580f36f52cb6c8c018aa282952a04aa3a0c91f787397"
+        }
+      },
+      "manifest_sha256": "ceb22a7cd943ad72b314ee8259edfde0e37cea247b773d31f32db3565c92eaee",
+      "repairs": 0,
+      "root_id": "root-candidate-chore-1",
+      "sessions": [],
+      "terminal_outcome": "completed",
+      "trial_id": "1",
+      "variant_id": "candidate",
+      "writer_run_id": "writer-candidate-chore-1"
+    }
+  ],
+  "variants": [
+    {
+      "id": "baseline",
+      "roles": {
+        "architect": {
+          "effort": "medium",
+          "model": "synthetic-model",
+          "provider": "test-provider"
+        },
+        "claude-reviewer": {
+          "effort": "medium",
+          "model": "synthetic-model",
+          "provider": "test-provider"
+        },
+        "developer": {
+          "effort": "medium",
+          "model": "synthetic-model",
+          "provider": "test-provider"
+        },
+        "fixer": {
+          "effort": "medium",
+          "model": "synthetic-model",
+          "provider": "test-provider"
+        },
+        "verifier": {
+          "effort": "medium",
+          "model": "synthetic-model",
+          "provider": "test-provider"
+        }
+      },
+      "workflow": {
+        "description": "",
+        "implement": {
+          "instructions": "",
+          "key": "implement",
+          "kind": "implement",
+          "profile": "developer"
+        },
+        "max_repairs": 3,
+        "name": "Fixture",
+        "prepare": {
+          "instructions": "",
+          "key": "prepare",
+          "kind": "prepare",
+          "profile": "architect"
+        },
+        "repair": {
+          "instructions": "",
+          "key": "repair",
+          "kind": "repair",
+          "profile": "fixer"
+        },
+        "reviewers": [
+          {
+            "instructions": "",
+            "key": "review",
+            "kind": "review",
+            "profile": "claude-reviewer"
+          }
+        ],
+        "revision": 1,
+        "task_type": "bug",
+        "template_id": "fixture",
+        "verify": {
+          "instructions": "",
+          "key": "verify",
+          "kind": "verify",
+          "profile": "verifier"
+        }
+      }
+    },
+    {
+      "id": "candidate",
+      "roles": {
+        "architect": {
+          "effort": "medium",
+          "model": "synthetic-model",
+          "provider": "test-provider"
+        },
+        "claude-reviewer": {
+          "effort": "medium",
+          "model": "synthetic-model",
+          "provider": "test-provider"
+        },
+        "developer": {
+          "effort": "medium",
+          "model": "synthetic-model",
+          "provider": "test-provider"
+        },
+        "fixer": {
+          "effort": "medium",
+          "model": "synthetic-model",
+          "provider": "test-provider"
+        },
+        "verifier": {
+          "effort": "medium",
+          "model": "synthetic-model",
+          "provider": "test-provider"
+        }
+      },
+      "workflow": {
+        "description": "",
+        "implement": {
+          "instructions": "",
+          "key": "implement",
+          "kind": "implement",
+          "profile": "developer"
+        },
+        "max_repairs": 3,
+        "name": "Fixture",
+        "prepare": {
+          "instructions": "",
+          "key": "prepare",
+          "kind": "prepare",
+          "profile": "architect"
+        },
+        "repair": {
+          "instructions": "",
+          "key": "repair",
+          "kind": "repair",
+          "profile": "fixer"
+        },
+        "reviewers": [
+          {
+            "instructions": "",
+            "key": "review",
+            "kind": "review",
+            "profile": "claude-reviewer"
+          }
+        ],
+        "revision": 1,
+        "task_type": "bug",
+        "template_id": "fixture",
+        "verify": {
+          "instructions": "",
+          "key": "verify",
+          "kind": "verify",
+          "profile": "verifier"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "applied": [
+    {
+      "receipt": "/Users/example/.hermes/backups/factory-ecc-20261019-guidance/a6fdbeb7-fd95-43fe-bed4-8f02b66b65bb.json",
+      "revision": 2,
+      "template_id": "a6fdbeb7-fd95-43fe-bed4-8f02b66b65bb"
+    },
+    {
+      "receipt": "/Users/example/.hermes/backups/factory-ecc-20261019-guidance/2537045b-b3fd-45c5-b316-0de9c7313ef1.json",
+      "revision": 2,
+      "template_id": "2537045b-b3fd-45c5-b316-0de9c7313ef1"
+    },
+    {
+      "receipt": "/Users/example/.hermes/backups/factory-ecc-20261019-guidance/349a6484-53f6-4635-a6ed-6f2aa74f611c.json",
+      "revision": 2,
+      "template_id": "349a6484-53f6-4635-a6ed-6f2aa74f611c"
+    }
+  ],
+  "error": null,
+  "schema": "factory-ecc-migration-result/v1",
+  "status": "complete"
+}

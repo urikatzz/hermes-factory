@@ -1,0 +1,108 @@
+test_prepare_report_and_invalid_input_preserve_existing_report (test_cli.CliTests.test_prepare_report_and_invalid_input_preserve_existing_report) ... ok
+test_report_refuses_to_overwrite_evidence_source_or_taskset (test_cli.CliTests.test_report_refuses_to_overwrite_evidence_source_or_taskset) ... FAIL
+test_preserves_custom_content_and_workflow_configuration (test_guidance.GuidanceTests.test_preserves_custom_content_and_workflow_configuration) ... ok
+test_rejects_damaged_or_edited_managed_blocks (test_guidance.GuidanceTests.test_rejects_damaged_or_edited_managed_blocks) ... ok
+test_repeated_transform_is_exact_noop (test_guidance.GuidanceTests.test_repeated_transform_is_exact_noop) ... ok
+test_existing_capture_and_new_capture_retain_distinct_stage_instructions (test_migration.MigrationTests.test_existing_capture_and_new_capture_retain_distinct_stage_instructions) ... ok
+test_partial_conflict_has_receipts_and_resumes_from_fresh_preview (test_migration.MigrationTests.test_partial_conflict_has_receipts_and_resumes_from_fresh_preview) ... ok
+test_preflight_size_limits_and_excludes_archived_templates (test_migration.MigrationTests.test_preflight_size_limits_and_excludes_archived_templates) ... ok
+test_rollback_creates_new_revision_and_refuses_later_user_edits (test_migration.MigrationTests.test_rollback_creates_new_revision_and_refuses_later_user_edits) ... ok
+test_rollback_rejects_cross_template_and_modified_historical_receipts (test_migration.MigrationTests.test_rollback_rejects_cross_template_and_modified_historical_receipts) ... FAIL
+test_service_migration_preserves_defaults_and_history_and_is_idempotent (test_migration.MigrationTests.test_service_migration_preserves_defaults_and_history_and_is_idempotent) ... ok
+test_stale_preview_and_modified_preview_do_not_write (test_migration.MigrationTests.test_stale_preview_and_modified_preview_do_not_write) ... ok
+test_conflicting_session_records_are_rejected (test_reporting.ReportingTests.test_conflicting_session_records_are_rejected) ... ok
+test_rates_expose_denominators_coverage_and_synthetic_label (test_reporting.ReportingTests.test_rates_expose_denominators_coverage_and_synthetic_label) ... ok
+test_shared_sessions_deduplicate_and_are_not_apportioned_across_variants (test_reporting.ReportingTests.test_shared_sessions_deduplicate_and_are_not_apportioned_across_variants) ... ok
+test_unknown_and_subscription_costs_are_not_zero_or_estimate_charges (test_reporting.ReportingTests.test_unknown_and_subscription_costs_are_not_zero_or_estimate_charges) ... ok
+test_attempt_history_distinguishes_execution_retry_from_repair (test_results.ResultsTests.test_attempt_history_distinguishes_execution_retry_from_repair) ... ok
+test_completed_trial_requires_matching_grade_gate_and_source (test_results.ResultsTests.test_completed_trial_requires_matching_grade_gate_and_source) ... ok
+test_conflicting_grade_gate_and_trial_identities_rejected (test_results.ResultsTests.test_conflicting_grade_gate_and_trial_identities_rejected) ... ok
+test_contradictory_writer_attempt_outcome_is_rejected (test_results.ResultsTests.test_contradictory_writer_attempt_outcome_is_rejected) ... FAIL
+test_escaping_and_symlinked_evidence_rejected (test_results.ResultsTests.test_escaping_and_symlinked_evidence_rejected) ... ok
+test_failed_verifier_attempt_with_failing_ac_is_failed (test_results.ResultsTests.test_failed_verifier_attempt_with_failing_ac_is_failed) ... FAIL
+test_incomplete_panel_is_not_success_and_different_manifest_is_error (test_results.ResultsTests.test_incomplete_panel_is_not_success_and_different_manifest_is_error) ... ok
+test_infrastructure_blocked_never_becomes_success (test_results.ResultsTests.test_infrastructure_blocked_never_becomes_success) ... ok
+test_known_grade_failure_without_gate_is_failed_with_incomplete_coverage (test_results.ResultsTests.test_known_grade_failure_without_gate_is_failed_with_incomplete_coverage) ... FAIL
+test_malformed_reviewer_profile_has_validation_error (test_results.ResultsTests.test_malformed_reviewer_profile_has_validation_error) ... ERROR
+test_missing_evidence_or_unrecorded_attempts_are_not_first_attempt_success (test_results.ResultsTests.test_missing_evidence_or_unrecorded_attempts_are_not_first_attempt_success) ... ok
+test_recorded_verifier_failure_counts_as_failed_not_incomplete (test_results.ResultsTests.test_recorded_verifier_failure_counts_as_failed_not_incomplete) ... ok
+test_schema_duplicates_unknown_cases_boolean_numbers_and_nonfinite_rejected (test_results.ResultsTests.test_schema_duplicates_unknown_cases_boolean_numbers_and_nonfinite_rejected) ... ok
+test_candidate_links_and_external_paths_rejected (test_tasksets.TasksetTests.test_candidate_links_and_external_paths_rejected) ... ok
+test_grading_preparation_keeps_checker_separate_and_records_manifest (test_tasksets.TasksetTests.test_grading_preparation_keeps_checker_separate_and_records_manifest) ... ok
+test_tampered_files_and_unknown_cases_are_rejected (test_tasksets.TasksetTests.test_tampered_files_and_unknown_cases_are_rejected) ... ok
+test_three_cases_prepare_only_public_source_and_instructions (test_tasksets.TasksetTests.test_three_cases_prepare_only_public_source_and_instructions) ... ok
+
+======================================================================
+ERROR: test_malformed_reviewer_profile_has_validation_error (test_results.ResultsTests.test_malformed_reviewer_profile_has_validation_error)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/tmp/factory-ecc-build/tests/ecc/test_results.py", line 115, in test_malformed_reviewer_profile_has_validation_error
+    with self.assertRaises(ValueError):self.load(results(self.taskset,[self.one]))
+                                       ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/tmp/factory-ecc-build/tests/ecc/test_results.py", line 23, in load
+    return load_trials(self.taskset, self.path, self.root)
+  File "/private/tmp/factory-ecc-build/factory_ecc/results.py", line 262, in load_trials
+    gate_complete, gate_pass, first = validate_gate(gate,trial,variants[trial['variant_id']],case) if gate is not None else (False,False,None)
+                                      ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/tmp/factory-ecc-build/factory_ecc/results.py", line 160, in validate_gate
+    if len(actual_reviewers) != len(set(actual_reviewers)) or set(actual_reviewers) - set(expected_reviewers):
+                                    ~~~^^^^^^^^^^^^^^^^^^
+TypeError: unhashable type: 'list'
+
+======================================================================
+FAIL: test_report_refuses_to_overwrite_evidence_source_or_taskset (test_cli.CliTests.test_report_refuses_to_overwrite_evidence_source_or_taskset)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/tmp/factory-ecc-build/tests/ecc/test_cli.py", line 63, in test_report_refuses_to_overwrite_evidence_source_or_taskset
+    self.assertEqual(completed.returncode,2,completed.stdout)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 2 : /var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/tmputj6lwgy/baseline-bug-1/gate.json
+/var/folders/k5/mr7t_ggx4r9_5h0gstdq_ffr0000gn/T/tmputj6lwgy/baseline-bug-1/gate.md
+
+
+======================================================================
+FAIL: test_rollback_rejects_cross_template_and_modified_historical_receipts (test_migration.MigrationTests.test_rollback_rejects_cross_template_and_modified_historical_receipts)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/tmp/factory-ecc-build/tests/ecc/test_migration.py", line 121, in test_rollback_rejects_cross_template_and_modified_historical_receipts
+    with self.assertRaises(ValueError):rollback_receipt(self.templates,altered)
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_contradictory_writer_attempt_outcome_is_rejected (test_results.ResultsTests.test_contradictory_writer_attempt_outcome_is_rejected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/tmp/factory-ecc-build/tests/ecc/test_results.py", line 93, in test_contradictory_writer_attempt_outcome_is_rejected
+    with self.assertRaises(ValueError):self.load(results(self.taskset,[self.one]))
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_failed_verifier_attempt_with_failing_ac_is_failed (test_results.ResultsTests.test_failed_verifier_attempt_with_failing_ac_is_failed)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/tmp/factory-ecc-build/tests/ecc/test_results.py", line 111, in test_failed_verifier_attempt_with_failing_ac_is_failed
+    self.assertEqual(self.load(results(self.taskset,[self.one]))[0]['classification'],'failed')
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'incomplete' != 'failed'
+- incomplete
++ failed
+
+
+======================================================================
+FAIL: test_known_grade_failure_without_gate_is_failed_with_incomplete_coverage (test_results.ResultsTests.test_known_grade_failure_without_gate_is_failed_with_incomplete_coverage)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/tmp/factory-ecc-build/tests/ecc/test_results.py", line 102, in test_known_grade_failure_without_gate_is_failed_with_incomplete_coverage
+    self.assertEqual(loaded['classification'],'failed')
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'incomplete' != 'failed'
+- incomplete
++ failed
+
+
+----------------------------------------------------------------------
+Ran 33 tests in 0.459s
+
+FAILED (failures=5, errors=1)

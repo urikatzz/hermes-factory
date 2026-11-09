@@ -1,0 +1,5 @@
+name: factory-models
+version: "0.1.0"
+description: "Resolve Factory worker models from saved role defaults and parent-task overrides. Requires the accompanying Hermes pre-spawn hook patch."
+provides_hooks:
+  - resolve_kanban_worker_model

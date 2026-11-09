@@ -1,0 +1,50 @@
+diff -ruN -x __pycache__ -x tests /Users/example/.hermes/scripts/factory_intake.py artifacts/game-audio-2026-11-06/build/scripts/factory_intake.py
+--- /Users/example/.hermes/scripts/factory_intake.py	2026-11-06 01:09:46
++++ artifacts/game-audio-2026-11-06/build/scripts/factory_intake.py	2026-11-09 12:51:29
+@@ -88,7 +88,7 @@
+                 continue
+             # Readable names: branch = <type>/<slug> (feature/, fix/, chore/, art/), folder = <slug>-<id suffix>; the branch gets the
+             # id suffix only if that name is already taken.
+-            prefix = {"bug": "fix", "chore": "chore", "art": "art"}.get((f.get("TYPE") or "feature").lower(), "feature")
++            prefix = {"bug": "fix", "chore": "chore", "art": "art", "audio": "audio"}.get((f.get("TYPE") or "feature").lower(), "feature")
+             branch = "%s/%s" % (prefix, slug[len(prefix) + 1:] if slug.startswith(prefix + "-") and len(slug) > len(prefix) + 1 else slug)
+             if git(path, "rev-parse", "--verify", "--quiet", "refs/heads/" + branch)[0] == 0 or \
+                git(path, "rev-parse", "--verify", "--quiet", "refs/remotes/origin/" + branch)[0] == 0:
+diff -ruN -x __pycache__ -x tests /Users/example/.hermes/scripts/factory_lib.py artifacts/game-audio-2026-11-06/build/scripts/factory_lib.py
+--- /Users/example/.hermes/scripts/factory_lib.py	2026-11-06 01:09:46
++++ artifacts/game-audio-2026-11-06/build/scripts/factory_lib.py	2026-11-09 12:51:29
+@@ -153,7 +153,7 @@
+             raise ValueError("Factory ticket values must be text")
+         if not fields["PROJECT"].strip() or not fields["REQUEST"].strip():
+             raise ValueError("Factory ticket requires project and request")
+-        if fields["TYPE"] not in {"feature", "bug", "chore", "art"}:
++        if fields["TYPE"] not in {"feature", "bug", "chore", "art", "audio"}:
+             raise ValueError("Invalid Factory ticket type")
+         return fields
+     fields, cur = {}, None
+diff -ruN -x __pycache__ -x tests /Users/example/.hermes/scripts/factory_publish.py artifacts/game-audio-2026-11-06/build/scripts/factory_publish.py
+--- /Users/example/.hermes/scripts/factory_publish.py	2026-11-06 01:09:46
++++ artifacts/game-audio-2026-11-06/build/scripts/factory_publish.py	2026-11-09 12:51:29
+@@ -168,8 +168,8 @@
+             if rc != 0:
+                 return fail(rid, "writer gate failed (%s): %s" % (g["cmd"][:60], (o or e)[-400:]))
+     title = root["title"][len("FACTORY:"):].strip()
+-    # Conventional-commit style PR/commit title: "feat: ...", "fix: ...", "chore: ...", "feat(art): ..." (from the job's TYPE).
+-    ctype = {"bug": "fix", "chore": "chore", "art": "feat(art)"}.get(hv(body, "TYPE").lower(), "feat")
++    # Conventional-commit style PR/commit title: "feat: ...", "fix: ...", "chore: ...", "feat(art): ...", "feat(audio): ..." (from the job's TYPE).
++    ctype = {"bug": "fix", "chore": "chore", "art": "feat(art)", "audio": "feat(audio)"}.get(hv(body, "TYPE").lower(), "feat")
+     if ctype in ("fix", "chore"):
+         title = re.sub(r"^%s\s+" % ctype, "", title, flags=re.I) or title  # "Fix score overflow" -> "fix: score overflow"
+     if not re.match(r"^(feat|fix|chore|docs|refactor|test)(\(.+\))?!?:", title):
+diff -ruN -x __pycache__ -x tests /Users/example/.hermes/scripts/factory_ticket.py artifacts/game-audio-2026-11-06/build/scripts/factory_ticket.py
+--- /Users/example/.hermes/scripts/factory_ticket.py	2026-11-06 01:09:46
++++ artifacts/game-audio-2026-11-06/build/scripts/factory_ticket.py	2026-11-09 12:51:29
+@@ -9,7 +9,7 @@
+ p = argparse.ArgumentParser()
+ p.add_argument("--title", required=True)
+ p.add_argument("--project", default="", help="repo alias from state/factory/repos.json (default repo if omitted), an absolute path, or 'new'")
+-p.add_argument("--type", default="feature", choices=["feature", "bug", "chore", "art"])
++p.add_argument("--type", default="feature", choices=["feature", "bug", "chore", "art", "audio"])
+ p.add_argument("--request", required=True)
+ p.add_argument("--acceptance", default="")
+ p.add_argument("--new-dir", default="")

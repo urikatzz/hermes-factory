@@ -1,0 +1,9 @@
+name: factory-models
+version: "0.3.0"
+description: "Capture immutable Factory task settings and enforce model/effort before worker launch. Requires creation and pre-spawn hooks."
+provides_hooks:
+  - resolve_kanban_worker_model
+  - before_kanban_task_create
+  - before_kanban_task_mutation
+  - on_kanban_dispatch_tick
+  - kanban_task_completed

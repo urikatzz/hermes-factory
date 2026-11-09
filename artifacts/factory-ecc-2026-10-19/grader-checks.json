@@ -1,0 +1,57 @@
+{
+  "checks": [
+    {
+      "ac_results": {
+        "AC1": "fail",
+        "AC2": "fail"
+      },
+      "case": "bug",
+      "mode": "baseline"
+    },
+    {
+      "ac_results": {
+        "AC1": "pass",
+        "AC2": "pass"
+      },
+      "case": "bug",
+      "mode": "reference"
+    },
+    {
+      "ac_results": {
+        "AC1": "pass",
+        "AC2": "fail"
+      },
+      "case": "feature",
+      "mode": "baseline"
+    },
+    {
+      "ac_results": {
+        "AC1": "pass",
+        "AC2": "pass"
+      },
+      "case": "feature",
+      "mode": "reference"
+    },
+    {
+      "ac_results": {
+        "AC1": "pass",
+        "AC2": "pass"
+      },
+      "case": "chore",
+      "mode": "baseline"
+    },
+    {
+      "ac_results": {
+        "AC1": "pass",
+        "AC2": "pass"
+      },
+      "case": "chore",
+      "mode": "reference"
+    }
+  ],
+  "image": "sha256:aab09aafbb5ccdd9a624473f268ab42367506f0c1a982f8e2dea57b594ce0e31",
+  "limitations": "Functional grading only; shared-process checker is not tamper resistant.",
+  "model_calls": 0,
+  "schema": "factory-ecc-grader-check/v1",
+  "taskset_digest": "706bca2e5768f19c868b9f02f31c6e83e0b62b496b78c899a900d0dc3a881966"
+}

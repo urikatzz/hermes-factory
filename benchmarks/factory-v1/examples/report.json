@@ -1,0 +1,340 @@
+{
+  "defined_cases": [
+    "bug",
+    "feature",
+    "chore"
+  ],
+  "imported_trials": 6,
+  "limitations": [
+    "Operator-imported evidence is not independently authenticated.",
+    "Functional graders share a process with candidate code; review grading provenance.",
+    "No statistical superiority is established by this report.",
+    "Unknown costs and unlinked coordinator/infrastructure usage are not zero."
+  ],
+  "schema": "factory-ecc-report/v1",
+  "synthetic": true,
+  "taskset_digest": "706bca2e5768f19c868b9f02f31c6e83e0b62b496b78c899a900d0dc3a881966",
+  "usage": {
+    "actual_usd": null,
+    "actual_usd_known_sessions": 0,
+    "cache_read_tokens": null,
+    "cache_read_tokens_known_sessions": 0,
+    "cache_write_tokens": null,
+    "cache_write_tokens_known_sessions": 0,
+    "estimate_usd": null,
+    "estimate_usd_known_sessions": 0,
+    "excluded_shared_session_ids": [],
+    "included_sessions": 0,
+    "input_tokens": null,
+    "input_tokens_known_sessions": 0,
+    "output_tokens": null,
+    "output_tokens_known_sessions": 0,
+    "reasoning_tokens": null,
+    "reasoning_tokens_known_sessions": 0,
+    "recorded_sessions": 0,
+    "shared_session_ids": [],
+    "trials_without_sessions": 6
+  },
+  "variants": [
+    {
+      "captured_settings": {
+        "id": "baseline",
+        "roles": {
+          "architect": {
+            "effort": "medium",
+            "model": "synthetic-model",
+            "provider": "test-provider"
+          },
+          "claude-reviewer": {
+            "effort": "medium",
+            "model": "synthetic-model",
+            "provider": "test-provider"
+          },
+          "developer": {
+            "effort": "medium",
+            "model": "synthetic-model",
+            "provider": "test-provider"
+          },
+          "fixer": {
+            "effort": "medium",
+            "model": "synthetic-model",
+            "provider": "test-provider"
+          },
+          "verifier": {
+            "effort": "medium",
+            "model": "synthetic-model",
+            "provider": "test-provider"
+          }
+        },
+        "workflow": {
+          "description": "",
+          "implement": {
+            "instructions": "",
+            "key": "implement",
+            "kind": "implement",
+            "profile": "developer"
+          },
+          "max_repairs": 3,
+          "name": "Fixture",
+          "prepare": {
+            "instructions": "",
+            "key": "prepare",
+            "kind": "prepare",
+            "profile": "architect"
+          },
+          "repair": {
+            "instructions": "",
+            "key": "repair",
+            "kind": "repair",
+            "profile": "fixer"
+          },
+          "reviewers": [
+            {
+              "instructions": "",
+              "key": "review",
+              "kind": "review",
+              "profile": "claude-reviewer"
+            }
+          ],
+          "revision": 1,
+          "task_type": "bug",
+          "template_id": "fixture",
+          "verify": {
+            "instructions": "",
+            "key": "verify",
+            "kind": "verify",
+            "profile": "verifier"
+          }
+        }
+      },
+      "cases": {
+        "bug": {
+          "counts": {
+            "failed": 0,
+            "incomplete": 0,
+            "infrastructure_blocked": 0,
+            "success": 1
+          },
+          "imported": 1
+        },
+        "chore": {
+          "counts": {
+            "failed": 0,
+            "incomplete": 0,
+            "infrastructure_blocked": 0,
+            "success": 1
+          },
+          "imported": 1
+        },
+        "feature": {
+          "counts": {
+            "failed": 0,
+            "incomplete": 0,
+            "infrastructure_blocked": 0,
+            "success": 1
+          },
+          "imported": 1
+        }
+      },
+      "counts": {
+        "failed": 0,
+        "incomplete": 0,
+        "infrastructure_blocked": 0,
+        "success": 3
+      },
+      "elapsed_seconds": {
+        "known_trials": 3,
+        "median": 12.5,
+        "total": 37.5
+      },
+      "eventual_success": {
+        "denominator": 3,
+        "rate": 1.0,
+        "successes": 3
+      },
+      "first_attempt_success": {
+        "denominator": 3,
+        "rate": 1.0,
+        "successes": 3
+      },
+      "id": "baseline",
+      "imported": 3,
+      "repairs": {
+        "known_trials": 3,
+        "median": 0,
+        "total": 0
+      },
+      "trials_with_incomplete_evidence": 0,
+      "usage": {
+        "actual_usd": null,
+        "actual_usd_known_sessions": 0,
+        "cache_read_tokens": null,
+        "cache_read_tokens_known_sessions": 0,
+        "cache_write_tokens": null,
+        "cache_write_tokens_known_sessions": 0,
+        "estimate_usd": null,
+        "estimate_usd_known_sessions": 0,
+        "excluded_shared_session_ids": [],
+        "included_sessions": 0,
+        "input_tokens": null,
+        "input_tokens_known_sessions": 0,
+        "output_tokens": null,
+        "output_tokens_known_sessions": 0,
+        "reasoning_tokens": null,
+        "reasoning_tokens_known_sessions": 0,
+        "recorded_sessions": 0,
+        "trials_without_sessions": 3
+      }
+    },
+    {
+      "captured_settings": {
+        "id": "candidate",
+        "roles": {
+          "architect": {
+            "effort": "medium",
+            "model": "synthetic-model",
+            "provider": "test-provider"
+          },
+          "claude-reviewer": {
+            "effort": "medium",
+            "model": "synthetic-model",
+            "provider": "test-provider"
+          },
+          "developer": {
+            "effort": "medium",
+            "model": "synthetic-model",
+            "provider": "test-provider"
+          },
+          "fixer": {
+            "effort": "medium",
+            "model": "synthetic-model",
+            "provider": "test-provider"
+          },
+          "verifier": {
+            "effort": "medium",
+            "model": "synthetic-model",
+            "provider": "test-provider"
+          }
+        },
+        "workflow": {
+          "description": "",
+          "implement": {
+            "instructions": "",
+            "key": "implement",
+            "kind": "implement",
+            "profile": "developer"
+          },
+          "max_repairs": 3,
+          "name": "Fixture",
+          "prepare": {
+            "instructions": "",
+            "key": "prepare",
+            "kind": "prepare",
+            "profile": "architect"
+          },
+          "repair": {
+            "instructions": "",
+            "key": "repair",
+            "kind": "repair",
+            "profile": "fixer"
+          },
+          "reviewers": [
+            {
+              "instructions": "",
+              "key": "review",
+              "kind": "review",
+              "profile": "claude-reviewer"
+            }
+          ],
+          "revision": 1,
+          "task_type": "bug",
+          "template_id": "fixture",
+          "verify": {
+            "instructions": "",
+            "key": "verify",
+            "kind": "verify",
+            "profile": "verifier"
+          }
+        }
+      },
+      "cases": {
+        "bug": {
+          "counts": {
+            "failed": 0,
+            "incomplete": 0,
+            "infrastructure_blocked": 0,
+            "success": 1
+          },
+          "imported": 1
+        },
+        "chore": {
+          "counts": {
+            "failed": 0,
+            "incomplete": 0,
+            "infrastructure_blocked": 0,
+            "success": 1
+          },
+          "imported": 1
+        },
+        "feature": {
+          "counts": {
+            "failed": 0,
+            "incomplete": 0,
+            "infrastructure_blocked": 1,
+            "success": 0
+          },
+          "imported": 1
+        }
+      },
+      "counts": {
+        "failed": 0,
+        "incomplete": 0,
+        "infrastructure_blocked": 1,
+        "success": 2
+      },
+      "elapsed_seconds": {
+        "known_trials": 3,
+        "median": 12.5,
+        "total": 37.5
+      },
+      "eventual_success": {
+        "denominator": 2,
+        "rate": 1.0,
+        "successes": 2
+      },
+      "first_attempt_success": {
+        "denominator": 2,
+        "rate": 1.0,
+        "successes": 2
+      },
+      "id": "candidate",
+      "imported": 3,
+      "repairs": {
+        "known_trials": 3,
+        "median": 0,
+        "total": 0
+      },
+      "trials_with_incomplete_evidence": 0,
+      "usage": {
+        "actual_usd": null,
+        "actual_usd_known_sessions": 0,
+        "cache_read_tokens": null,
+        "cache_read_tokens_known_sessions": 0,
+        "cache_write_tokens": null,
+        "cache_write_tokens_known_sessions": 0,
+        "estimate_usd": null,
+        "estimate_usd_known_sessions": 0,
+        "excluded_shared_session_ids": [],
+        "included_sessions": 0,
+        "input_tokens": null,
+        "input_tokens_known_sessions": 0,
+        "output_tokens": null,
+        "output_tokens_known_sessions": 0,
+        "reasoning_tokens": null,
+        "reasoning_tokens_known_sessions": 0,
+        "recorded_sessions": 0,
+        "trials_without_sessions": 3
+      }
+    }
+  ]
+}

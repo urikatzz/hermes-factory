@@ -1,0 +1,18 @@
+{
+  "install_factory_snapshots.py": "6e1a5499b5aab4c6e397c8bd33c2310474ca47244b08121e356b4acb6170c1e3",
+  "activate_factory_snapshots.py": "e795a9cd4256359cd7bf1cf7232fb7c56b587b3a8c8cab7ed7e235a2f5fedf08",
+  "factory-intake-v2.patch": "dfe7c4fa06ff64ae7cc16e7cbcd214abae3bd763c1895c98d094d8cb134e4c48",
+  "factory-dashboard-tests.log": "323906d9002f305eb97be8102cd0843eb19452bdd9a4b4a68e3f2e164842ddb7",
+  "hermes-regression-tests.tgz": "60e60a16a9c14d0263d92e6a63f73eff2aa7ecad82c138f897e8c7d61ab5b13f",
+  "factory-hermes-lint.log": "2a84b98d3b3851c0f032462c0e9dc22108d7d2e53ed05a28d7c4768cd52f9803",
+  "hermes-task-snapshots.patch": "31baf06fc43c1fe9f3857ec040f47c245900380be92ad42b8183f54d270d860d",
+  "installed-factory-verification.log": "be2b8cacc0f422d2167a168c1a30d727b1fdb1bfa6cce43ed61562cb0e0dddc1",
+  "verify_installed_factory.py": "73201126fd3c6499976102f98664195f34ab4ed4bc3b93a582cd72f24421bdd5",
+  "factory-task-snapshots-results.md": "526346757a373f292c9b7c2aa0260eb43c0cebb1f19b5ba969be734e76b1d968",
+  "implementation-ledger.md": "df3d6fd9b9638c3e299517b2edb86c11def742e35730fca849f61606af8a7a10",
+  "timeline.png": "949041019676d34ad56c6bdf4363753c9c1e88efb1d13c9c1413c34aae27c6a3",
+  "factory-dashboard-source.tgz": "975efc1104546445ad26914d65a9c1e54f1ce7095f42d0e7bc6e540e998e2a61",
+  "defaults.png": "40fea5b7ce3a3d724e3d1f91935b490c5ce0064592f0b3d283fcec5385564b6b",
+  "factory-final-hermes-tests.log": "cc2ffb4a3b29f0945f92076ddc0731cdb8381368e0002e989b35f001a84bfa93",
+  "new-task.png": "f35dad8d417f7d0797cf8a4873449f5c64941a975835cc887874aaae1c68578e"
+}

@@ -1,0 +1,59 @@
+#!/bin/sh
+# Unity gate for a factory worktree: compile + EditMode (or PlayMode) tests through Unity's official CLI.
+# usage: unity_gate.sh <worktree-root> [EditMode|PlayMode] [project-subdir]
+# - One Unity run at a time on this Mac (lock dir), the editor is heavy.
+# - Seeds the worktree's Library/ from the main checkout with an APFS clone (instant, no extra disk) so the
+#   first run is an incremental import, not a from-scratch import of a ~20 GB cache.
+# Exit 0 = compiled and all tests passed. Prints one summary line; log and NUnit report are written to
+# ~/.hermes/state/factory/unity-runs/<worktree name>/ (outside the worktree, so workers have no temp files to delete).
+set -u
+WT=${1:?worktree root}; MODE=${2:-EditMode}; SUB=${3:-Client/BouncingGems}
+WT=$(cd "$WT" && pwd)  # absolute path: callers pass "."
+UNITY="$HOME/.unity/bin/unity"
+PROJ="$WT/$SUB"
+[ -d "$PROJ/Assets" ] || { echo "UNITY_GATE FAIL: no Unity project at $PROJ"; exit 2; }
+[ -x "$UNITY" ] || { echo "UNITY_GATE FAIL: unity CLI not found at $UNITY"; exit 2; }
+LOCK="$HOME/.hermes/state/factory/unity.lock"; mkdir -p "$(dirname "$LOCK")"
+i=0
+while ! mkdir "$LOCK" 2>/dev/null; do
+  if [ -f "$LOCK/pid" ] && ! kill -0 "$(cat "$LOCK/pid")" 2>/dev/null; then rm -rf "$LOCK"; continue; fi
+  i=$((i+1)); [ $i -gt 360 ] && { echo "UNITY_GATE FAIL: waited 60 min for the Unity lock"; exit 3; }
+  sleep 10
+done
+echo $$ > "$LOCK/pid"; trap 'rm -rf "$LOCK"' EXIT INT TERM
+if [ ! -d "$PROJ/Library" ]; then
+  COMMON=$(git -C "$WT" rev-parse --git-common-dir 2>/dev/null); MAIN=$(cd "$WT" && cd "$COMMON/.." 2>/dev/null && pwd)
+  [ -d "$MAIN/$SUB/Library" ] && cp -cR "$MAIN/$SUB/Library" "$PROJ/Library"
+fi
+OUT="$HOME/.hermes/state/factory/unity-runs/$(basename "$WT")"; mkdir -p "$OUT"; XML="$OUT/unity-$(echo "$MODE" | tr 'A-Z' 'a-z').xml"; rm -f "$XML"  # outside the worktree: nothing to clean up in the job folder
+# Known-hanging test classes (one name per line) are excluded; see state/factory/unity_exclude.txt.
+EXCL="$HOME/.hermes/state/factory/unity_exclude.txt"; FILTER=""
+[ -f "$EXCL" ] && FILTER=$(grep -v '^#' "$EXCL" | grep -v '^$' | sed 's/^/!/' | tr '\n' ';' | sed 's/;$//')
+set -- "$UNITY" test "$PROJ" --mode "$MODE" --output "$XML" --timeout "${UNITY_GATE_TIMEOUT:-900}" --non-interactive --no-banner
+[ -n "$FILTER" ] && set -- "$@" --filter "$FILTER"
+"$@" > "$OUT/unity-test.log" 2>&1
+RC=$?
+# Unity's Addressables step deletes this tracked file on every run; put it back so the worktree only holds the real change.
+for f in Assets/AddressableAssetsData/link.xml Assets/AddressableAssetsData/link.xml.meta; do
+  [ -e "$PROJ/$f" ] || git -C "$WT" restore --quiet -- "$SUB/$f" 2>/dev/null
+done
+if [ -f "$XML" ]; then
+  SUM=$(grep -o '<test-run [^>]*' "$XML" | head -1 | grep -oE '(result|total|passed|failed|skipped)="[^"]*"' | tr '\n' ' ')
+else
+  SUM="no report written (compile error or editor failed to start); see $OUT/unity-test.log"
+fi
+# Exit 8 = some tests failed. Pass when every failure is already in the baseline (tests broken on main before the change).
+if [ $RC -eq 8 ] && [ -f "$XML" ]; then
+  NEW=$(python3 - "$XML" "$HOME/.hermes/state/factory/unity_baseline.txt" <<'PY'
+import re, sys
+x = open(sys.argv[1]).read()
+base = {l.strip() for l in open(sys.argv[2]) if l.strip() and not l.startswith("#")} if len(sys.argv) > 2 else set()
+fails = re.findall(r'<test-case [^>]*?fullname="([^"]*)"[^>]*?result="Failed"', x)
+print("\n".join(f for f in fails if f not in base))
+PY
+)
+  if [ -z "$NEW" ]; then echo "UNITY_GATE PASS $MODE (only known baseline failures): $SUM"; exit 0; fi
+  echo "UNITY_GATE FAIL $MODE: new failing tests:"; echo "$NEW"; exit 8
+fi
+if [ $RC -eq 0 ]; then echo "UNITY_GATE PASS $MODE: $SUM"; else echo "UNITY_GATE FAIL $MODE (exit $RC): $SUM"; tail -n 15 "$OUT/unity-test.log"; fi
+exit $RC

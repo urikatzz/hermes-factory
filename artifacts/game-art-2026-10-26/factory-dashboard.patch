@@ -1,0 +1,105 @@
+diff -ruN -x __pycache__ -x integrations /Users/example/.hermes/factory-dashboard/factory_dashboard/assets/task_forms.js /private/tmp/hermes-game-art/factory-dashboard/factory_dashboard/assets/task_forms.js
+--- /Users/example/.hermes/factory-dashboard/factory_dashboard/assets/task_forms.js	2026-10-18 17:25:10
++++ /private/tmp/hermes-game-art/factory-dashboard/factory_dashboard/assets/task_forms.js	2026-10-26 23:56:15
+@@ -40,7 +40,7 @@
+   m.dialog.append(el('p','Submit to the existing Factory queue. The scheduler may start it automatically when capacity is available. All profile settings are frozen on submission.','muted'));
+   const title=field(m.dialog,'Title'),project=field(m.dialog,'Project','select'),type=field(m.dialog,'Type','select'),prompt=field(m.dialog,'Task prompt','textarea'),acceptance=field(m.dialog,'Acceptance criteria','textarea');
+   title.maxLength=200;prompt.rows=7;acceptance.rows=3;
+-  options(type,['feature','bug','chore'].map(v=>[v,v]));
++  options(type,['feature','bug','chore','art'].map(v=>[v,v]));
+   const review=el('pre',null,'settings-review');m.dialog.append(review);
+   let identity=crypto.randomUUID();let defaults,prepared=null,accepted=false,workflowData,workflowSelection;
+   const workflow=context.workflows?field(m.dialog,'Workflow','select'):null;
+diff -ruN -x __pycache__ -x integrations /Users/example/.hermes/factory-dashboard/factory_dashboard/assets/workflow_forms.js /private/tmp/hermes-game-art/factory-dashboard/factory_dashboard/assets/workflow_forms.js
+--- /Users/example/.hermes/factory-dashboard/factory_dashboard/assets/workflow_forms.js	2026-10-18 17:25:10
++++ /private/tmp/hermes-game-art/factory-dashboard/factory_dashboard/assets/workflow_forms.js	2026-10-26 23:56:15
+@@ -35,7 +35,7 @@
+    documentValue=structuredClone(doc);delete documentValue.archived;form.replaceChildren();
+    const name=field(form,'Name','input',doc.name);name.maxLength=100;name.oninput=()=>documentValue.name=name.value;
+    const description=field(form,'Description','textarea',doc.description);description.maxLength=1000;description.oninput=()=>documentValue.description=description.value;
+-   const type=field(form,'Suggested task type','select',doc.task_type,['feature','bug','chore']);type.onchange=()=>documentValue.task_type=type.value;
++   const type=field(form,'Suggested task type','select',doc.task_type,['feature','bug','chore','art']);type.onchange=()=>documentValue.task_type=type.value;
+    for(const [key,label] of [['prepare','1 · Preparation'],['implement','2 · Implementation'],['verify','Independent verification'],['repair','Repair after failed review']]){
+     const section=el('fieldset');section.append(el('legend',label));form.append(section);
+     const profile=field(section,'Profile','select',doc[key].profile,allowedProfiles(data.capabilities,key));profile.onchange=()=>documentValue[key].profile=profile.value;
+diff -ruN -x __pycache__ -x integrations /Users/example/.hermes/factory-dashboard/factory_dashboard/task_submission.py /private/tmp/hermes-game-art/factory-dashboard/factory_dashboard/task_submission.py
+--- /Users/example/.hermes/factory-dashboard/factory_dashboard/task_submission.py	2026-10-18 08:13:22
++++ /private/tmp/hermes-game-art/factory-dashboard/factory_dashboard/task_submission.py	2026-10-26 23:56:15
+@@ -3,6 +3,7 @@
+ import uuid
+ from .model_policy import ConfigurationError
+ from .policy_store import RevisionConflict
++from .workflow_types import TASK_TYPES
+ 
+ class TaskSubmissionService:
+     def __init__(self,store,adapter,board,validate_roles):
+@@ -18,7 +19,7 @@
+             if not isinstance(payload[key],str) or '\x00' in payload[key]:raise ConfigurationError('Invalid task text')
+         if not payload['title'].strip() or len(payload['title'])>200 or any(x in payload['title'] for x in '\r\n'):raise ConfigurationError('Title must be one line, 1–200 characters')
+         if not payload['prompt'].strip() or len(payload['prompt'])+len(payload['acceptance'])>12000:raise ConfigurationError('Request and acceptance must total 1–12,000 characters')
+-        if payload['type'] not in ('feature','bug','chore'):raise ConfigurationError('Invalid task type')
++        if payload['type'] not in TASK_TYPES:raise ConfigurationError('Invalid task type')
+         if payload['project'] not in {p['id'] for p in self._adapter.list_projects()}:raise ConfigurationError('Project is no longer available')
+ 
+     def preview(self,payload):
+diff -ruN -x __pycache__ -x integrations /Users/example/.hermes/factory-dashboard/factory_dashboard/workflow_templates.py /private/tmp/hermes-game-art/factory-dashboard/factory_dashboard/workflow_templates.py
+--- /Users/example/.hermes/factory-dashboard/factory_dashboard/workflow_templates.py	2026-10-18 08:12:59
++++ /private/tmp/hermes-game-art/factory-dashboard/factory_dashboard/workflow_templates.py	2026-10-27 00:09:54
+@@ -8,18 +8,39 @@
+ from .workflow_types import WorkflowDefinition, TASK_TYPES
+ 
+ 
++LINT = "art_lint.py from the art-review skill (the skill's LINT line gives its absolute path)"
++GAME_ART = {
++    'description': 'Art Director plans, Artist produces (Codex concept, Tripo or Blender blockout, Blender cleanup), art-reviewer and claude-reviewer review, verifier runs the art lint gate.',
++    'prepare': ('Plan game art as the art-director SOUL says. First check the style bible: python3 <art_lint.py> <PROJECT_DIR> --check-bible, where art_lint.py is ' + LINT + '. '
++                'Style task (the request asks for a style bible, or none exists and the request is about style): specify STYLE.md rules with IDs and (blocking) marks, style.json classes, the palette and 2-3 reference images with prompts; ACs require that --check-bible prints "bible": "ok" and that the references exist. '
++                'Asset task without a valid bible: complete VERDICT=BLOCKED with blocked_reason "no approved style bible: submit an Art task asking for a style bible". '
++                'Otherwise list every asset with target path (matching a style.json class), kind (sprite or model), concept prompt, class limits and STYLE rule IDs; one AC per asset plus "art_lint reports no BLOCKER or HIGH"; include list: art/style/, every target path and art/concepts/<name>.png for each model. '
++                'For an asset task run python3 <art_lint.py> <PROJECT_DIR> --style-hash and record its value in PLAN.md as style_sha256: <hex>.'),
++    'implement': ('Make the planned art with the art-production skill (artist SOUL). Before completing run the art lint gate on PROJECT_DIR: python3 <art_lint.py> <PROJECT_DIR> <changed art paths> --out <PROJECT_DIR>/.factory/tmp/art-lint --fail-on-blocking, where art_lint.py is ' + LINT + ', adding --expect-style-hash <style_sha256 from PLAN.md> in an asset task. '
++                  'Record it in checks_run, and assets, fallbacks and tripo_tasks in metadata. An asset task never writes art/style/.'),
++    'repair': 'Regenerate or refit only the assets named in SCOPE findings with the art-production skill, never art/style/ in an asset task, and rerun the art lint gate (with --expect-style-hash <style_sha256 from PLAN.md> in an asset task) before completing. Never call Tripo again for an asset with a recorded Tripo task or unknown-create; record new Tripo task IDs.',
++    'verify': ('Run the art lint gate on the frozen copy as a required check: python3 <art_lint.py> <src_dir> --out "$HERMES_KANBAN_WORKSPACE/art-lint" --fail-on-blocking, where art_lint.py is ' + LINT + ', adding --expect-style-hash <style_sha256 from PLAN.md> when PLAN.md records one (asset task). '
++               'Exit 1 means a BLOCKER or HIGH lint finding: record the command in failed_checks and fail the AC it threatens. Blender missing makes the affected model ACs unverified:environment. Attach art-lint/lint.json.'),
++    'claude-reviewer': 'Review the changed scripts, JSON (style.json, text tables) and engine import settings (.meta files) for correctness. Do not judge art taste or style; art-reviewer does that.',
++    'art-reviewer': 'Follow the art-review skill in factory mode.',
++}
++
++
+ def _preset(kind):
+     prepare, implement, reviewers = {
+         'feature': ('architect', 'developer', ('claude-reviewer', 'security-reviewer', 'ux-reviewer', 'ui-reviewer')),
+         'bug': ('fixer', 'fixer', ('claude-reviewer', 'security-reviewer')),
+         'chore': ('developer', 'developer', ('claude-reviewer',)),
++        'art': ('art-director', 'artist', ('art-reviewer', 'claude-reviewer')),
+     }[kind]
+     def stage(key, profile, instructions='', stage_kind=None):
+         return dict(key=key, kind=stage_kind or key, profile=profile, instructions=instructions)
+-    instructions = {'feature': 'Design the change and observable acceptance criteria.', 'bug': 'Diagnose the root cause and plan a regression test that fails before the repair and passes afterward.', 'chore': 'Define the scope and demonstrate no unintended behavior change.'}
+-    return dict(template_id=str(uuid.uuid4()), revision=1, name={'feature':'Feature', 'bug':'Bug fix', 'chore':'Chore'}[kind], description='', task_type=kind,
+-                prepare=stage('prepare', prepare, instructions[kind]), implement=stage('implement', implement),
+-                reviewers=[stage(p, p, stage_kind='review') for p in reviewers], verify=stage('verify', 'verifier'), repair=stage('repair', 'fixer'), max_repairs=3)
++    instructions = {'feature': 'Design the change and observable acceptance criteria.', 'bug': 'Diagnose the root cause and plan a regression test that fails before the repair and passes afterward.', 'chore': 'Define the scope and demonstrate no unintended behavior change.', 'art': GAME_ART['prepare']}
++    notes = GAME_ART if kind == 'art' else {}
++    return dict(template_id=str(uuid.uuid4()), revision=1, name={'feature':'Feature', 'bug':'Bug fix', 'chore':'Chore', 'art':'Game Art'}[kind], description=notes.get('description', ''), task_type=kind,
++                prepare=stage('prepare', prepare, instructions[kind]), implement=stage('implement', implement, notes.get('implement', '')),
++                reviewers=[stage(p, p, notes.get(p, ''), stage_kind='review') for p in reviewers], verify=stage('verify', 'verifier', notes.get('verify', '')),
++                repair=stage('repair', 'artist' if kind == 'art' else 'fixer', notes.get('repair', '')), max_repairs=2 if kind == 'art' else 3)
+ 
+ 
+ class WorkflowTemplates:
+diff -ruN -x __pycache__ -x integrations /Users/example/.hermes/factory-dashboard/factory_dashboard/workflow_types.py /private/tmp/hermes-game-art/factory-dashboard/factory_dashboard/workflow_types.py
+--- /Users/example/.hermes/factory-dashboard/factory_dashboard/workflow_types.py	2026-10-18 08:11:30
++++ /private/tmp/hermes-game-art/factory-dashboard/factory_dashboard/workflow_types.py	2026-10-26 23:56:15
+@@ -8,8 +8,9 @@
+     'claude-reviewer': ('review',), 'codex-reviewer': ('review',),
+     'security-reviewer': ('review',), 'ux-reviewer': ('review',),
+     'ui-reviewer': ('review',), 'verifier': ('verify',),
++    'art-director': ('prepare',), 'artist': ('implement', 'repair'), 'art-reviewer': ('review',),
+ }
+-TASK_TYPES = ('feature', 'bug', 'chore')
++TASK_TYPES = ('feature', 'bug', 'chore', 'art')
+ 
+ 
+ @dataclass(frozen=True)

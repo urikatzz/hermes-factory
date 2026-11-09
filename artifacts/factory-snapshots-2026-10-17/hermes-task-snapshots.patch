@@ -1,0 +1,219 @@
+--- a/hermes_cli/kanban_db.py
++++ b/hermes_cli/kanban_db.py
+@@ -1249,16 +1249,10 @@
+     parents = tuple(p for p in parents if p)
+     skills_list = _normalize_task_skills(skills)
+ 
+-    # Idempotency check BEFORE the write txn (no lock held); a concurrent-create
+-    # race may insert twice, the next lookup stabilises on the newest.
+-    if idempotency_key:
+-        row = conn.execute(
+-            "SELECT id FROM tasks WHERE idempotency_key = ? "
+-            "AND status != 'archived' "
+-            "ORDER BY created_at DESC LIMIT 1", (idempotency_key,),
+-        ).fetchone()
+-        if row:
+-            return row["id"]
++    from hermes_cli.kanban_db_task_creation import existing_task, prepare_creation
++    existing = existing_task(conn, idempotency_key)
++    if existing:
++        return existing
+ 
+     now = int(time.time())
+ 
+@@ -1277,6 +1271,9 @@
+             # commit so the dispatcher never sees a half-built graph.
+             with write_txn(conn, allow_nested=True):
+                 task_status, tenant = initial_task_state(conn, parents, initial_status, triage, tenant)
++                existing = prepare_creation(conn, locals())
++                if existing:
++                    return existing
+                 # Project worktree: fresh dir under the repo + deterministic
+                 # branch, instead of the random ``wt/<id>`` worker fallback.
+                 if project_obj is not None and workspace_kind == "worktree":
+--- a/hermes_cli/kanban_db_dispatch.py
++++ b/hermes_cli/kanban_db_dispatch.py
+@@ -2006,19 +2006,6 @@
+     return result
+ 
+ 
+-def _call_spawn_fn(spawn_fn, task: Task, workspace: str, board: Optional[str]) -> Optional[int]:
+-    """Back-compat: older spawn_fn signatures (and test stubs) accept only
+-    ``(task, workspace)``; pass ``board`` only when the callable supports it."""
+-    import inspect
+-    try:
+-        sig = inspect.signature(spawn_fn)
+-        if "board" in sig.parameters:
+-            return spawn_fn(task, workspace, board=board)
+-        return spawn_fn(task, workspace)
+-    except (TypeError, ValueError):
+-        return spawn_fn(task, workspace)
+-
+-
+ def _dispatch_lane_task(
+     conn: sqlite3.Connection,
+     row: sqlite3.Row,
+@@ -2118,7 +2105,9 @@
+         # worker's system prompt via KANBAN_GUIDANCE.
+         claimed.skills = list(dict.fromkeys([*(claimed.skills or []), "sdlc-review"]))
+     try:
+-        pid = _call_spawn_fn(spawn_fn if spawn_fn is not None else _default_spawn, claimed, str(workspace), board)
++        from hermes_cli.kanban_db_worker_model import spawn_worker_with_model
++
++        pid = spawn_worker_with_model(conn, spawn_fn if spawn_fn is not None else _default_spawn, claimed, str(workspace), board)
+         if pid:
+             _set_worker_pid(conn, claimed.id, int(pid))
+         # Fires AFTER the PID (when reported) is durably persisted. Best-effort.
+--- a/hermes_cli/plugins.py
++++ b/hermes_cli/plugins.py
+@@ -130,7 +130,7 @@
+     # Run-all-then-pick-first (see get_plugin_error_classification). Privacy: error_message/
+     # error_body may be unredacted.
+     "transform_api_error_classification", "on_session_start", "on_session_end",
+-    "on_session_finalize", "on_session_reset",
++    "on_session_finalize", "on_session_reset", "resolve_kanban_worker_model", "before_kanban_task_create",
+     # on_skill_lifecycle: successful skill lifecycle facts (local skill name visible to plugins).
+     "on_skill_lifecycle", "subagent_start", "subagent_stop",
+     # pre_gateway_dispatch: once per incoming MessageEvent, after the internal-event guard, BEFORE
+--- /dev/null
++++ b/hermes_cli/kanban_db_task_creation.py
+@@ -0,0 +1,34 @@
++"""Synchronous creation observers before a task becomes eligible to dispatch."""
++import inspect
++
++
++def existing_task(conn, key):
++    if not key:
++        return None
++    row = conn.execute("SELECT id FROM tasks WHERE idempotency_key=? AND (status != 'archived' OR ? LIKE 'factory-submit-%' OR ? LIKE 'intake-%') ORDER BY created_at DESC LIMIT 1", (key, key, key)).fetchone()
++    return row['id'] if row else None
++
++
++def prepare_creation(conn, fields):
++    from hermes_cli.plugins import has_hook, iter_hook_callbacks
++
++    existing = existing_task(conn, fields['idempotency_key'])
++    if existing:
++        return existing
++    if not has_hook('before_kanban_task_create'):
++        return None
++    task = {key: fields.get(key) for key in ('title', 'body', 'assignee', 'created_by', 'idempotency_key',
++            'model_override', 'provider_override', 'reasoning_effort', 'creator_task_id')}
++    task.update(id=fields['task_id'], skills=fields['skills_list'], status=fields['task_status'])
++    path = next(row[2] for row in conn.execute('PRAGMA database_list') if row[1] == 'main')
++    payload = dict(task=task, board_path=path, board=fields.get('board'))
++    for callback in iter_hook_callbacks('before_kanban_task_create'):
++        signature = inspect.signature(callback)
++        kwargs = payload if any(p.kind == p.VAR_KEYWORD for p in signature.parameters.values()) else {
++            key: value for key, value in payload.items() if key in signature.parameters}
++        result = callback(**kwargs)
++        if inspect.isawaitable(result):
++            if inspect.iscoroutine(result):
++                result.close()
++            raise ValueError('Task creation hooks must be synchronous')
++    return None
+--- /dev/null
++++ b/hermes_cli/kanban_db_worker_model.py
+@@ -0,0 +1,102 @@
++"""Resolve a worker model once per attempt before any process is launched."""
++from dataclasses import asdict, replace
++from typing import Optional
++
++from hermes_cli.kanban_db import Task
++import inspect
++import json
++
++
++def _validate(selection):
++    if not isinstance(selection, dict):
++        raise ValueError('Worker model resolver must return a mapping or None')
++    for key in ('provider', 'model', 'source', 'root_id'):
++        value = selection.get(key)
++        if not isinstance(value, str) or not value.strip() or value != value.strip() or value.startswith('-') or any(ord(c) < 32 for c in value):
++            raise ValueError(f'Invalid worker model selection: {key}')
++    if type(selection.get('revision')) is not int or selection['revision'] < 0:
++        raise ValueError('Invalid worker model selection revision')
++    result = {key: selection[key] for key in ('provider', 'model', 'source', 'root_id', 'revision')}
++    if 'effort' in selection:
++        if selection['effort'] not in ('none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'):
++            raise ValueError('Invalid worker reasoning effort')
++        result['effort'] = selection['effort']
++    if 'snapshot_id' in selection:
++        value = selection['snapshot_id']
++        if not isinstance(value, str) or not value.strip() or any(ord(c) < 32 for c in value):
++            raise ValueError('Invalid worker snapshot identity')
++        if 'effort' not in result:
++            raise ValueError('Snapshot selection requires reasoning effort')
++        result['snapshot_id'] = value
++    return result
++
++
++def _resolve(task, workspace, board, board_path):
++    from hermes_cli.plugins import has_hook, iter_hook_callbacks
++
++    if not has_hook('resolve_kanban_worker_model'):
++        return None
++    payload = dict(task=asdict(task), workspace=workspace, board=board, board_path=board_path)
++    resolved = []
++    for callback in iter_hook_callbacks('resolve_kanban_worker_model'):
++        signature = inspect.signature(callback)
++        kwargs = payload if any(p.kind == p.VAR_KEYWORD for p in signature.parameters.values()) else {
++            key: value for key, value in payload.items() if key in signature.parameters
++        }
++        result = callback(**kwargs)
++        if inspect.isawaitable(result):
++            if inspect.iscoroutine(result):
++                result.close()
++            raise ValueError('Worker model resolvers must be synchronous')
++        if result is not None:
++            resolved.append(_validate(result))
++    if len(resolved) > 1:
++        raise ValueError('Multiple worker model resolvers claimed this task')
++    return resolved[0] if resolved else None
++
++
++def prepare_worker_model(conn, task, workspace, board):
++    from hermes_cli import kanban_db as kb
++
++    row = conn.execute('SELECT metadata,status FROM task_runs WHERE id=? AND task_id=?',
++                       (task.current_run_id, task.id)).fetchone()
++    if row is None or row['status'] != 'running':
++        raise ValueError('Worker model resolution requires a current running attempt')
++    metadata = json.loads(row['metadata'] or '{}')
++    captured = metadata.get('worker_model_selection')
++    if captured is None:
++        board_path = next(row[2] for row in conn.execute('PRAGMA database_list') if row[1] == 'main')
++        captured = _resolve(task, workspace, board, board_path)
++        if captured is None:
++            return task
++        with kb.write_txn(conn):
++            # Merge against the latest metadata so session-link writers are preserved.
++            current = conn.execute('SELECT metadata FROM task_runs WHERE id=? AND task_id=? AND status=?',
++                                   (task.current_run_id, task.id, 'running')).fetchone()
++            if current is None:
++                raise ValueError('Worker attempt ended before model capture')
++            metadata = json.loads(current['metadata'] or '{}')
++            captured = metadata.setdefault('worker_model_selection', captured)
++            conn.execute('UPDATE task_runs SET metadata=? WHERE id=?',
++                         (json.dumps(metadata), task.current_run_id))
++    captured = _validate(captured)
++    return replace(task, model_override=captured['model'], provider_override=captured['provider'],
++                   reasoning_effort=captured.get('effort', task.reasoning_effort))
++
++
++def _call_spawn_fn(spawn_fn, task: Task, workspace: str, board: Optional[str]) -> Optional[int]:
++    """Back-compat: older spawn_fn signatures (and test stubs) accept only
++    ``(task, workspace)``; pass ``board`` only when the callable supports it."""
++    import inspect
++    try:
++        sig = inspect.signature(spawn_fn)
++        if "board" in sig.parameters:
++            return spawn_fn(task, workspace, board=board)
++        return spawn_fn(task, workspace)
++    except (TypeError, ValueError):
++        return spawn_fn(task, workspace)
++
++
++def spawn_worker_with_model(conn, spawn_fn, task, workspace, board):
++    worker = prepare_worker_model(conn, task, workspace, board)
++    return _call_spawn_fn(spawn_fn, worker, workspace, board)

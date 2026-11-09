@@ -1,0 +1,54 @@
+{
+  "cases": [
+    {
+      "acceptance": {
+        "AC1": "Both bounds are included, including equal bounds.",
+        "AC2": "Order, duplicates, empty inputs and inverted bounds behave correctly."
+      },
+      "grader": "graders/bug.py",
+      "id": "bug",
+      "prompt": "Fix in_range so both bounds are inclusive. Preserve order, duplicates and the existing function signature.",
+      "source": [
+        "cases/bug/source/solution.py"
+      ],
+      "task_type": "bug"
+    },
+    {
+      "acceptance": {
+        "AC1": "The default output preserves input order and empty inputs.",
+        "AC2": "sort=True sorts alphabetically without mutating input."
+      },
+      "grader": "graders/feature.py",
+      "id": "feature",
+      "prompt": "Extend format_names(names, *, sort=False) with an optional alphabetical sort. Preserve default ordering and do not mutate the input.",
+      "source": [
+        "cases/feature/source/solution.py"
+      ],
+      "task_type": "feature"
+    },
+    {
+      "acceptance": {
+        "AC1": "Count and sum are correct for empty, negative and fractional inputs.",
+        "AC2": "One-pass iterables work without repeated consumption."
+      },
+      "grader": "graders/chore.py",
+      "id": "chore",
+      "prompt": "Simplify summarize without changing its public interface or outputs. Preserve one-pass iterable support. Keep the change local.",
+      "source": [
+        "cases/chore/source/solution.py"
+      ],
+      "task_type": "chore"
+    }
+  ],
+  "digest": "706bca2e5768f19c868b9f02f31c6e83e0b62b496b78c899a900d0dc3a881966",
+  "files": {
+    "cases/bug/source/solution.py": "ff85e8f3d98026c9c8e307176a04318b8be49210821b220293845df787e2ab83",
+    "cases/chore/source/solution.py": "38bc87006403d6bbe13747e49eb87b0352f3981b078403161569856ae6d2d442",
+    "cases/feature/source/solution.py": "0ab865cad327c0217271a8f4e5b7f108d9b9d67a005f9b243106eed3c54e27c3",
+    "graders/bug.py": "1dbf2810ddc06a679b591bca2d1c86eb9726ccf602a1c6925be492f5f190064f",
+    "graders/chore.py": "d19020c69b448b94b570d79d32356c7af86e0a75c440d66ad61cfd97563d2802",
+    "graders/feature.py": "04ff971f25cd1460533c47eac5c90b7197501e51196dca2cdd7479d974e8a19e"
+  },
+  "schema": "factory-ecc-taskset/v1",
+  "version": 1
+}

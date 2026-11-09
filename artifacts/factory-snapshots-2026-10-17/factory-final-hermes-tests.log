@@ -1,0 +1,26 @@
+▶ not activated — using HERMES_PYTHON: /private/tmp/hermes-factory-sandbox-testenv/bin/python
+▶ running per-file parallel test suite via run_tests_parallel.py
+  (TZ=UTC LANG=C.UTF-8 PYTHONHASHSEED=0; clean env)
+▶ pre-compiling bytecode cache
+▶ launching test runner
+Discovered 5 test files (~26 tests) under ['tests/hermes_cli/test_kanban_worker_model_resolution.py', 'tests/hermes_cli/test_kanban_task_settings_creation.py', 'tests/plugins/test_kanban_model_override.py', '/private/tmp/hermes-factory-dashboard/tests/hermes_integration/test_factory_submission.py', '/private/tmp/hermes-factory-dashboard/tests/hermes_integration/test_factory_model_dispatch.py']; running with -j 10
+[ 11.5% |     3/~26 | ✓3 | ✗0] ✓ tests/hermes_cli/test_kanban_task_settings_creation.py (3✓, 2.0s)
+[ 15.4% |     4/~26 | ✓4 | ✗0] ✓ /private/tmp/hermes-factory-dashboard/tests/hermes_integration/test_factory_submission.py (1✓, 2.0s)
+[ 19.2% |     5/~26 | ✓5 | ✗0] ✓ /private/tmp/hermes-factory-dashboard/tests/hermes_integration/test_factory_model_dispatch.py (1✓, 2.1s)
+[ 38.5% |    10/~26 | ✓10 | ✗ 0] ✓ tests/hermes_cli/test_kanban_worker_model_resolution.py (5✓, 2.5s)
+[100.0% |    26/~26 | ✓26 | ✗ 0] ✓ tests/plugins/test_kanban_model_override.py (16✓, 6.7s)
+
+=== Summary: 5 files, 26 tests passed, 0 failed (100% complete) in 6.7s (10 workers) ===
+  Durations cached to test_durations.json (5 files)
+
+=== Per-file subprocess time distribution ===
+  Files:   5
+  Total subprocess CPU-wall: 15.3s  (runner wall: 6.7s, parallelism: 10x)
+  P50: 2.05s  P90: 6.65s  P95: 6.65s  P99: 6.65s  Max: 6.65s
+  <1s: 0 files (0%)  <2s: 0 files (0%)
+  Top 10 slowest:
+      6.65s  tests/plugins/test_kanban_model_override.py
+      2.55s  tests/hermes_cli/test_kanban_worker_model_resolution.py
+      2.05s  /private/tmp/hermes-factory-dashboard/tests/hermes_integration/test_factory_model_dispatch.py
+      2.03s  /private/tmp/hermes-factory-dashboard/tests/hermes_integration/test_factory_submission.py
+      2.02s  tests/hermes_cli/test_kanban_task_settings_creation.py

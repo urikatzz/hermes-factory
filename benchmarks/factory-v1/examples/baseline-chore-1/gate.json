@@ -1,0 +1,122 @@
+{
+  "attempts_complete": true,
+  "board": "fixture-board",
+  "captured_variant": {
+    "id": "baseline",
+    "roles": {
+      "architect": {
+        "effort": "medium",
+        "model": "synthetic-model",
+        "provider": "test-provider"
+      },
+      "claude-reviewer": {
+        "effort": "medium",
+        "model": "synthetic-model",
+        "provider": "test-provider"
+      },
+      "developer": {
+        "effort": "medium",
+        "model": "synthetic-model",
+        "provider": "test-provider"
+      },
+      "fixer": {
+        "effort": "medium",
+        "model": "synthetic-model",
+        "provider": "test-provider"
+      },
+      "verifier": {
+        "effort": "medium",
+        "model": "synthetic-model",
+        "provider": "test-provider"
+      }
+    },
+    "workflow": {
+      "description": "",
+      "implement": {
+        "instructions": "",
+        "key": "implement",
+        "kind": "implement",
+        "profile": "developer"
+      },
+      "max_repairs": 3,
+      "name": "Fixture",
+      "prepare": {
+        "instructions": "",
+        "key": "prepare",
+        "kind": "prepare",
+        "profile": "architect"
+      },
+      "repair": {
+        "instructions": "",
+        "key": "repair",
+        "kind": "repair",
+        "profile": "fixer"
+      },
+      "reviewers": [
+        {
+          "instructions": "",
+          "key": "review",
+          "kind": "review",
+          "profile": "claude-reviewer"
+        }
+      ],
+      "revision": 1,
+      "task_type": "bug",
+      "template_id": "fixture",
+      "verify": {
+        "instructions": "",
+        "key": "verify",
+        "kind": "verify",
+        "profile": "verifier"
+      }
+    }
+  },
+  "decision": {
+    "blocking": [],
+    "decision": "pass",
+    "reason": "All checks passed",
+    "waived": []
+  },
+  "factory_manifest_sha12": "aaaaaaaaaaaa",
+  "repairs_used": 0,
+  "reviewers": [
+    {
+      "manifest_sha12": "aaaaaaaaaaaa",
+      "outcome": "completed",
+      "profile": "claude-reviewer",
+      "run_id": "review-run-baseline-chore-1",
+      "task_id": "review-baseline-chore-1",
+      "verdict": "NO_BLOCKING_FINDINGS"
+    }
+  ],
+  "root_id": "root-baseline-chore-1",
+  "schema": "factory-ecc-gate/v1",
+  "source_manifest_sha256": "ceb22a7cd943ad72b314ee8259edfde0e37cea247b773d31f32db3565c92eaee",
+  "verifier": {
+    "ac_results": {
+      "AC1": "pass",
+      "AC2": "pass"
+    },
+    "manifest_sha12": "aaaaaaaaaaaa",
+    "outcome": "completed",
+    "profile": "verifier",
+    "run_id": "verify-run-baseline-chore-1",
+    "task_id": "verify-baseline-chore-1",
+    "verdict": "PASS"
+  },
+  "writer": {
+    "manifest_sha12": "aaaaaaaaaaaa",
+    "outcome": "completed",
+    "profile": "developer",
+    "run_id": "writer-baseline-chore-1",
+    "task_id": "write-baseline-chore-1",
+    "verdict": "DONE"
+  },
+  "writer_attempts": [
+    {
+      "outcome": "completed",
+      "run_id": "writer-baseline-chore-1",
+      "task_id": "write-baseline-chore-1"
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "board": {
+    "tasks": {
+      "rows": 110,
+      "sha256": "ec7c2582c965ed75b3b38b6fcd4ee8358955e81357d885eaab81b3981a599827"
+    },
+    "task_runs": {
+      "rows": 174,
+      "sha256": "d7b5caef73a360726faae7dd0c8c263c3ef841ccb52e43f1f963ebd86a0de181"
+    }
+  },
+  "settings": {
+    "factory_defaults": {
+      "rows": 1,
+      "sha256": "1340e39d3dcd7315830769468cd4d5352b97d6752d8435c9b7e68ac3e3003801"
+    },
+    "factory_snapshots": {
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "factory_tasks": {
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "factory_submissions": {
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    }
+  }
+}

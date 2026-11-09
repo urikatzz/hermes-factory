@@ -1,0 +1,86 @@
+diff -ruN -x __pycache__ -x integrations /Users/example/.hermes/factory-dashboard/factory_dashboard/assets/task_forms.js artifacts/game-audio-2026-11-06/build/factory-dashboard/factory_dashboard/assets/task_forms.js
+--- /Users/example/.hermes/factory-dashboard/factory_dashboard/assets/task_forms.js	2026-11-06 01:09:46
++++ artifacts/game-audio-2026-11-06/build/factory-dashboard/factory_dashboard/assets/task_forms.js	2026-11-09 12:51:29
+@@ -40,7 +40,7 @@
+   m.dialog.append(el('p','Submit to the existing Factory queue. The scheduler may start it automatically when capacity is available. All profile settings are frozen on submission.','muted'));
+   const title=field(m.dialog,'Title'),project=field(m.dialog,'Project','select'),type=field(m.dialog,'Type','select'),prompt=field(m.dialog,'Task prompt','textarea'),acceptance=field(m.dialog,'Acceptance criteria','textarea');
+   title.maxLength=200;prompt.rows=7;acceptance.rows=3;
+-  options(type,['feature','bug','chore','art'].map(v=>[v,v]));
++  options(type,['feature','bug','chore','art','audio'].map(v=>[v,v]));
+   const review=el('pre',null,'settings-review');m.dialog.append(review);
+   let identity=crypto.randomUUID();let defaults,prepared=null,accepted=false,workflowData,workflowSelection;
+   const workflow=context.workflows?field(m.dialog,'Workflow','select'):null;
+diff -ruN -x __pycache__ -x integrations /Users/example/.hermes/factory-dashboard/factory_dashboard/assets/workflow_forms.js artifacts/game-audio-2026-11-06/build/factory-dashboard/factory_dashboard/assets/workflow_forms.js
+--- /Users/example/.hermes/factory-dashboard/factory_dashboard/assets/workflow_forms.js	2026-11-06 01:09:46
++++ artifacts/game-audio-2026-11-06/build/factory-dashboard/factory_dashboard/assets/workflow_forms.js	2026-11-09 12:51:29
+@@ -35,7 +35,7 @@
+    documentValue=structuredClone(doc);delete documentValue.archived;form.replaceChildren();
+    const name=field(form,'Name','input',doc.name);name.maxLength=100;name.oninput=()=>documentValue.name=name.value;
+    const description=field(form,'Description','textarea',doc.description);description.maxLength=1000;description.oninput=()=>documentValue.description=description.value;
+-   const type=field(form,'Suggested task type','select',doc.task_type,['feature','bug','chore','art']);type.onchange=()=>documentValue.task_type=type.value;
++   const type=field(form,'Suggested task type','select',doc.task_type,['feature','bug','chore','art','audio']);type.onchange=()=>documentValue.task_type=type.value;
+    for(const [key,label] of [['prepare','1 · Preparation'],['implement','2 · Implementation'],['verify','Independent verification'],['repair','Repair after failed review']]){
+     const section=el('fieldset');section.append(el('legend',label));form.append(section);
+     const profile=field(section,'Profile','select',doc[key].profile,allowedProfiles(data.capabilities,key));profile.onchange=()=>documentValue[key].profile=profile.value;
+diff -ruN -x __pycache__ -x integrations /Users/example/.hermes/factory-dashboard/factory_dashboard/workflow_templates.py artifacts/game-audio-2026-11-06/build/factory-dashboard/factory_dashboard/workflow_templates.py
+--- /Users/example/.hermes/factory-dashboard/factory_dashboard/workflow_templates.py	2026-11-06 01:09:46
++++ artifacts/game-audio-2026-11-06/build/factory-dashboard/factory_dashboard/workflow_templates.py	2026-11-09 12:50:42
+@@ -25,22 +25,40 @@
+     'art-reviewer': 'Follow the art-review skill in factory mode.',
+ }
+ 
++AUDIO_LINT = "audio_lint.py from the audio-review skill (the skill's LINT line gives its absolute path)"
++GAME_AUDIO = {
++    'description': 'Audio Director plans, Sound Designer synthesizes WAV effects or processes your Suno files into OGG music, audio-reviewer and claude-reviewer review, verifier runs the audio lint gate.',
++    'prepare': ('Plan game audio as the audio-director SOUL says. First check the sound bible: python3 <audio_lint.py> <PROJECT_DIR> --check-bible, where audio_lint.py is ' + AUDIO_LINT + '. '
++                'If it exits 1 and the prompt does not ask for a sound bible, complete VERDICT=BLOCKED with blocked_reason "no approved sound bible: submit an Audio task asking for a sound bible". '
++                'Otherwise record audio_task: style|sfx|music-cues|music-import in PLAN.md, one AC per asset or cue plus "audio_lint reports no BLOCKER or HIGH" (not for style or music-cues), and the include list from the SOUL. '
++                'For every task except style run python3 <audio_lint.py> <PROJECT_DIR> --style-hash and record style_sha256: <hex> in PLAN.md.'),
++    'implement': ('Make the planned audio with the audio-production skill (sound-designer SOUL). Before completing run the audio lint gate: python3 <audio_lint.py> <PROJECT_DIR> <changed audio paths> --out <PROJECT_DIR>/.factory/tmp/audio-lint --fail-on-blocking, where audio_lint.py is ' + AUDIO_LINT + ', adding --expect-style-hash <style_sha256 from PLAN.md> when PLAN.md records one. '
++                  'Record it in checks_run, and assets and missing in metadata. Never write audio/style/ outside a style task, never write audio/incoming/.'),
++    'repair': 'Change only the recipes or processing of the assets named in SCOPE findings with the audio-production skill, never audio/style/ outside a style task and never audio/incoming/, and rerun the audio lint gate (with --expect-style-hash when PLAN.md records style_sha256) before completing.',
++    'verify': ('Run the audio lint gate on the frozen copy as a required check: python3 <audio_lint.py> <src_dir> --out "$HERMES_KANBAN_WORKSPACE/audio-lint" --fail-on-blocking, where audio_lint.py is ' + AUDIO_LINT + ', adding --expect-style-hash <style_sha256 from PLAN.md> when PLAN.md records one. '
++               'Exit 1 means a BLOCKER or HIGH lint finding: record the command in failed_checks and fail the AC it threatens. ffmpeg missing makes affected ACs unverified:environment. Missing Suno files listed under missing are not failures. Attach audio-lint/lint.json.'),
++    'claude-reviewer': 'Review the changed recipes, cue sheets, audio.json and any engine import settings for correctness and consistency with PLAN.md. Do not judge how it sounds; audio-reviewer does that.',
++    'audio-reviewer': 'Follow the audio-review skill in factory mode.',
++}
+ 
++
+ def _preset(kind):
+     prepare, implement, reviewers = {
+         'feature': ('architect', 'developer', ('claude-reviewer', 'security-reviewer', 'ux-reviewer', 'ui-reviewer')),
+         'bug': ('fixer', 'fixer', ('claude-reviewer', 'security-reviewer')),
+         'chore': ('developer', 'developer', ('claude-reviewer',)),
+         'art': ('art-director', 'artist', ('art-reviewer', 'claude-reviewer')),
++        'audio': ('audio-director', 'sound-designer', ('audio-reviewer', 'claude-reviewer')),
+     }[kind]
+     def stage(key, profile, instructions='', stage_kind=None):
+         return dict(key=key, kind=stage_kind or key, profile=profile, instructions=instructions)
+-    instructions = {'feature': 'Design the change and observable acceptance criteria.', 'bug': 'Diagnose the root cause and plan a regression test that fails before the repair and passes afterward.', 'chore': 'Define the scope and demonstrate no unintended behavior change.', 'art': GAME_ART['prepare']}
+-    notes = GAME_ART if kind == 'art' else {}
+-    return dict(template_id=str(uuid.uuid4()), revision=1, name={'feature':'Feature', 'bug':'Bug fix', 'chore':'Chore', 'art':'Game Art'}[kind], description=notes.get('description', ''), task_type=kind,
++    instructions = {'feature': 'Design the change and observable acceptance criteria.', 'bug': 'Diagnose the root cause and plan a regression test that fails before the repair and passes afterward.', 'chore': 'Define the scope and demonstrate no unintended behavior change.', 'art': GAME_ART['prepare'], 'audio': GAME_AUDIO['prepare']}
++    notes = {'art': GAME_ART, 'audio': GAME_AUDIO}.get(kind, {})
++    writer = {'art': 'artist', 'audio': 'sound-designer'}.get(kind, 'fixer')
++    return dict(template_id=str(uuid.uuid4()), revision=1, name={'feature':'Feature', 'bug':'Bug fix', 'chore':'Chore', 'art':'Game Art', 'audio':'Game Audio'}[kind], description=notes.get('description', ''), task_type=kind,
+                 prepare=stage('prepare', prepare, instructions[kind]), implement=stage('implement', implement, notes.get('implement', '')),
+                 reviewers=[stage(p, p, notes.get(p, ''), stage_kind='review') for p in reviewers], verify=stage('verify', 'verifier', notes.get('verify', '')),
+-                repair=stage('repair', 'artist' if kind == 'art' else 'fixer', notes.get('repair', '')), max_repairs=2 if kind == 'art' else 3)
++                repair=stage('repair', writer, notes.get('repair', '')), max_repairs=2 if kind in ('art', 'audio') else 3)
+ 
+ 
+ class WorkflowTemplates:
+diff -ruN -x __pycache__ -x integrations /Users/example/.hermes/factory-dashboard/factory_dashboard/workflow_types.py artifacts/game-audio-2026-11-06/build/factory-dashboard/factory_dashboard/workflow_types.py
+--- /Users/example/.hermes/factory-dashboard/factory_dashboard/workflow_types.py	2026-11-06 01:09:46
++++ artifacts/game-audio-2026-11-06/build/factory-dashboard/factory_dashboard/workflow_types.py	2026-11-09 12:50:42
+@@ -9,8 +9,9 @@
+     'security-reviewer': ('review',), 'ux-reviewer': ('review',),
+     'ui-reviewer': ('review',), 'verifier': ('verify',),
+     'art-director': ('prepare',), 'artist': ('implement', 'repair'), 'art-reviewer': ('review',),
++    'audio-director': ('prepare',), 'sound-designer': ('implement', 'repair'), 'audio-reviewer': ('review',),
+ }
+-TASK_TYPES = ('feature', 'bug', 'chore', 'art')
++TASK_TYPES = ('feature', 'bug', 'chore', 'art', 'audio')
+ 
+ 
+ @dataclass(frozen=True)

@@ -1,0 +1,237 @@
+diff --git a/hermes_cli/kanban_db_dispatch.py b/hermes_cli/kanban_db_dispatch.py
+index 7ae9f4dcfcf..9d70f624b78 100644
+--- a/hermes_cli/kanban_db_dispatch.py
++++ b/hermes_cli/kanban_db_dispatch.py
+@@ -2006,19 +2006,6 @@ def dispatch_once(
+     return result
+ 
+ 
+-def _call_spawn_fn(spawn_fn, task: Task, workspace: str, board: Optional[str]) -> Optional[int]:
+-    """Back-compat: older spawn_fn signatures (and test stubs) accept only
+-    ``(task, workspace)``; pass ``board`` only when the callable supports it."""
+-    import inspect
+-    try:
+-        sig = inspect.signature(spawn_fn)
+-        if "board" in sig.parameters:
+-            return spawn_fn(task, workspace, board=board)
+-        return spawn_fn(task, workspace)
+-    except (TypeError, ValueError):
+-        return spawn_fn(task, workspace)
+-
+-
+ def _dispatch_lane_task(
+     conn: sqlite3.Connection,
+     row: sqlite3.Row,
+@@ -2118,7 +2105,9 @@ def _dispatch_lane_task(
+         # worker's system prompt via KANBAN_GUIDANCE.
+         claimed.skills = list(dict.fromkeys([*(claimed.skills or []), "sdlc-review"]))
+     try:
+-        pid = _call_spawn_fn(spawn_fn if spawn_fn is not None else _default_spawn, claimed, str(workspace), board)
++        from hermes_cli.kanban_db_worker_model import spawn_worker_with_model
++
++        pid = spawn_worker_with_model(conn, spawn_fn if spawn_fn is not None else _default_spawn, claimed, str(workspace), board)
+         if pid:
+             _set_worker_pid(conn, claimed.id, int(pid))
+         # Fires AFTER the PID (when reported) is durably persisted. Best-effort.
+diff --git a/hermes_cli/plugins.py b/hermes_cli/plugins.py
+index a652179cd4a..fe83a92a57a 100644
+--- a/hermes_cli/plugins.py
++++ b/hermes_cli/plugins.py
+@@ -130,7 +130,7 @@ VALID_HOOKS: set[str] = {
+     # Run-all-then-pick-first (see get_plugin_error_classification). Privacy: error_message/
+     # error_body may be unredacted.
+     "transform_api_error_classification", "on_session_start", "on_session_end",
+-    "on_session_finalize", "on_session_reset",
++    "on_session_finalize", "on_session_reset", "resolve_kanban_worker_model",
+     # on_skill_lifecycle: successful skill lifecycle facts (local skill name visible to plugins).
+     "on_skill_lifecycle", "subagent_start", "subagent_stop",
+     # pre_gateway_dispatch: once per incoming MessageEvent, after the internal-event guard, BEFORE
+diff --git a/hermes_cli/kanban_db_worker_model.py b/hermes_cli/kanban_db_worker_model.py
+new file mode 100644
+index 00000000000..dc7b5d5f3c2
+--- /dev/null
++++ b/hermes_cli/kanban_db_worker_model.py
+@@ -0,0 +1,89 @@
++"""Resolve a worker model once per attempt before any process is launched."""
++from dataclasses import asdict, replace
++from typing import Optional
++
++from hermes_cli.kanban_db import Task
++import inspect
++import json
++
++
++def _validate(selection):
++    if not isinstance(selection, dict):
++        raise ValueError('Worker model resolver must return a mapping or None')
++    for key in ('provider', 'model', 'source', 'root_id'):
++        value = selection.get(key)
++        if not isinstance(value, str) or not value.strip() or value != value.strip() or value.startswith('-') or any(ord(c) < 32 for c in value):
++            raise ValueError(f'Invalid worker model selection: {key}')
++    if type(selection.get('revision')) is not int or selection['revision'] < 0:
++        raise ValueError('Invalid worker model selection revision')
++    return {key: selection[key] for key in ('provider', 'model', 'source', 'root_id', 'revision')}
++
++
++def _resolve(task, workspace, board, board_path):
++    from hermes_cli.plugins import has_hook, iter_hook_callbacks
++
++    if not has_hook('resolve_kanban_worker_model'):
++        return None
++    payload = dict(task=asdict(task), workspace=workspace, board=board, board_path=board_path)
++    resolved = []
++    for callback in iter_hook_callbacks('resolve_kanban_worker_model'):
++        signature = inspect.signature(callback)
++        kwargs = payload if any(p.kind == p.VAR_KEYWORD for p in signature.parameters.values()) else {
++            key: value for key, value in payload.items() if key in signature.parameters
++        }
++        result = callback(**kwargs)
++        if inspect.isawaitable(result):
++            if inspect.iscoroutine(result):
++                result.close()
++            raise ValueError('Worker model resolvers must be synchronous')
++        if result is not None:
++            resolved.append(_validate(result))
++    if len(resolved) > 1:
++        raise ValueError('Multiple worker model resolvers claimed this task')
++    return resolved[0] if resolved else None
++
++
++def prepare_worker_model(conn, task, workspace, board):
++    from hermes_cli import kanban_db as kb
++
++    row = conn.execute('SELECT metadata,status FROM task_runs WHERE id=? AND task_id=?',
++                       (task.current_run_id, task.id)).fetchone()
++    if row is None or row['status'] != 'running':
++        raise ValueError('Worker model resolution requires a current running attempt')
++    metadata = json.loads(row['metadata'] or '{}')
++    captured = metadata.get('worker_model_selection')
++    if captured is None:
++        board_path = next(row[2] for row in conn.execute('PRAGMA database_list') if row[1] == 'main')
++        captured = _resolve(task, workspace, board, board_path)
++        if captured is None:
++            return task
++        with kb.write_txn(conn):
++            # Merge against the latest metadata so session-link writers are preserved.
++            current = conn.execute('SELECT metadata FROM task_runs WHERE id=? AND task_id=? AND status=?',
++                                   (task.current_run_id, task.id, 'running')).fetchone()
++            if current is None:
++                raise ValueError('Worker attempt ended before model capture')
++            metadata = json.loads(current['metadata'] or '{}')
++            captured = metadata.setdefault('worker_model_selection', captured)
++            conn.execute('UPDATE task_runs SET metadata=? WHERE id=?',
++                         (json.dumps(metadata), task.current_run_id))
++    captured = _validate(captured)
++    return replace(task, model_override=captured['model'], provider_override=captured['provider'])
++
++
++def _call_spawn_fn(spawn_fn, task: Task, workspace: str, board: Optional[str]) -> Optional[int]:
++    """Back-compat: older spawn_fn signatures (and test stubs) accept only
++    ``(task, workspace)``; pass ``board`` only when the callable supports it."""
++    import inspect
++    try:
++        sig = inspect.signature(spawn_fn)
++        if "board" in sig.parameters:
++            return spawn_fn(task, workspace, board=board)
++        return spawn_fn(task, workspace)
++    except (TypeError, ValueError):
++        return spawn_fn(task, workspace)
++
++
++def spawn_worker_with_model(conn, spawn_fn, task, workspace, board):
++    worker = prepare_worker_model(conn, task, workspace, board)
++    return _call_spawn_fn(spawn_fn, worker, workspace, board)
+diff --git a/tests/hermes_cli/test_kanban_worker_model_resolution.py b/tests/hermes_cli/test_kanban_worker_model_resolution.py
+new file mode 100644
+index 00000000000..8fadc8fbdb5
+--- /dev/null
++++ b/tests/hermes_cli/test_kanban_worker_model_resolution.py
+@@ -0,0 +1,88 @@
++"""Model resolution is captured before dispatch, never reconstructed from defaults."""
++import json
++from pathlib import Path
++
++import pytest
++from hermes_cli import kanban_db as kb
++from hermes_cli import kanban_db_connect as kbc
++from hermes_cli import kanban_db_dispatch as dispatch
++from hermes_cli.plugins import get_plugin_manager
++
++
++@pytest.fixture
++def board(tmp_path, monkeypatch):
++    home = tmp_path / '.hermes'
++    home.mkdir()
++    monkeypatch.setenv('HERMES_HOME', str(home))
++    monkeypatch.setattr(Path, 'home', lambda: tmp_path)
++    kb.init_db()
++    conn = kbc.connect()
++    manager = get_plugin_manager()
++    saved = {k: list(v) for k, v in manager._hooks.items()}
++    manager._hooks['resolve_kanban_worker_model'] = []
++    yield conn, manager
++    manager._hooks = saved
++    conn.close()
++
++
++def choice(**kwargs):
++    return dict(provider='test-provider', model='chosen-model', source='task_override', revision=7, root_id='t_ab')
++
++
++def test_dispatch_captures_model_before_spawn(board, all_assignees_spawnable):
++    conn, manager = board
++    manager._hooks['resolve_kanban_worker_model'] = [choice]
++    tid = kb.create_task(conn, title='work', assignee='alice')
++    observed = []
++    def spawn(task, workspace, **kwargs):
++        row = conn.execute('SELECT metadata FROM task_runs WHERE id=?', (task.current_run_id,)).fetchone()
++        observed.append((task.model_override, task.provider_override, json.loads(row[0] or '{}')))
++    result = dispatch.dispatch_once(conn, spawn_fn=spawn)
++    assert result.spawned
++    assert observed[0][0:2] == ('chosen-model', 'test-provider')
++    assert observed[0][2]['worker_model_selection']['revision'] == 7
++    assert kb.get_task(conn, tid).model_override is None
++
++
++def test_resolver_failure_prevents_spawn(board, all_assignees_spawnable):
++    conn, manager = board
++    def broken(**kwargs): raise ValueError('model policy unavailable')
++    manager._hooks['resolve_kanban_worker_model'] = [broken]
++    tid = kb.create_task(conn, title='work', assignee='alice')
++    spawned = []
++    dispatch.dispatch_once(conn, spawn_fn=lambda *a, **k: spawned.append(a))
++    assert not spawned
++    row = conn.execute('SELECT outcome,error FROM task_runs WHERE task_id=?', (tid,)).fetchone()
++    assert row['outcome'] == 'spawn_failed'
++    assert 'model policy unavailable' in row['error']
++
++
++def test_unmanaged_dispatch_keeps_native_override(board, all_assignees_spawnable):
++    conn, _ = board
++    kb.create_task(conn, title='ordinary', assignee='alice', model_override='native', provider_override='native-provider')
++    seen = []
++    dispatch.dispatch_once(conn, spawn_fn=lambda task, *a, **k: seen.append(task.model_override))
++    assert seen == ['native']
++
++
++def test_capture_preserves_metadata_and_rejects_duplicate_resolvers(board):
++    from hermes_cli.kanban_db_worker_model import prepare_worker_model
++    conn, manager = board
++    tid = kb.create_task(conn, title='work', assignee='alice')
++    kb.promote_task(conn, tid, actor='test')
++    task = kb.claim_task(conn, tid)
++    conn.execute('UPDATE task_runs SET metadata=? WHERE id=?', ('{"worker_session_id":"session"}', task.current_run_id))
++    conn.commit()
++    manager._hooks['resolve_kanban_worker_model'] = [choice]
++    captured = prepare_worker_model(conn, task, '/tmp', 'default')
++    manager._hooks['resolve_kanban_worker_model'] = [lambda **kw: {**choice(), 'model':'later', 'revision':8}]
++    # Re-entering the same claimed attempt must retain its original decision.
++    again = prepare_worker_model(conn, task, '/tmp', 'default')
++    assert again.model_override == captured.model_override == 'chosen-model'
++    metadata = json.loads(conn.execute('SELECT metadata FROM task_runs WHERE id=?', (task.current_run_id,)).fetchone()[0])
++    assert metadata['worker_session_id'] == 'session'
++    conn.execute('UPDATE task_runs SET metadata=NULL WHERE id=?', (task.current_run_id,))
++    conn.commit()
++    manager._hooks['resolve_kanban_worker_model'] = [choice, choice]
++    with pytest.raises(ValueError, match='Multiple'):
++        prepare_worker_model(conn, task, '/tmp', 'default')

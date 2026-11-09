@@ -1,0 +1,29 @@
+#!/usr/bin/env python3
+"""Drop a ticket into the factory intake queue (Triage lane). The intake pump turns it into a FACTORY root.
+  factory_ticket.py --title "Add daily reward popup" --project bouncinggems --type feature \
+      --acceptance "popup shows once per day" --request "..."
+  --project new   -> brand-new project (optional --new-dir /abs/path)."""
+import argparse, sys
+from factory_lib import hermes, load_config
+
+p = argparse.ArgumentParser()
+p.add_argument("--title", required=True)
+p.add_argument("--project", default="", help="repo alias from state/factory/repos.json (default repo if omitted), an absolute path, or 'new'")
+p.add_argument("--type", default="feature", choices=["feature", "bug", "chore"])
+p.add_argument("--request", required=True)
+p.add_argument("--acceptance", default="")
+p.add_argument("--new-dir", default="")
+p.add_argument("--decompose", action="store_true", help="let `kanban decompose` split a large ticket first")
+p.add_argument("--priority", default="0")
+p.add_argument("--board", default=None)
+a = p.parse_args()
+cfg = load_config()
+lines = ["FACTORY_TICKET v1", "PROJECT: " + a.project, "TYPE: " + a.type]
+if a.new_dir:
+    lines.append("NEW_DIR: " + a.new_dir)
+if a.decompose:
+    lines.append("DECOMPOSE: yes")
+lines += ["ACCEPTANCE: " + (a.acceptance or "none"), "REQUEST:", a.request]
+r = hermes(["create", "%s %s" % (cfg["ticket_prefix"], a.title), "--triage", "--priority", a.priority,
+            "--created-by", "factory-ticket", "--body-file", "-", "--json"], a.board, stdin="\n".join(lines) + "\n")
+print(r.stdout.strip())

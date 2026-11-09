@@ -1,0 +1,155 @@
+▶ not activated — using HERMES_PYTHON: /private/tmp/hermes-factory-sandbox-testenv/bin/python
+▶ running per-file parallel test suite via run_tests_parallel.py
+  (TZ=UTC LANG=C.UTF-8 PYTHONHASHSEED=0; clean env)
+▶ pre-compiling bytecode cache
+▶ launching test runner
+Discovered 6 test files (~73 tests) under ['/private/tmp/hermes-factory-dashboard/tests/hermes_integration/test_workflow_controller.py', '/private/tmp/hermes-factory-dashboard/tests/hermes_integration/test_workflow_guards.py', 'tests/hermes_cli/test_kanban_mutation_guards.py', 'tests/hermes_cli/test_kanban_db.py', 'tests/hermes_cli/test_kanban_worker_model_resolution.py', 'tests/hermes_cli/test_kanban_task_settings_creation.py']; running with -j 10
+[  4.1% |     3/~73 | ✓3 | ✗0] ✓ tests/hermes_cli/test_kanban_task_settings_creation.py (3✓, 3.6s)
+[ 11.0% |     8/~73 | ✓8 | ✗0] ✓ tests/hermes_cli/test_kanban_worker_model_resolution.py (5✓, 4.9s)
+[ 20.5% |    15/~73 | ✓15 | ✗ 0] ✓ /private/tmp/hermes-factory-dashboard/tests/hermes_integration/test_workflow_guards.py (7✓, 5.8s)
+[ 28.8% |    21/~73 | ✓22 | ✗ 0] ✓ /private/tmp/hermes-factory-dashboard/tests/hermes_integration/test_workflow_controller.py (7✓, 6.0s)
+[ 34.2% |    25/~73 | ✓35 | ✗ 0] ✓ tests/hermes_cli/test_kanban_mutation_guards.py (13✓, 8.0s)
+[100.0% |    73/~73 | ✓88 | ✗ 1] ✗ tests/hermes_cli/test_kanban_db.py (53✓ 1✗ 1s, 17.9s)
+
+  ╔╍ Failed: tests/hermes_cli/test_kanban_db.py ╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍
+  ║ INFO     hermes_cli.plugins:plugins.py:373 Plugin 'browser-firecrawl' registered browser provider: firecrawl
+  ║ INFO     hermes_cli.plugins:plugins.py:373 Plugin 'deepinfra' registered image_gen provider: deepinfra
+  ║ INFO     hermes_cli.plugins:plugins.py:373 Plugin 'fal' registered image_gen provider: fal
+  ║ INFO     hermes_cli.plugins:plugins.py:373 Plugin 'krea' registered image_gen provider: krea
+  ║ INFO     hermes_cli.plugins:plugins.py:373 Plugin 'meta-ai-image-gen' registered image_gen provider: meta-ai
+  ║ INFO     hermes_cli.plugins:plugins.py:373 Plugin 'openai' registered image_gen provider: openai
+  ║ INFO     hermes_cli.plugins:plugins.py:373 Plugin 'openai-codex' registered image_gen provider: openai-codex
+  ║ INFO     hermes_cli.plugins:plugins.py:373 Plugin 'openrouter' registered image_gen provider: openrouter
+  ║ INFO     hermes_cli.plugins:plugins.py:373 Plugin 'openrouter' registered image_gen provider: nous
+  ║ INFO     hermes_cli.plugins:plugins.py:373 Plugin 'xai' registered image_gen provider: xai
+  ║ INFO     hermes_cli.plugins:plugins.py:373 Plugin 'deepinfra' registered video_gen provider: deepinfra
+  ║ INFO     hermes_cli.plugins:plugins.py:373 Plugin 'fal' registered video_gen provider: fal
+  ║ INFO     hermes_cli.plugins:plugins.py:373 Plugin 'openrouter' registered video_gen provider: openrouter
+  ║ INFO     hermes_cli.plugins:plugins.py:373 Plugin 'xai' registered video_gen provider: xai
+  ║ INFO     hermes_cli.plugins:plugins.py:373 Plugin 'web-brave-free' registered web provider: brave-free
+  ║ INFO     hermes_cli.plugins:plugins.py:373 Plugin 'web-ddgs' registered web provider: ddgs
+  ║ INFO     hermes_cli.plugins:plugins.py:373 Plugin 'web-exa' registered web provider: exa
+  ║ INFO     hermes_cli.plugins:plugins.py:373 Plugin 'web-firecrawl' registered web provider: firecrawl
+  ║ INFO     hermes_cli.plugins:plugins.py:373 Plugin 'web-keenable' registered web provider: keenable
+  ║ INFO     hermes_cli.plugins:plugins.py:373 Plugin 'web-openai-native' registered web provider: openai-native
+  ║ INFO     hermes_cli.plugins:plugins.py:373 Plugin 'web-parallel' registered web provider: parallel
+  ║ INFO     hermes_cli.plugins:plugins.py:373 Plugin 'web-perplexity' registered web provider: perplexity
+  ║ INFO     hermes_cli.plugins:plugins.py:373 Plugin 'web-searxng' registered web provider: searxng
+  ║ INFO     hermes_cli.plugins:plugins.py:373 Plugin 'web-tavily' registered web provider: tavily
+  ║ INFO     hermes_cli.plugins:plugins.py:373 Plugin 'web-xai' registered web provider: xai
+  ║ INFO     hermes_cli.plugins:plugins.py:1428 Plugin discovery complete: 55 found, 51 enabled
+  ║ WARNING  hermes_cli.kanban_db:kanban_db_workspace.py:608 kanban: scratch workspaces are ephemeral — they're deleted when the task completes. Use --workspace worktree: (git worktree) or --workspace dir:/abs/path (existing dir) to preserve worker output. (task t_f46e0903)
+  ║ =========================== short test summary info ============================
+  ║ FAILED tests/hermes_cli/test_kanban_db.py::test_infrastructure_spawn_refusal_never_charges_the_card
+  ║ =================== 1 failed, 53 passed, 1 skipped in 16.91s ===================
+  ║
+  ║  Repro: python -m pytest tests/hermes_cli/test_kanban_db.py
+  ╚╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍
+
+
+=== Summary: 6 files, 88 tests passed, 1 failed, 1 skipped (100% complete) in 18.0s (10 workers) ===
+
+  note: platforms('windows') tests (in 1 file) were SKIPPED on this host (darwin); they run on the Windows Python-tests lane.
+  Durations cached to test_durations.json (5 files)
+
+=== Per-file subprocess time distribution ===
+  Files:   6
+  Total subprocess CPU-wall: 46.2s  (runner wall: 18.0s, parallelism: 10x)
+  P50: 6.02s  P90: 17.90s  P95: 17.90s  P99: 17.90s  Max: 17.90s
+  <1s: 0 files (0%)  <2s: 0 files (0%)
+  Top 10 slowest:
+     17.90s  tests/hermes_cli/test_kanban_db.py
+      8.04s  tests/hermes_cli/test_kanban_mutation_guards.py
+      6.02s  /private/tmp/hermes-factory-dashboard/tests/hermes_integration/test_workflow_controller.py
+      5.76s  /private/tmp/hermes-factory-dashboard/tests/hermes_integration/test_workflow_guards.py
+      4.88s  tests/hermes_cli/test_kanban_worker_model_resolution.py
+      3.62s  tests/hermes_cli/test_kanban_task_settings_creation.py
+
+=== Failure output ===
+
+--- tests/hermes_cli/test_kanban_db.py ---
+============================= test session starts ==============================
+platform darwin -- Python 3.14.7, pytest-9.1.1, pluggy-1.7.0
+rootdir: /private/tmp/hermes-timeline-integration
+configfile: pyproject.toml
+plugins: asyncio-1.3.0, anyio-4.14.2
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 55 items
+
+tests/hermes_cli/test_kanban_db.py s.................F.................. [ 67%]
+..................                                                       [100%]
+
+=================================== FAILURES ===================================
+___________ test_infrastructure_spawn_refusal_never_charges_the_card ___________
+
+kanban_home = PosixPath('/private/var/tmp/hermes-pytest-501/r-6bivts_z/pytest-of-example/pytest-0/test_infrastructure_spawn_refu0/.hermes')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10e388c30>
+all_assignees_spawnable = None
+
+    def test_infrastructure_spawn_refusal_never_charges_the_card(
+        kanban_home, monkeypatch, all_assignees_spawnable,
+    ):
+        """The host refusing to place a worker (managed gateway, user bus gone —
+        #114720) is not a card failure: through the REAL spawn boundary and the
+        real dispatcher accounting, ``consecutive_failures`` stays put, the breaker
+        never parks the card as a bare ``blocked``, the run is tagged
+        ``infrastructure`` and the guard spaces the retries. A control spawn
+        failure on the same card still counts."""
+        from tools import process_registry
+    
+        monkeypatch.setattr(process_registry, "_is_supervised_gateway_process", lambda: True)
+        monkeypatch.setenv("INVOCATION_ID", "managed-gateway")
+        monkeypatch.setattr(process_registry, "_systemd_run_user_scope_available", lambda: False)
+        monkeypatch.setenv("HERMES_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS", "0")
+    
+        def spawn_via_real_boundary(task, workspace, board=None):
+            kbd._restart_safe_worker_argv(task, ["hermes", "chat"])  # raises: real probe verdict, real _degrade()
+            raise AssertionError("unreachable")
+    
+        with kbc.connect() as conn:
+            tid = kb.create_task(conn, title="bus is down", assignee="a")
+            for _ in range(3):
+                res = kbd.dispatch_once(conn, spawn_fn=spawn_via_real_boundary, failure_limit=2)
+>               assert res.auto_blocked == []
+E               AssertionError: assert ['t_f46e0903'] == []
+E                 
+E                 Left contains one more item: 't_f46e0903'
+E                 Use -v to get more diff
+
+tests/hermes_cli/test_kanban_db.py:578: AssertionError
+------------------------------ Captured log call -------------------------------
+INFO     hermes_cli.plugins:plugins.py:373 Plugin 'browser-browser-use' registered browser provider: browser-use
+INFO     hermes_cli.plugins:plugins.py:373 Plugin 'browser-browserbase' registered browser provider: browserbase
+INFO     hermes_cli.plugins:plugins.py:373 Plugin 'browser-firecrawl' registered browser provider: firecrawl
+INFO     hermes_cli.plugins:plugins.py:373 Plugin 'deepinfra' registered image_gen provider: deepinfra
+INFO     hermes_cli.plugins:plugins.py:373 Plugin 'fal' registered image_gen provider: fal
+INFO     hermes_cli.plugins:plugins.py:373 Plugin 'krea' registered image_gen provider: krea
+INFO     hermes_cli.plugins:plugins.py:373 Plugin 'meta-ai-image-gen' registered image_gen provider: meta-ai
+INFO     hermes_cli.plugins:plugins.py:373 Plugin 'openai' registered image_gen provider: openai
+INFO     hermes_cli.plugins:plugins.py:373 Plugin 'openai-codex' registered image_gen provider: openai-codex
+INFO     hermes_cli.plugins:plugins.py:373 Plugin 'openrouter' registered image_gen provider: openrouter
+INFO     hermes_cli.plugins:plugins.py:373 Plugin 'openrouter' registered image_gen provider: nous
+INFO     hermes_cli.plugins:plugins.py:373 Plugin 'xai' registered image_gen provider: xai
+INFO     hermes_cli.plugins:plugins.py:373 Plugin 'deepinfra' registered video_gen provider: deepinfra
+INFO     hermes_cli.plugins:plugins.py:373 Plugin 'fal' registered video_gen provider: fal
+INFO     hermes_cli.plugins:plugins.py:373 Plugin 'openrouter' registered video_gen provider: openrouter
+INFO     hermes_cli.plugins:plugins.py:373 Plugin 'xai' registered video_gen provider: xai
+INFO     hermes_cli.plugins:plugins.py:373 Plugin 'web-brave-free' registered web provider: brave-free
+INFO     hermes_cli.plugins:plugins.py:373 Plugin 'web-ddgs' registered web provider: ddgs
+INFO     hermes_cli.plugins:plugins.py:373 Plugin 'web-exa' registered web provider: exa
+INFO     hermes_cli.plugins:plugins.py:373 Plugin 'web-firecrawl' registered web provider: firecrawl
+INFO     hermes_cli.plugins:plugins.py:373 Plugin 'web-keenable' registered web provider: keenable
+INFO     hermes_cli.plugins:plugins.py:373 Plugin 'web-openai-native' registered web provider: openai-native
+INFO     hermes_cli.plugins:plugins.py:373 Plugin 'web-parallel' registered web provider: parallel
+INFO     hermes_cli.plugins:plugins.py:373 Plugin 'web-perplexity' registered web provider: perplexity
+INFO     hermes_cli.plugins:plugins.py:373 Plugin 'web-searxng' registered web provider: searxng
+INFO     hermes_cli.plugins:plugins.py:373 Plugin 'web-tavily' registered web provider: tavily
+INFO     hermes_cli.plugins:plugins.py:373 Plugin 'web-xai' registered web provider: xai
+INFO     hermes_cli.plugins:plugins.py:1428 Plugin discovery complete: 55 found, 51 enabled
+WARNING  hermes_cli.kanban_db:kanban_db_workspace.py:608 kanban: scratch workspaces are ephemeral — they're deleted when the task completes. Use --workspace worktree: (git worktree) or --workspace dir:/abs/path (existing dir) to preserve worker output. (task t_f46e0903)
+=========================== short test summary info ============================
+FAILED tests/hermes_cli/test_kanban_db.py::test_infrastructure_spawn_refusal_never_charges_the_card
+=================== 1 failed, 53 passed, 1 skipped in 16.91s ===================
+
+=== 1 file with test failures (1 test failed) ===
+  tests/hermes_cli/test_kanban_db.py  (1 test failed)

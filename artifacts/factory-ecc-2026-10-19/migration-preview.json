@@ -1,0 +1,330 @@
+{
+  "changes": [
+    {
+      "after": {
+        "description": "",
+        "implement": {
+          "instructions": "<!-- factory-ecc-guidance/v1:begin -->\nContext retrieval: use the assigned workspace and permitted parent artifacts only.\nStart with repository terms and likely entry points; inspect relevant callers and tests.\nName missing context, refine the search, and reassess after at most three refinement\nrounds. Continue necessary reading; the bound never permits guessing requirements.\nCheck PLAN.md references against this workspace. Record unresolved gaps and supporting\npaths/reasons in PLAN.md during preparation, or the existing report during later stages.\nRespect read-only preparation, manifest snapshots, and the existing worker contract.\nKeep detailed evidence in retained artifacts, not extra handoff metadata.\n<!-- factory-ecc-guidance/v1:end -->",
+          "key": "implement",
+          "kind": "implement",
+          "profile": "developer"
+        },
+        "max_repairs": 3,
+        "name": "Feature",
+        "prepare": {
+          "instructions": "Design the change and observable acceptance criteria.\n\n<!-- factory-ecc-guidance/v1:begin -->\nResearch before planning: search the assigned repository for existing behavior,\nconventions, and extension points. For relevant dependencies/integrations, consult\navailable approved documentation or registries. Never add tools, expand network policy,\nor treat unavailable search channels as proof that no solution exists.\nIn PLAN.md record the need, inspected paths, reusable solutions, selected approach and\nreasons, alternatives when architecture matters, unavailable channels, and context gaps.\nExternal research is conditional; local evidence is always the starting point.\n\nContext retrieval: use the assigned workspace and permitted parent artifacts only.\nStart with repository terms and likely entry points; inspect relevant callers and tests.\nName missing context, refine the search, and reassess after at most three refinement\nrounds. Continue necessary reading; the bound never permits guessing requirements.\nCheck PLAN.md references against this workspace. Record unresolved gaps and supporting\npaths/reasons in PLAN.md during preparation, or the existing report during later stages.\nRespect read-only preparation, manifest snapshots, and the existing worker contract.\nKeep detailed evidence in retained artifacts, not extra handoff metadata.\n<!-- factory-ecc-guidance/v1:end -->",
+          "key": "prepare",
+          "kind": "prepare",
+          "profile": "architect"
+        },
+        "repair": {
+          "instructions": "<!-- factory-ecc-guidance/v1:begin -->\nContext retrieval: use the assigned workspace and permitted parent artifacts only.\nStart with repository terms and likely entry points; inspect relevant callers and tests.\nName missing context, refine the search, and reassess after at most three refinement\nrounds. Continue necessary reading; the bound never permits guessing requirements.\nCheck PLAN.md references against this workspace. Record unresolved gaps and supporting\npaths/reasons in PLAN.md during preparation, or the existing report during later stages.\nRespect read-only preparation, manifest snapshots, and the existing worker contract.\nKeep detailed evidence in retained artifacts, not extra handoff metadata.\n<!-- factory-ecc-guidance/v1:end -->",
+          "key": "repair",
+          "kind": "repair",
+          "profile": "fixer"
+        },
+        "reviewers": [
+          {
+            "instructions": "",
+            "key": "claude-reviewer",
+            "kind": "review",
+            "profile": "claude-reviewer"
+          },
+          {
+            "instructions": "",
+            "key": "security-reviewer",
+            "kind": "review",
+            "profile": "security-reviewer"
+          },
+          {
+            "instructions": "",
+            "key": "ux-reviewer",
+            "kind": "review",
+            "profile": "ux-reviewer"
+          },
+          {
+            "instructions": "",
+            "key": "ui-reviewer",
+            "kind": "review",
+            "profile": "ui-reviewer"
+          }
+        ],
+        "revision": 1,
+        "task_type": "feature",
+        "template_id": "a6fdbeb7-fd95-43fe-bed4-8f02b66b65bb",
+        "verify": {
+          "instructions": "",
+          "key": "verify",
+          "kind": "verify",
+          "profile": "verifier"
+        }
+      },
+      "before": {
+        "description": "",
+        "implement": {
+          "instructions": "",
+          "key": "implement",
+          "kind": "implement",
+          "profile": "developer"
+        },
+        "max_repairs": 3,
+        "name": "Feature",
+        "prepare": {
+          "instructions": "Design the change and observable acceptance criteria.",
+          "key": "prepare",
+          "kind": "prepare",
+          "profile": "architect"
+        },
+        "repair": {
+          "instructions": "",
+          "key": "repair",
+          "kind": "repair",
+          "profile": "fixer"
+        },
+        "reviewers": [
+          {
+            "instructions": "",
+            "key": "claude-reviewer",
+            "kind": "review",
+            "profile": "claude-reviewer"
+          },
+          {
+            "instructions": "",
+            "key": "security-reviewer",
+            "kind": "review",
+            "profile": "security-reviewer"
+          },
+          {
+            "instructions": "",
+            "key": "ux-reviewer",
+            "kind": "review",
+            "profile": "ux-reviewer"
+          },
+          {
+            "instructions": "",
+            "key": "ui-reviewer",
+            "kind": "review",
+            "profile": "ui-reviewer"
+          }
+        ],
+        "revision": 1,
+        "task_type": "feature",
+        "template_id": "a6fdbeb7-fd95-43fe-bed4-8f02b66b65bb",
+        "verify": {
+          "instructions": "",
+          "key": "verify",
+          "kind": "verify",
+          "profile": "verifier"
+        }
+      },
+      "instruction_diffs": {
+        "implement": "--- implement/before\n+++ implement/after\n@@ -0,0 +1,10 @@\n+<!-- factory-ecc-guidance/v1:begin -->\n+Context retrieval: use the assigned workspace and permitted parent artifacts only.\n+Start with repository terms and likely entry points; inspect relevant callers and tests.\n+Name missing context, refine the search, and reassess after at most three refinement\n+rounds. Continue necessary reading; the bound never permits guessing requirements.\n+Check PLAN.md references against this workspace. Record unresolved gaps and supporting\n+paths/reasons in PLAN.md during preparation, or the existing report during later stages.\n+Respect read-only preparation, manifest snapshots, and the existing worker contract.\n+Keep detailed evidence in retained artifacts, not extra handoff metadata.\n+<!-- factory-ecc-guidance/v1:end -->",
+        "prepare": "--- prepare/before\n+++ prepare/after\n@@ -1 +1,20 @@\n-Design the change and observable acceptance criteria.+Design the change and observable acceptance criteria.\n+\n+<!-- factory-ecc-guidance/v1:begin -->\n+Research before planning: search the assigned repository for existing behavior,\n+conventions, and extension points. For relevant dependencies/integrations, consult\n+available approved documentation or registries. Never add tools, expand network policy,\n+or treat unavailable search channels as proof that no solution exists.\n+In PLAN.md record the need, inspected paths, reusable solutions, selected approach and\n+reasons, alternatives when architecture matters, unavailable channels, and context gaps.\n+External research is conditional; local evidence is always the starting point.\n+\n+Context retrieval: use the assigned workspace and permitted parent artifacts only.\n+Start with repository terms and likely entry points; inspect relevant callers and tests.\n+Name missing context, refine the search, and reassess after at most three refinement\n+rounds. Continue necessary reading; the bound never permits guessing requirements.\n+Check PLAN.md references against this workspace. Record unresolved gaps and supporting\n+paths/reasons in PLAN.md during preparation, or the existing report during later stages.\n+Respect read-only preparation, manifest snapshots, and the existing worker contract.\n+Keep detailed evidence in retained artifacts, not extra handoff metadata.\n+<!-- factory-ecc-guidance/v1:end -->",
+        "repair": "--- repair/before\n+++ repair/after\n@@ -0,0 +1,10 @@\n+<!-- factory-ecc-guidance/v1:begin -->\n+Context retrieval: use the assigned workspace and permitted parent artifacts only.\n+Start with repository terms and likely entry points; inspect relevant callers and tests.\n+Name missing context, refine the search, and reassess after at most three refinement\n+rounds. Continue necessary reading; the bound never permits guessing requirements.\n+Check PLAN.md references against this workspace. Record unresolved gaps and supporting\n+paths/reasons in PLAN.md during preparation, or the existing report during later stages.\n+Respect read-only preparation, manifest snapshots, and the existing worker contract.\n+Keep detailed evidence in retained artifacts, not extra handoff metadata.\n+<!-- factory-ecc-guidance/v1:end -->"
+      },
+      "revision": 1,
+      "template_id": "a6fdbeb7-fd95-43fe-bed4-8f02b66b65bb"
+    },
+    {
+      "after": {
+        "description": "",
+        "implement": {
+          "instructions": "<!-- factory-ecc-guidance/v1:begin -->\nContext retrieval: use the assigned workspace and permitted parent artifacts only.\nStart with repository terms and likely entry points; inspect relevant callers and tests.\nName missing context, refine the search, and reassess after at most three refinement\nrounds. Continue necessary reading; the bound never permits guessing requirements.\nCheck PLAN.md references against this workspace. Record unresolved gaps and supporting\npaths/reasons in PLAN.md during preparation, or the existing report during later stages.\nRespect read-only preparation, manifest snapshots, and the existing worker contract.\nKeep detailed evidence in retained artifacts, not extra handoff metadata.\n<!-- factory-ecc-guidance/v1:end -->",
+          "key": "implement",
+          "kind": "implement",
+          "profile": "fixer"
+        },
+        "max_repairs": 3,
+        "name": "Bug fix",
+        "prepare": {
+          "instructions": "Diagnose the root cause and plan a regression test that fails before the repair and passes afterward.\n\n<!-- factory-ecc-guidance/v1:begin -->\nResearch before planning: search the assigned repository for existing behavior,\nconventions, and extension points. For relevant dependencies/integrations, consult\navailable approved documentation or registries. Never add tools, expand network policy,\nor treat unavailable search channels as proof that no solution exists.\nIn PLAN.md record the need, inspected paths, reusable solutions, selected approach and\nreasons, alternatives when architecture matters, unavailable channels, and context gaps.\nExternal research is conditional; local evidence is always the starting point.\n\nContext retrieval: use the assigned workspace and permitted parent artifacts only.\nStart with repository terms and likely entry points; inspect relevant callers and tests.\nName missing context, refine the search, and reassess after at most three refinement\nrounds. Continue necessary reading; the bound never permits guessing requirements.\nCheck PLAN.md references against this workspace. Record unresolved gaps and supporting\npaths/reasons in PLAN.md during preparation, or the existing report during later stages.\nRespect read-only preparation, manifest snapshots, and the existing worker contract.\nKeep detailed evidence in retained artifacts, not extra handoff metadata.\n<!-- factory-ecc-guidance/v1:end -->",
+          "key": "prepare",
+          "kind": "prepare",
+          "profile": "fixer"
+        },
+        "repair": {
+          "instructions": "<!-- factory-ecc-guidance/v1:begin -->\nContext retrieval: use the assigned workspace and permitted parent artifacts only.\nStart with repository terms and likely entry points; inspect relevant callers and tests.\nName missing context, refine the search, and reassess after at most three refinement\nrounds. Continue necessary reading; the bound never permits guessing requirements.\nCheck PLAN.md references against this workspace. Record unresolved gaps and supporting\npaths/reasons in PLAN.md during preparation, or the existing report during later stages.\nRespect read-only preparation, manifest snapshots, and the existing worker contract.\nKeep detailed evidence in retained artifacts, not extra handoff metadata.\n<!-- factory-ecc-guidance/v1:end -->",
+          "key": "repair",
+          "kind": "repair",
+          "profile": "fixer"
+        },
+        "reviewers": [
+          {
+            "instructions": "",
+            "key": "claude-reviewer",
+            "kind": "review",
+            "profile": "claude-reviewer"
+          },
+          {
+            "instructions": "",
+            "key": "security-reviewer",
+            "kind": "review",
+            "profile": "security-reviewer"
+          }
+        ],
+        "revision": 1,
+        "task_type": "bug",
+        "template_id": "2537045b-b3fd-45c5-b316-0de9c7313ef1",
+        "verify": {
+          "instructions": "",
+          "key": "verify",
+          "kind": "verify",
+          "profile": "verifier"
+        }
+      },
+      "before": {
+        "description": "",
+        "implement": {
+          "instructions": "",
+          "key": "implement",
+          "kind": "implement",
+          "profile": "fixer"
+        },
+        "max_repairs": 3,
+        "name": "Bug fix",
+        "prepare": {
+          "instructions": "Diagnose the root cause and plan a regression test that fails before the repair and passes afterward.",
+          "key": "prepare",
+          "kind": "prepare",
+          "profile": "fixer"
+        },
+        "repair": {
+          "instructions": "",
+          "key": "repair",
+          "kind": "repair",
+          "profile": "fixer"
+        },
+        "reviewers": [
+          {
+            "instructions": "",
+            "key": "claude-reviewer",
+            "kind": "review",
+            "profile": "claude-reviewer"
+          },
+          {
+            "instructions": "",
+            "key": "security-reviewer",
+            "kind": "review",
+            "profile": "security-reviewer"
+          }
+        ],
+        "revision": 1,
+        "task_type": "bug",
+        "template_id": "2537045b-b3fd-45c5-b316-0de9c7313ef1",
+        "verify": {
+          "instructions": "",
+          "key": "verify",
+          "kind": "verify",
+          "profile": "verifier"
+        }
+      },
+      "instruction_diffs": {
+        "implement": "--- implement/before\n+++ implement/after\n@@ -0,0 +1,10 @@\n+<!-- factory-ecc-guidance/v1:begin -->\n+Context retrieval: use the assigned workspace and permitted parent artifacts only.\n+Start with repository terms and likely entry points; inspect relevant callers and tests.\n+Name missing context, refine the search, and reassess after at most three refinement\n+rounds. Continue necessary reading; the bound never permits guessing requirements.\n+Check PLAN.md references against this workspace. Record unresolved gaps and supporting\n+paths/reasons in PLAN.md during preparation, or the existing report during later stages.\n+Respect read-only preparation, manifest snapshots, and the existing worker contract.\n+Keep detailed evidence in retained artifacts, not extra handoff metadata.\n+<!-- factory-ecc-guidance/v1:end -->",
+        "prepare": "--- prepare/before\n+++ prepare/after\n@@ -1 +1,20 @@\n-Diagnose the root cause and plan a regression test that fails before the repair and passes afterward.+Diagnose the root cause and plan a regression test that fails before the repair and passes afterward.\n+\n+<!-- factory-ecc-guidance/v1:begin -->\n+Research before planning: search the assigned repository for existing behavior,\n+conventions, and extension points. For relevant dependencies/integrations, consult\n+available approved documentation or registries. Never add tools, expand network policy,\n+or treat unavailable search channels as proof that no solution exists.\n+In PLAN.md record the need, inspected paths, reusable solutions, selected approach and\n+reasons, alternatives when architecture matters, unavailable channels, and context gaps.\n+External research is conditional; local evidence is always the starting point.\n+\n+Context retrieval: use the assigned workspace and permitted parent artifacts only.\n+Start with repository terms and likely entry points; inspect relevant callers and tests.\n+Name missing context, refine the search, and reassess after at most three refinement\n+rounds. Continue necessary reading; the bound never permits guessing requirements.\n+Check PLAN.md references against this workspace. Record unresolved gaps and supporting\n+paths/reasons in PLAN.md during preparation, or the existing report during later stages.\n+Respect read-only preparation, manifest snapshots, and the existing worker contract.\n+Keep detailed evidence in retained artifacts, not extra handoff metadata.\n+<!-- factory-ecc-guidance/v1:end -->",
+        "repair": "--- repair/before\n+++ repair/after\n@@ -0,0 +1,10 @@\n+<!-- factory-ecc-guidance/v1:begin -->\n+Context retrieval: use the assigned workspace and permitted parent artifacts only.\n+Start with repository terms and likely entry points; inspect relevant callers and tests.\n+Name missing context, refine the search, and reassess after at most three refinement\n+rounds. Continue necessary reading; the bound never permits guessing requirements.\n+Check PLAN.md references against this workspace. Record unresolved gaps and supporting\n+paths/reasons in PLAN.md during preparation, or the existing report during later stages.\n+Respect read-only preparation, manifest snapshots, and the existing worker contract.\n+Keep detailed evidence in retained artifacts, not extra handoff metadata.\n+<!-- factory-ecc-guidance/v1:end -->"
+      },
+      "revision": 1,
+      "template_id": "2537045b-b3fd-45c5-b316-0de9c7313ef1"
+    },
+    {
+      "after": {
+        "description": "",
+        "implement": {
+          "instructions": "<!-- factory-ecc-guidance/v1:begin -->\nContext retrieval: use the assigned workspace and permitted parent artifacts only.\nStart with repository terms and likely entry points; inspect relevant callers and tests.\nName missing context, refine the search, and reassess after at most three refinement\nrounds. Continue necessary reading; the bound never permits guessing requirements.\nCheck PLAN.md references against this workspace. Record unresolved gaps and supporting\npaths/reasons in PLAN.md during preparation, or the existing report during later stages.\nRespect read-only preparation, manifest snapshots, and the existing worker contract.\nKeep detailed evidence in retained artifacts, not extra handoff metadata.\n<!-- factory-ecc-guidance/v1:end -->",
+          "key": "implement",
+          "kind": "implement",
+          "profile": "developer"
+        },
+        "max_repairs": 3,
+        "name": "Chore",
+        "prepare": {
+          "instructions": "Define the scope and demonstrate no unintended behavior change.\n\n<!-- factory-ecc-guidance/v1:begin -->\nResearch before planning: search the assigned repository for existing behavior,\nconventions, and extension points. For relevant dependencies/integrations, consult\navailable approved documentation or registries. Never add tools, expand network policy,\nor treat unavailable search channels as proof that no solution exists.\nIn PLAN.md record the need, inspected paths, reusable solutions, selected approach and\nreasons, alternatives when architecture matters, unavailable channels, and context gaps.\nExternal research is conditional; local evidence is always the starting point.\n\nContext retrieval: use the assigned workspace and permitted parent artifacts only.\nStart with repository terms and likely entry points; inspect relevant callers and tests.\nName missing context, refine the search, and reassess after at most three refinement\nrounds. Continue necessary reading; the bound never permits guessing requirements.\nCheck PLAN.md references against this workspace. Record unresolved gaps and supporting\npaths/reasons in PLAN.md during preparation, or the existing report during later stages.\nRespect read-only preparation, manifest snapshots, and the existing worker contract.\nKeep detailed evidence in retained artifacts, not extra handoff metadata.\n<!-- factory-ecc-guidance/v1:end -->",
+          "key": "prepare",
+          "kind": "prepare",
+          "profile": "developer"
+        },
+        "repair": {
+          "instructions": "<!-- factory-ecc-guidance/v1:begin -->\nContext retrieval: use the assigned workspace and permitted parent artifacts only.\nStart with repository terms and likely entry points; inspect relevant callers and tests.\nName missing context, refine the search, and reassess after at most three refinement\nrounds. Continue necessary reading; the bound never permits guessing requirements.\nCheck PLAN.md references against this workspace. Record unresolved gaps and supporting\npaths/reasons in PLAN.md during preparation, or the existing report during later stages.\nRespect read-only preparation, manifest snapshots, and the existing worker contract.\nKeep detailed evidence in retained artifacts, not extra handoff metadata.\n<!-- factory-ecc-guidance/v1:end -->",
+          "key": "repair",
+          "kind": "repair",
+          "profile": "fixer"
+        },
+        "reviewers": [
+          {
+            "instructions": "",
+            "key": "claude-reviewer",
+            "kind": "review",
+            "profile": "claude-reviewer"
+          }
+        ],
+        "revision": 1,
+        "task_type": "chore",
+        "template_id": "349a6484-53f6-4635-a6ed-6f2aa74f611c",
+        "verify": {
+          "instructions": "",
+          "key": "verify",
+          "kind": "verify",
+          "profile": "verifier"
+        }
+      },
+      "before": {
+        "description": "",
+        "implement": {
+          "instructions": "",
+          "key": "implement",
+          "kind": "implement",
+          "profile": "developer"
+        },
+        "max_repairs": 3,
+        "name": "Chore",
+        "prepare": {
+          "instructions": "Define the scope and demonstrate no unintended behavior change.",
+          "key": "prepare",
+          "kind": "prepare",
+          "profile": "developer"
+        },
+        "repair": {
+          "instructions": "",
+          "key": "repair",
+          "kind": "repair",
+          "profile": "fixer"
+        },
+        "reviewers": [
+          {
+            "instructions": "",
+            "key": "claude-reviewer",
+            "kind": "review",
+            "profile": "claude-reviewer"
+          }
+        ],
+        "revision": 1,
+        "task_type": "chore",
+        "template_id": "349a6484-53f6-4635-a6ed-6f2aa74f611c",
+        "verify": {
+          "instructions": "",
+          "key": "verify",
+          "kind": "verify",
+          "profile": "verifier"
+        }
+      },
+      "instruction_diffs": {
+        "implement": "--- implement/before\n+++ implement/after\n@@ -0,0 +1,10 @@\n+<!-- factory-ecc-guidance/v1:begin -->\n+Context retrieval: use the assigned workspace and permitted parent artifacts only.\n+Start with repository terms and likely entry points; inspect relevant callers and tests.\n+Name missing context, refine the search, and reassess after at most three refinement\n+rounds. Continue necessary reading; the bound never permits guessing requirements.\n+Check PLAN.md references against this workspace. Record unresolved gaps and supporting\n+paths/reasons in PLAN.md during preparation, or the existing report during later stages.\n+Respect read-only preparation, manifest snapshots, and the existing worker contract.\n+Keep detailed evidence in retained artifacts, not extra handoff metadata.\n+<!-- factory-ecc-guidance/v1:end -->",
+        "prepare": "--- prepare/before\n+++ prepare/after\n@@ -1 +1,20 @@\n-Define the scope and demonstrate no unintended behavior change.+Define the scope and demonstrate no unintended behavior change.\n+\n+<!-- factory-ecc-guidance/v1:begin -->\n+Research before planning: search the assigned repository for existing behavior,\n+conventions, and extension points. For relevant dependencies/integrations, consult\n+available approved documentation or registries. Never add tools, expand network policy,\n+or treat unavailable search channels as proof that no solution exists.\n+In PLAN.md record the need, inspected paths, reusable solutions, selected approach and\n+reasons, alternatives when architecture matters, unavailable channels, and context gaps.\n+External research is conditional; local evidence is always the starting point.\n+\n+Context retrieval: use the assigned workspace and permitted parent artifacts only.\n+Start with repository terms and likely entry points; inspect relevant callers and tests.\n+Name missing context, refine the search, and reassess after at most three refinement\n+rounds. Continue necessary reading; the bound never permits guessing requirements.\n+Check PLAN.md references against this workspace. Record unresolved gaps and supporting\n+paths/reasons in PLAN.md during preparation, or the existing report during later stages.\n+Respect read-only preparation, manifest snapshots, and the existing worker contract.\n+Keep detailed evidence in retained artifacts, not extra handoff metadata.\n+<!-- factory-ecc-guidance/v1:end -->",
+        "repair": "--- repair/before\n+++ repair/after\n@@ -0,0 +1,10 @@\n+<!-- factory-ecc-guidance/v1:begin -->\n+Context retrieval: use the assigned workspace and permitted parent artifacts only.\n+Start with repository terms and likely entry points; inspect relevant callers and tests.\n+Name missing context, refine the search, and reassess after at most three refinement\n+rounds. Continue necessary reading; the bound never permits guessing requirements.\n+Check PLAN.md references against this workspace. Record unresolved gaps and supporting\n+paths/reasons in PLAN.md during preparation, or the existing report during later stages.\n+Respect read-only preparation, manifest snapshots, and the existing worker contract.\n+Keep detailed evidence in retained artifacts, not extra handoff metadata.\n+<!-- factory-ecc-guidance/v1:end -->"
+      },
+      "revision": 1,
+      "template_id": "349a6484-53f6-4635-a6ed-6f2aa74f611c"
+    }
+  ],
+  "defaults": {
+    "revision": 1,
+    "templates": {
+      "bug": "2537045b-b3fd-45c5-b316-0de9c7313ef1",
+      "chore": "349a6484-53f6-4635-a6ed-6f2aa74f611c",
+      "feature": "a6fdbeb7-fd95-43fe-bed4-8f02b66b65bb"
+    }
+  },
+  "guidance_digest": "c0fb5462a003c7f28d31211c79be55f4f0f756727e4119590dc425296a845461",
+  "schema": "factory-ecc-migration/v1",
+  "settings_db": "/Users/example/.hermes/state/factory/task-settings.db"
+}

@@ -1,0 +1,143 @@
+#!/usr/bin/env python3
+"""Factory watchdog (no LLM). Recovers ENVIRONMENT blocks on FACTORY roots and leaves every judgment call to the human.
+
+Per run:
+  1. If any factory root is active (todo/ready/running) and Docker is down, try to start Docker (rate limited).
+  2. For each blocked FACTORY root, look at its latest `blocked` event:
+       - auto-retry ONLY when the block is environmental (Docker unavailable, or kind=capability), the orchestrator's own
+         printed reply line is free of waiver/approval/stop wording, preflight passes, and the card has retries left
+         (MAX_AUTO_RETRIES per card). The reply sent is the orchestrator's own text, verbatim.
+       - anything else (needs_input decisions, accepting failures, approving plans, publishing) is only reported.
+  Usage: factory_watchdog.py [--dry-run]. stdout is the report (empty when nothing happened)."""
+import json, os, re, subprocess, sys, time
+from factory_lib import STATE_DIR, hermes, kanban_list, kanban_show, load_config
+
+DRY = "--dry-run" in sys.argv
+MAX_AUTO_RETRIES = 2
+MAX_CARD_CHARS = 85000          # the orchestrator's tool output spills to an unreadable file around 100k chars
+DOCKER_WAIT_SECONDS = 180
+DOCKER_RETRY_COOLDOWN = 300
+STATE = os.path.join(STATE_DIR, "watchdog.json")
+BAD_REPLY = re.compile(r"\b(stop|accept|waive|waiver|approv\w*|exception\w*|substitut\w*|skip|ignore|override|disable|publish|merge)\b", re.I)
+DOCKER_BLOCK = re.compile(r"docker", re.I)
+DOCKER_DOWN = re.compile(r"unavailable|not (running|available|reachable)|restore docker|make docker available|daemon|cannot connect", re.I)
+REPLY = re.compile(r'hermes kanban unblock (t_[0-9a-f]+) --reason "([^"]+)"')
+
+
+def load_state():
+    try:
+        with open(STATE) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {"cards": {}, "docker_last_attempt": 0}
+
+
+def save_state(st):
+    if DRY:
+        return
+    os.makedirs(STATE_DIR, exist_ok=True)
+    with open(STATE, "w") as f:
+        json.dump(st, f, indent=1)
+
+
+def docker_ok():
+    try:
+        return subprocess.run(["docker", "info"], capture_output=True, timeout=25).returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
+def ensure_docker(st, out):
+    """Start Docker Desktop if it is down. Returns True when the daemon answers."""
+    if docker_ok():
+        return True
+    if time.time() - st.get("docker_last_attempt", 0) < DOCKER_RETRY_COOLDOWN:
+        return False
+    st["docker_last_attempt"] = time.time()
+    if DRY:
+        out.append("[dry-run] Docker is down; would run `open -a Docker`")
+        return False
+    out.append("Docker is down while the factory is active: starting Docker Desktop")
+    subprocess.run(["open", "-a", "Docker"], capture_output=True)
+    deadline = time.time() + DOCKER_WAIT_SECONDS
+    while time.time() < deadline:
+        time.sleep(5)
+        if docker_ok():
+            out.append("Docker is up again")
+            return True
+    out.append("NEEDS YOU: Docker did not come up within %ds (a crash dialog may be open; quit and reopen Docker Desktop)" % DOCKER_WAIT_SECONDS)
+    return False
+
+
+def last_event(events, kind):
+    hit = [e for e in events if (e.get("kind") or e.get("type")) == kind]
+    return hit[-1] if hit else None
+
+
+def main():
+    cfg = load_config()
+    prefix = cfg.get("root_prefix", "FACTORY:")
+    st = load_state()
+    out = []
+
+    active = [t for s in ("todo", "ready", "running") for t in kanban_list(status=s) if t.get("title", "").startswith(prefix)]
+    if active:
+        ensure_docker(st, out)
+
+    for t in kanban_list(status="blocked"):
+        if not t.get("title", "").startswith(prefix):
+            continue
+        tid = t["id"]
+        d = kanban_show(tid)
+        ev = d.get("events", [])
+        blk = last_event(ev, "blocked")
+        if not blk:
+            continue
+        unb = last_event(ev, "unblocked")
+        ts = blk.get("created_at") or 0
+        if unb and (unb.get("created_at") or 0) > ts:
+            continue  # already unblocked after that block; board status is stale or transitioning
+        payload = blk.get("payload") or {}
+        reason = payload.get("reason") or ""
+        kind = payload.get("kind") or ""
+        card = st["cards"].setdefault(tid, {"retries": 0, "seen": 0})
+        if card["seen"] == ts:
+            continue  # already handled this exact block
+        env = (kind == "capability") or (DOCKER_BLOCK.search(reason) and DOCKER_DOWN.search(reason))
+        head = reason.strip().splitlines()[0][:160] if reason.strip() else "(no reason)"
+
+        if not env:
+            card["seen"] = ts
+            out.append("NEEDS YOU (%s): %s -> %s" % (tid, t["title"][:60], head))
+            continue
+        if card["retries"] >= MAX_AUTO_RETRIES:
+            card["seen"] = ts
+            out.append("NEEDS YOU (%s): auto-retry limit (%d) reached; last block: %s" % (tid, MAX_AUTO_RETRIES, head))
+            continue
+        replies = [m.group(2) for m in REPLY.finditer(reason) if m.group(1) == tid and not BAD_REPLY.search(m.group(2))]
+        if not replies:
+            card["seen"] = ts
+            out.append("NEEDS YOU (%s): environment block but no safe retry reply offered: %s" % (tid, head))
+            continue
+        if DOCKER_BLOCK.search(reason) and not ensure_docker(st, out):
+            continue  # try again next tick; do not mark as seen
+        size = len(json.dumps(d))
+        if size > MAX_CARD_CHARS:
+            card["seen"] = ts
+            out.append("NEEDS YOU (%s): card is %d chars (> %d); the orchestrator cannot read it. Shorten the card body or archive old comments first." % (tid, size, MAX_CARD_CHARS))
+            continue
+        if DRY:
+            out.append("[dry-run] would unblock %s with: %s" % (tid, replies[0][:140]))
+            continue
+        hermes(["unblock", tid, "--reason", replies[0]])
+        card["retries"] += 1
+        card["seen"] = ts
+        out.append("AUTO-RETRY %d/%d (%s): %s" % (card["retries"], MAX_AUTO_RETRIES, tid, replies[0][:140]))
+
+    save_state(st)
+    if out:
+        print("\n".join(out))
+
+
+if __name__ == "__main__":
+    main()

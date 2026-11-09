@@ -1,0 +1,15 @@
+{
+  "ac_results": {
+    "AC1": "pass",
+    "AC2": "pass"
+  },
+  "acceptance": [
+    "AC1",
+    "AC2"
+  ],
+  "case_id": "bug",
+  "grader_digest": "1dbf2810ddc06a679b591bca2d1c86eb9726ccf602a1c6925be492f5f190064f",
+  "manifest_sha256": "ceb22a7cd943ad72b314ee8259edfde0e37cea247b773d31f32db3565c92eaee",
+  "schema": "factory-ecc-grades/v1",
+  "taskset_digest": "706bca2e5768f19c868b9f02f31c6e83e0b62b496b78c899a900d0dc3a881966"
+}

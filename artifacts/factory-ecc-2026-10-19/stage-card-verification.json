@@ -1,0 +1,78 @@
+{
+  "checks": [
+    {
+      "task_type": "feature",
+      "stage_kind": "prepare",
+      "template_id": "a6fdbeb7-fd95-43fe-bed4-8f02b66b65bb",
+      "revision": 2,
+      "profile": "architect",
+      "instructions_sha256": "163033a8fc98e76a71ca981676dec6640f877fcf671fb6588bc86258b5326d20"
+    },
+    {
+      "task_type": "feature",
+      "stage_kind": "implement",
+      "template_id": "a6fdbeb7-fd95-43fe-bed4-8f02b66b65bb",
+      "revision": 2,
+      "profile": "developer",
+      "instructions_sha256": "4099c3bf060d931bc6ba9fbed77fb8e5c726975200a7438f1c2b08767335c10d"
+    },
+    {
+      "task_type": "feature",
+      "stage_kind": "repair",
+      "template_id": "a6fdbeb7-fd95-43fe-bed4-8f02b66b65bb",
+      "revision": 2,
+      "profile": "fixer",
+      "instructions_sha256": "4099c3bf060d931bc6ba9fbed77fb8e5c726975200a7438f1c2b08767335c10d"
+    },
+    {
+      "task_type": "bug",
+      "stage_kind": "prepare",
+      "template_id": "2537045b-b3fd-45c5-b316-0de9c7313ef1",
+      "revision": 2,
+      "profile": "fixer",
+      "instructions_sha256": "ec11e79c93edd86266d7474de1db892c51cf700f855e19d521f527459bbeb5f3"
+    },
+    {
+      "task_type": "bug",
+      "stage_kind": "implement",
+      "template_id": "2537045b-b3fd-45c5-b316-0de9c7313ef1",
+      "revision": 2,
+      "profile": "fixer",
+      "instructions_sha256": "4099c3bf060d931bc6ba9fbed77fb8e5c726975200a7438f1c2b08767335c10d"
+    },
+    {
+      "task_type": "bug",
+      "stage_kind": "repair",
+      "template_id": "2537045b-b3fd-45c5-b316-0de9c7313ef1",
+      "revision": 2,
+      "profile": "fixer",
+      "instructions_sha256": "4099c3bf060d931bc6ba9fbed77fb8e5c726975200a7438f1c2b08767335c10d"
+    },
+    {
+      "task_type": "chore",
+      "stage_kind": "prepare",
+      "template_id": "349a6484-53f6-4635-a6ed-6f2aa74f611c",
+      "revision": 2,
+      "profile": "developer",
+      "instructions_sha256": "c27e3dc24f6945666893f9bab231ecaa8c279a2484ce4526a798b30392750a29"
+    },
+    {
+      "task_type": "chore",
+      "stage_kind": "implement",
+      "template_id": "349a6484-53f6-4635-a6ed-6f2aa74f611c",
+      "revision": 2,
+      "profile": "developer",
+      "instructions_sha256": "4099c3bf060d931bc6ba9fbed77fb8e5c726975200a7438f1c2b08767335c10d"
+    },
+    {
+      "task_type": "chore",
+      "stage_kind": "repair",
+      "template_id": "349a6484-53f6-4635-a6ed-6f2aa74f611c",
+      "revision": 2,
+      "profile": "fixer",
+      "instructions_sha256": "4099c3bf060d931bc6ba9fbed77fb8e5c726975200a7438f1c2b08767335c10d"
+    }
+  ],
+  "worker_processes_launched": 0,
+  "model_calls": 0
+}

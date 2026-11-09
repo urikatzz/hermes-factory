@@ -1,0 +1,1 @@
+unity@claude-plugins-official 0.1.6-beta (Unity-Technologies/unity-agent-plugin); copied 2026-10-02. Refresh: ~/.hermes/scripts/sync_unity_plugin.sh

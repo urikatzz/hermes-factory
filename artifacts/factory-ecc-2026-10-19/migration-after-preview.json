@@ -1,0 +1,14 @@
+{
+  "changes": [],
+  "defaults": {
+    "revision": 1,
+    "templates": {
+      "bug": "2537045b-b3fd-45c5-b316-0de9c7313ef1",
+      "chore": "349a6484-53f6-4635-a6ed-6f2aa74f611c",
+      "feature": "a6fdbeb7-fd95-43fe-bed4-8f02b66b65bb"
+    }
+  },
+  "guidance_digest": "c0fb5462a003c7f28d31211c79be55f4f0f756727e4119590dc425296a845461",
+  "schema": "factory-ecc-migration/v1",
+  "settings_db": "/Users/example/.hermes/state/factory/task-settings.db"
+}
