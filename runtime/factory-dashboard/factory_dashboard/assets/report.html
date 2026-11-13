@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'; img-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Hermes · Factory report</title>
+<style>@@CSS@@</style>
+</head>
+<body>
+<header class="masthead"><a href="#main" class="brand"><span class="brand-icon" aria-hidden="true">H</span><span>HERMES <span class="muted">/ FACTORY</span></span></a><span class="snapshot-tag"><i></i> LOCAL SNAPSHOT</span></header>
+<main id="main">
+<section class="intro"><div><p class="eyebrow">OPERATIONS / RUN INTELLIGENCE</p><h1>Inside the factory<span class="accent">.</span></h1><p class="subtitle">Stages, handoffs, and the cost of getting work done.</p></div><div class="snapshot-info" id="snapshot-info"></div></section>
+<section id="summary" class="summary-grid" aria-label="Spending and usage summary"></section>
+<section id="metrics" class="metrics-bar" aria-label="Factory metrics"></section>
+<section class="workspace" aria-label="Task explorer">
+<aside class="task-panel"><div class="panel-heading"><h2>Tasks</h2><span class="count" id="task-count"></span></div><label class="sr-only" for="search">Search tasks</label><input id="search" type="search" placeholder="Search title, ID, or agent…"><label class="sr-only" for="status-filter">Filter task status</label><select id="status-filter"><option value="all">All statuses</option></select><div id="task-list" aria-live="polite"></div></aside>
+<section id="detail" class="detail-panel" aria-label="Selected task details" aria-live="polite"></section>
+</section>
+<section class="coverage-panel"><div class="panel-heading"><h2>Data coverage & sources</h2><span id="warning-count" class="count"></span></div><div id="coverage"></div><div id="shared"></div><details id="source-details"><summary>Source records and warnings</summary><div id="sources"></div><div id="warnings"></div></details></section>
+<footer>Read-only report · Regenerate to refresh · Recorded worker sessions only. Subscription fees, infrastructure, and unlinked coordinator/development sessions are outside these totals. Cross-database reads are not globally atomic.</footer>
+</main>
+<script id="report-data" type="application/json">@@DATA@@</script>
+<script>@@JS@@</script>
+</body>
+</html>

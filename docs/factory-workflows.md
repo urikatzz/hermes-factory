@@ -1,5 +1,7 @@
 # Factory workflow templates
 
+For the new project/task hierarchy, see [Project workflows v2](project-workflows.md). Version 2 plans relevant art/audio before architecture, decomposes the project, verifies every task before review, routes specialist repairs, and runs final integration plus retro. The legacy behavior below remains applicable to captured version 1 tasks.
+
 Use **Workflows** to duplicate or edit Feature, Bug fix and Chore templates. Choose preparation/implementation profiles, reviewers, instructions and zero to three repair cycles. Verification and at least one code reviewer are mandatory. **Use as type default** changes the suggestion for future tasks.
 
 **New task** shows the selected workflow and profile settings before submission. An explicit workflow choice survives type changes and reloads. Reloading adopts the latest revision but preserves the prompt. Saved tasks retain their complete workflow and model/effort snapshot; later changes apply only to new tasks.

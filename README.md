@@ -17,15 +17,19 @@ This checkout complements an existing Hermes Factory installation. It is not a s
 
 ## Agents and workflow
 
-The Factory's selectable roster contains 16 agents spanning orchestration, software development, game art, game audio, review, and verification. Each card below describes an agent's responsibility. Captured workflows choose the participating agents and stage order; a task does not run every profile.
+Factory v2 plans the project first, then gives each small task its own Factory cycle. The orchestrator calls the art/audio directors when needed; the architect consumes their plans before defining code, integration, task dependencies, and acceptance criteria.
 
 <p align="center">
-  <img src="docs/images/factory-agents.svg" alt="All 16 Factory agents grouped by orchestration, software, art, audio, independent review, and verification, with repair and publishing outcomes." width="100%">
+  <img src="docs/images/factory-agents.svg" alt="Factory v2: relevant directors before architecture, small dependent tasks, verification before reviews, specialist repairs, final integration, and factory-retro." width="100%">
 </p>
 
-The `factory-orchestrator` coordinates work; the runtime controller enforces evidence gates and repair limits. Software templates can use `architect`, `developer`, and `fixer`, with independent code, security, UX, and UI reviewers as selected. Art and audio templates use their own directors, producers, and specialist reviewers. Every workflow requires verification and at least one code reviewer. Existing tasks retain their captured settings when templates change.
+Each task inherits the director and architecture plans. Its writer produces the result, then `verifier` must pass before code/security reviews and the relevant UX/UI/art/audio reviews start. Code repairs go to `fixer`, visual repairs to `artist`, and sound repairs to `sound-designer`. Repaired work repeats verification and all selected reviews. Tasks run serially in the shared project directory; dependent code tasks wait for their asset tasks to pass.
 
-The `pr-writer` is an additional publishing helper outside the selectable stage roster. It drafts the PR description; the publisher performs Git and PR operations. Game Art and Game Audio templates allow up to two repair cycles, with the asset producer repairing findings before all selected checks run again.
+Final integration runs another full cycle over the assembled project. Art approval requires rendered evidence against the art director's plan, including in-engine images for final integration. Audio approval requires actual listening evidence; waveform and loudness checks alone cannot establish a match. Missing tools stop approval and require human recovery.
+
+The additional `factory-retro` agent analyzes successful and failed runs and proposes improvements to Factory itself. It cannot apply changes or waive failed checks. `pr-writer` remains a separate publishing helper: it drafts the description, while the publisher performs Git and PR operations when invoked. Existing tasks retain their captured v1 workflows.
+
+See the [project workflow guide](docs/project-workflows.md) for the execution contract, installation, and verification. The repository-owned runtime is in [`runtime/factory-dashboard`](runtime/factory-dashboard).
 
 ## Requirements
 
@@ -34,6 +38,7 @@ The `pr-writer` is an additional publishing helper outside the selectable stage 
 - **Blender** for rendering and inspecting 3D assets.
 - **A POSIX shell and `rsync`** for the installer scripts.
 - **Hermes Factory and configured worker profiles** for model-backed reviews and managed workflows. Production wrappers may also require their respective generation service credentials or CLI.
+- **PyYAML in the Hermes Python environment** for the project workflow installer.
 
 Run the commands below from the repository root. Individual scripts expose their arguments through `--help`.
 

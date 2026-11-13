@@ -25,7 +25,7 @@ Copies the bible and the given paths to a private temporary directory, runs the 
       --description "Independent art reviewer: checks sprites, 3D models and game text against the repo style bible."
     cp ~/.hermes/factory-skills/worker/art-review/SOUL.md ~/.hermes/profiles/art-reviewer/SOUL.md
 
-The profile is not in any dispatch roster or workflow template; the factory cannot schedule it yet.
+These standalone installation commands do not add dispatch or workflow configuration. In an installed [project workflow v2](project-workflows.md), the controller selects `art-reviewer` for art tasks after verification passes, and for final integration. Those stages additionally require retained comparisons against the art director's plan, including actual in-engine images for final integration.
 
 ## Known limits
 
