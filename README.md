@@ -15,6 +15,56 @@ This checkout complements an existing Hermes Factory installation. It is not a s
 | Factory integration | Migrate Game Art and Game Audio workflow types and check installed configurations. |
 | Evaluation | Prepare pinned benchmark cases and grading inputs, then report retained trial evidence. |
 
+## Agents and workflow
+
+The installed Factory coordinates agents through a captured workflow. This diagram shows the Game Art and Game Audio templates, with each agent's job inside its box. Reviewers and the verifier inspect the same implementation manifest; the controller evaluates their evidence before allowing delivery or another repair cycle.
+
+```mermaid
+flowchart TD
+    Task["Task submission<br/>Capture scope, workflow, and model settings"]
+
+    subgraph Art["Game Art agents"]
+        AD["art-director · Prepare<br/>Read the style bible and plan assets"]
+        Artist["artist · Implement and repair<br/>Produce sprites and models; fit and export assets"]
+        AR["art-reviewer · Review<br/>Check lint, rendered views, and visual style rules"]
+        AD --> Artist --> AR
+    end
+
+    subgraph Audio["Game Audio agents"]
+        AUD["audio-director · Prepare<br/>Read the audio bible and plan recipes and cues"]
+        SD["sound-designer · Implement and repair<br/>Synthesize SFX; write cues; process supplied music"]
+        AUR["audio-reviewer · Review<br/>Check measurements, recipes, cues, and rule compliance"]
+        AUD --> SD --> AUR
+    end
+
+    subgraph Checks["Shared independent checks"]
+        CR["claude-reviewer · Code review<br/>Review changed scripts, JSON, and import settings"]
+        V["verifier · Verify<br/>Run acceptance checks and the asset lint gate"]
+    end
+
+    Task -->|Art task| AD
+    Task -->|Audio task| AUD
+    Artist --> CR
+    Artist --> V
+    SD --> CR
+    SD --> V
+    AR --> Gate
+    AUR --> Gate
+    CR --> Gate
+    V --> Gate
+
+    Gate{"Factory controller<br/>Evaluate all required evidence"}
+    Gate -->|Blocking findings; repairs remain| Repair["Original artist or sound-designer<br/>Repair findings, then repeat all selected checks"]
+    Repair -->|Art| Artist
+    Repair -->|Audio| SD
+    Gate -->|Needs intervention or limit reached| Human["Human review / blocked task"]
+    Gate -->|Accepted| Delivery["Accepted deliverable"]
+    Delivery -->|When publishing is invoked| PR["pr-writer · PR description<br/>Summarize changes, evidence, risks, and retrospective"]
+    PR --> Publisher["Factory publisher<br/>Open a draft pull request"]
+```
+
+The controller and publisher are runtime components. The `pr-writer` drafts the description; the publisher performs Git and PR operations. The Game Art and Game Audio templates allow up to two repair cycles. Other templates can select different preparation, implementation, and review profiles; every workflow requires verification and at least one code reviewer. Existing tasks keep their captured settings when templates change.
+
 ## Requirements
 
 - **Python 3.11+** for the Python tools. The core lint, synthesis, and benchmark code uses the standard library; there is no package installation step.
