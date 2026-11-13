@@ -8,11 +8,31 @@ Art/audio mean creation, modification or integration of those assets. UI/UX mean
 Choose from evidence; do not infer false merely because the request omitted an existing integration.'''
 
 ARCHITECT = '''Read every inherited director plan before designing code. Retain PLAN.md and project-plan.json.
-Break the work into 1..40 small tasks in project-plan.json: {"tasks":[{"id":"lowercase-id","title":"...","owner":"developer|artist|sound-designer","dependencies":["task-id"],"acceptance":{"AC1":"observable criterion"},"needs":{"art":false,"audio":false,"ui":false,"ux":false}}]}.
+Break the work into 1..40 small tasks in project-plan.json: {"tasks":[{"id":"lowercase-id","title":"...","owner":"developer|artist|sound-designer","dependencies":["task-id"],"acceptance":{"AC1":"observable criterion"},"needs":{"art":false,"audio":false,"ui":false,"ux":false},"risk":"normal|high"}]}.
+risk is optional (default normal). Use high only for security-sensitive, concurrency, data-migration or cross-cutting changes: those tasks get the second selected code reviewer.
+If the work needs art, audio, UI or UX that PROJECT_CONTEXT scope marks false, set metadata.scope_additions to those domains, e.g. ["art"]. Added art/audio first runs the missing director, then this stage again with its plan; do not plan around a missing director.
 Every PLAN.md AC must be covered by at least one task; use the same AC IDs in task acceptance.
 Asset tasks precede code tasks that integrate their output: declare those dependencies explicitly.
 Plans must preserve the directors' asset paths, visual/audio criteria, and code integration contracts.
-The engine also runs a final integration cycle over every project AC. No code or asset writes in this stage.'''
+The engine also runs a final integration cycle over every project AC. No code or asset writes in this stage.
+An independent reviewer checks this plan before any task starts.'''
+
+REPLAN = '''This is a revision of the earlier plan; PROJECT_CONTEXT.replan gives the reason, the failing task and its findings.
+Correct the plan defect: fix wrong or untestable acceptance criteria, split oversized tasks, add missing tasks or dependencies.
+Tasks in PROJECT_CONTEXT.completed_tasks already passed: keep each of them in project-plan.json exactly as captured.
+Do not weaken an acceptance criterion merely so failing work passes; do not change director intent.'''
+
+PLAN_REVIEW = '''Review the architect's PLAN.md and project-plan.json against the request, scope and inherited director plans. Read-only.
+Check: every request requirement maps to an acceptance criterion; each criterion is observable and testable; tasks are small,
+correctly owned and ordered; dependencies are complete; director asset paths and criteria are preserved; scope booleans are right.
+Retain PLAN-REVIEW.md. Report defects in metadata.findings as "F<n>|SEVERITY|AC or -|task-id|problem and required change".
+BLOCKER/HIGH (and MEDIUM tied to an AC) return the plan to the architect; use LOW/NIT for suggestions.
+Use the inherited project acceptance IDs in ac_ids and finish DONE; this stage creates no plan of its own.'''
+
+PLAN_DEFECT = '''If the failure comes from a wrong, contradictory or untestable task plan or acceptance criterion rather than from the
+implementation, set metadata.plan_defect to a one-sentence reason. The engine then returns the project to the architect instead of repairing.'''
+
+PREPARE_OUTPUT = 'Create PLAN.md with numbered AC1..ACn and a Manifest include list. Attach PLAN.md; do not modify PROJECT_DIR.'
 
 DIRECTOR = '''Read the request and inherited scope. Retain PLAN.md with observable director criteria, target asset paths,
 style bible references, integration constraints, and how the final rendered/listened result will be compared.
@@ -47,6 +67,10 @@ def project_card(definition, stage, cycle, context, inputs, project, task=None):
     details = dict(scope=project.get('scope'), director_and_architecture_plans=project.get('plans', []),
                    task=task, project_ac_ids=project.get('ac_ids', []),
                    completed_tasks=project.get('completed', []), terminal=project.get('terminal'))
+    if project.get('replan'):
+        details['replan'] = project['replan']
+    if task and project.get('work', {}).get('attribution'):
+        details['repair_attribution'] = project['work']['attribution']
     if project.get('recovery_note'):
         details['human_recovery_note'] = project['recovery_note']
     text = '\nPROJECT_WORKFLOW_VERSION 2\nPROJECT_CONTEXT ' + json.dumps(details, sort_keys=True)
@@ -54,8 +78,10 @@ def project_card(definition, stage, cycle, context, inputs, project, task=None):
         text += '\nOnly the TASK acceptance IDs apply to this cycle. Inherit the directors\' plans and architecture; do not substitute current defaults.'
         text += '\nPreserve outputs of completed tasks. Keep the cumulative manifest so the final integration snapshot includes the whole project.'
         card['title'] = task['title'] + ' · ' + card['title']
+    if stage.key == 'project-plan-review':
+        card['body'] = card['body'].replace(PREPARE_OUTPUT, 'Create PLAN-REVIEW.md; do not modify PROJECT_DIR.')
     if stage.profile == 'factory-retro':
-        card['body'] = card['body'].replace('Create PLAN.md with numbered AC1..ACn and a Manifest include list. Attach PLAN.md; do not modify PROJECT_DIR.', 'Create RETRO.md; do not modify PROJECT_DIR.')
+        card['body'] = card['body'].replace(PREPARE_OUTPUT, 'Create RETRO.md; do not modify PROJECT_DIR.')
         text += '\nPROJECT_HISTORY ' + json.dumps(project.get('history', []), sort_keys=True)
         if not project.get('ac_ids'):
             text += '\nNo project ACs were captured before failure. Use retrospective-only AC1: retain an evidence-backed RETRO.md; this cannot establish product acceptance.'

@@ -58,6 +58,46 @@ class ProjectPolicyTests(unittest.TestCase):
         self.assertEqual(repair_profiles(['art-reviewer:F1|HIGH|AC1|a|Wrong', 'audio-reviewer:F2|HIGH|AC1|b|Wrong'], 'developer'),
                          ['artist', 'sound-designer', 'fixer'])
 
+    def test_second_code_reviewer_is_a_second_opinion_not_a_default(self):
+        from factory_dashboard.project_policy import review_profiles
+        needs = dict(art=False, audio=False, ui=False, ux=False)
+        both = ['codex-reviewer', 'claude-reviewer']
+        self.assertEqual(review_profiles(needs, both), ['codex-reviewer', 'security-reviewer'])
+        self.assertEqual(review_profiles(needs, both, True), ['codex-reviewer', 'claude-reviewer', 'security-reviewer'])
+
+    def test_rereview_covers_finding_sources_and_the_repaired_discipline(self):
+        from factory_dashboard.project_policy import rereview_profiles
+        panel = ['claude-reviewer', 'security-reviewer', 'ux-reviewer', 'ui-reviewer', 'art-reviewer']
+        self.assertEqual(rereview_profiles(panel, ['art-reviewer:F1|HIGH|AC1|a.png|Wrong'], ['artist']), ['art-reviewer'])
+        self.assertEqual(rereview_profiles(panel, ['ui-reviewer:F1|HIGH|AC1|menu|Overlap'], ['fixer']),
+                         ['claude-reviewer', 'security-reviewer', 'ui-reviewer'])
+        self.assertEqual(rereview_profiles(panel, ['AC1: fail'], ['artist', 'fixer']),
+                         ['claude-reviewer', 'security-reviewer', 'art-reviewer'])
+
+    def test_integration_failures_route_to_owners_of_the_failing_criteria(self):
+        from factory_dashboard.project_policy import repair_profiles
+        owners = {'AC1': ['artist'], 'AC2': ['developer'], 'AC3': ['sound-designer']}
+        self.assertEqual(repair_profiles(['AC1: fail'], 'developer', (), owners), ['artist'])
+        self.assertEqual(repair_profiles(['AC2: fail'], 'developer', (), owners), ['fixer'])
+        self.assertEqual(repair_profiles(['AC1: fail', 'AC3: fail'], 'developer', (), owners), ['artist', 'sound-designer', 'fixer'])
+        self.assertEqual(repair_profiles(['Verifier checks failed'], 'developer', (), owners), ['fixer'])
+        self.assertEqual(repair_profiles(['AC1: fail'], 'developer', ['code'], owners), ['fixer'])
+
+    def test_plan_accepts_optional_risk_and_scope_only_widens(self):
+        from factory_dashboard.project_policy import scope_additions, validate_plan
+        scope = dict(art=False, audio=False, ui=False, ux=False)
+        task = dict(id='code', title='Build', owner='developer', dependencies=[], acceptance={'AC1': 'Works'}, needs=scope)
+        self.assertEqual(validate_plan(dict(tasks=[{**task, 'risk': 'high'}]), scope, ['AC1'])[0]['risk'], 'high')
+        with self.assertRaisesRegex(ConfigurationError, 'risk'):
+            validate_plan(dict(tasks=[{**task, 'risk': 'extreme'}]), scope, ['AC1'])
+        self.assertEqual(scope_additions(['art'], scope), ['art'])
+        self.assertEqual(scope_additions(None, scope), [])
+        for bad in (['art', 'art'], ['video'], 'art'):
+            with self.assertRaises(ConfigurationError):
+                scope_additions(bad, scope)
+        with self.assertRaises(ConfigurationError):
+            scope_additions(['art'], {**scope, 'art': True})
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -5,10 +5,13 @@ Version 2 introduces project planning above small, dependent task cycles. `execu
 ## Project planning
 
 1. `factory-orchestrator` inspects the request/project read-only, retains `PLAN.md`, and records `project_scope` with `art`, `audio`, `ui`, and `ux` booleans.
-2. Relevant `art-director` and `audio-director` stages retain their plans. The current implementation schedules them serially. With no art or audio, it goes directly to architecture.
+2. Relevant `art-director` and `audio-director` stages retain their plans. They only read the request and scope, so both cards are created together and run concurrently. With no art or audio, it goes directly to architecture.
 3. `architect` receives all those retained plans and writes the project architecture, acceptance criteria and `project-plan.json`.
+4. A plan review runs before any task is written. The first code reviewer selected in the template reads the plan against the request, scope and director plans, retains `PLAN-REVIEW.md` and reports defects as findings. Blocking findings (BLOCKER, HIGH, or MEDIUM tied to an AC) return the plan to the architect; otherwise the task graph is approved.
 
-The JSON contains `tasks`, each with `id`, `title`, `owner`, `dependencies`, `acceptance`, and `needs`. Owners are `developer`, `artist`, or `sound-designer`; `needs` uses the four scope booleans. Every project AC must be covered. IDs are unique, dependency references must exist, and cycles are refused. Code tasks integrating art/audio must depend on the corresponding asset-production tasks. There are at most 40 small tasks per project.
+The orchestrator's scope is not final. If the architect finds the work needs a domain the scope marks false, it sets `scope_additions`, for example `["art"]`. The scope is widened once per project and never narrowed. Added art or audio runs the missing director first and then the architect again with that plan; added UI or UX only widens the review needs.
+
+The JSON contains `tasks`, each with `id`, `title`, `owner`, `dependencies`, `acceptance`, `needs`, and optionally `risk` (`normal` by default, or `high`). Owners are `developer`, `artist`, or `sound-designer`; `needs` uses the four scope booleans. Every project AC must be covered. IDs are unique, dependency references must exist, and cycles are refused. Code tasks integrating art/audio must depend on the corresponding asset-production tasks. There are at most 40 small tasks per project.
 
 ```json
 {
@@ -35,15 +38,19 @@ The JSON contains `tasks`, each with `id`, `title`, `owner`, `dependencies`, `ac
 
 ## Task execution and repairs
 
-Dependency-ready tasks run serially because they write into one shared project directory. Every task inherits the captured director and architecture plans, dependencies, acceptance criteria and model snapshot. Each task has separate stage keys, worker attempts, gate events and a bounded repair count; these live under the project root rather than creating independent untracked root cards.
+Dependency-ready tasks run serially because they write into one shared project directory and each writer rebuilds one cumulative manifest. Running independent tasks concurrently would need a separate workspace and manifest per task plus a merge step; that is not implemented. Every task inherits the captured director and architecture plans, dependencies, acceptance criteria and model snapshot. Each task has separate stage keys, worker attempts, gate events and a bounded repair count; these live under the project root rather than creating independent untracked root cards.
 
 The sequence is writer → verifier → selected review panel. Verification must explicitly PASS with complete acceptance coverage, a matching manifest, successful release audit, and no failed checks or unavailable tools. No reviewer cards are materialized before this gate passes. Unlike the legacy policy, v2 does not waive an unavailable Unity environment into a verifier pass.
 
-Code review and security review are required. The captured template selects Claude/Codex code reviewers; UX and UI reviewers run when the task declares those needs. Art/audio reviewers run for relevant tasks.
+Code review and security review are required. Each task gets one code reviewer: the first Claude/Codex reviewer selected in the captured template. A second selected code reviewer is a second opinion and joins only tasks the architect marked `risk: high` and final integration. UX and UI reviewers run when the task declares those needs. Art/audio reviewers run for relevant tasks.
 
-Blocking findings route to the owning specialist: art-reviewer → artist, audio-reviewer → sound-designer, and code/security/UX/UI findings → fixer. The verifier can declare `repair_domains: ["code", "art", "audio"]` to identify asset failures. Mixed repairs run serially and finish with a cumulative implementation manifest. Every repair restarts verification and then the complete selected review panel; earlier approvals cannot approve a changed manifest.
+Blocking findings route to the owning specialist: art-reviewer → artist, audio-reviewer → sound-designer, and code/security/UX/UI findings → fixer. The verifier can declare `repair_domains: ["code", "art", "audio"]` to identify asset failures. Mixed repairs run serially and finish with a cumulative implementation manifest.
 
-The captured template's repair limit applies to each task and final integration separately. Exhausted limits and evidence contradictions require human review. Missing tools/environment block the workflow. After explicit recovery, `resume_factory_workflow.py` requires a human note and creates fresh verification/review evidence without consuming an implementation repair cycle. It cannot waive a defect or change scope.
+Every repair restarts verification. The reviews that follow are scoped to what the repair touched: the reviewers who raised blocking findings, plus the reviewers of the repaired discipline (fixer → code and security reviewers, artist → art-reviewer, sound-designer → audio-reviewer). Approvals from untouched disciplines carry over within the task. Reviews that never ran stay owed: a repair after a failed first verification is still followed by the complete panel. Each gate event records `rereview` so carried approvals are visible. Final integration never carries an approval: every integration cycle runs the complete panel, including the second code reviewer, on the exact manifest that is delivered.
+
+The captured template's repair limit applies to each task and final integration separately.
+
+Repairing cannot fix a wrong plan, so two cases return the project to the architect instead of to a repairer or a human: a task that exhausts its repair limit, and a writer, verifier or reviewer that sets `plan_defect` to a one-sentence reason on a failing cycle. The architect receives the reason, the failing task and its findings, and may fix acceptance criteria, split tasks or add tasks and dependencies. Tasks that already passed must stay in the plan exactly as captured, and their results are kept. The revised plan is reviewed again, and revised tasks start with fresh stage keys and a fresh repair count. A project has two such replans in total, shared with plan-review revisions. After that, exhausted limits and plan defects require human review, as evidence contradictions always do. Missing tools/environment block the workflow. After explicit recovery, `resume_factory_workflow.py` requires a human note and creates fresh verification/review evidence without consuming an implementation repair cycle. It cannot waive a defect or change scope.
 
 ## Comparing director intent to the result
 
@@ -58,6 +65,8 @@ Evidence is operator/worker-retained reporting, not an independent authenticatio
 ## Integration and retrospective
 
 After all tasks pass, the developer assembles the project and a final verifier-first cycle checks every project AC and the integrated visual/audio result. Only this cycle's manifest/snapshot can become the delivered project.
+
+Integration failures have an owner. A failing acceptance criterion is attributed to the tasks that produced it, and the repair goes to those tasks' specialists: artist for an art task, sound-designer for an audio task, fixer for a code task. Reviewer findings and verifier `repair_domains` keep their normal routing. The repair card carries `repair_attribution` (AC → task IDs). The developer only assembles; it never repairs. Integration does not reopen a completed task's cycle: repairs happen in the integration cycle, and a problem that needs new or different tasks goes back to the architect as a replan.
 
 `factory-retro` runs after a successful or unsuccessful project outcome. It writes retained `RETRO.md` with evidence, root causes, prioritized improvements, tradeoffs and validation steps. It has a scratch workspace and cannot apply improvements, modify Factory configuration, change outcomes, or publish. A missing retro report cannot silently become success.
 

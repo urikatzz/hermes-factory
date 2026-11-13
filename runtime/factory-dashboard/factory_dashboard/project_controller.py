@@ -5,9 +5,12 @@ from pathlib import Path
 import time
 
 from .model_policy import ConfigurationError
-from .project_cards import ARCHITECT, COMPARISON, DIRECTOR, RETRO, SCOPE, project_card
+from .project_cards import ARCHITECT, COMPARISON, DIRECTOR, PLAN_DEFECT, PLAN_REVIEW, REPLAN, RETRO, SCOPE, project_card
 from .project_evidence import plan_evidence, retained_json, validate_comparison
-from .project_policy import planning_profiles, repair_profiles, review_profiles, validate_plan, validate_scope
+from .project_policy import (MAX_REPLANS, blocking_findings, finding_ac, planning_profiles, repair_profiles, rereview_profiles,
+                             review_profiles, scope_additions, validate_plan, validate_scope)
+
+REPAIR_LIMIT = 'Captured repair limit reached'
 from .workflow_gate import evaluate_cycle
 from .workflow_guards import controller_scope
 from .workflow_types import StageSpec
@@ -118,6 +121,45 @@ class ProjectController:
     def _inputs(project):
         return [p['task_id'] for p in project['plans']]
 
+    @staticmethod
+    def _current(project):
+        if project['mode'] == 'integration':
+            return project['integration']
+        done = {t['id'] for t in project['completed']}
+        return next((t for t in project['tasks'] if t['id'] not in done), None)
+
+    @staticmethod
+    def _prefix(project, task):
+        # A replanned task may reuse an ID; '.' cannot occur in task IDs, so generations never share stage keys.
+        gen = project.get('gen', 0)
+        return 'task-' + task['id'] + (f'.g{gen}' if gen else '')
+
+    @staticmethod
+    def _panel(selected, task, work):
+        """Reviewers for this cycle. Final integration always gets the complete panel on the delivered manifest."""
+        integration = task['id'] == 'integration'
+        profiles = review_profiles(task['needs'], selected, integration or task.get('risk') == 'high')
+        scoped = None if integration else work.get('panel')
+        return [p for p in profiles if p in scoped] if scoped else profiles
+
+    @staticmethod
+    def _defect(results):
+        return next((r.metadata['plan_defect'].strip() for r in results
+                     if isinstance(r.metadata.get('plan_defect'), str) and r.metadata['plan_defect'].strip()), None)
+
+    def _replan(self, conn, root, project, task, reason, findings, inputs):
+        """Return the project to the architect. Bounded; completed tasks stay frozen."""
+        if project.get('replans', 0) >= MAX_REPLANS:
+            return False
+        project.update(replans=project.get('replans', 0) + 1, gen=project.get('gen', 0) + 1, mode='planning',
+                       replan=dict(reason=reason, task=task['id'] if task else None, findings=list(findings)[:15],
+                                   inputs=list(dict.fromkeys(inputs))))
+        project.pop('work', None)
+        project.pop('integration', None)
+        self._state.event(conn, root['root_id'], 'project_replan', project['replan'])
+        project['history'].append(dict(replan=project['replans'], **project['replan']))
+        return True
+
     def _advance(self, conn, root, definition, context, project):
         mode = project['mode']
         if mode == 'retro':
@@ -137,28 +179,72 @@ class ProjectController:
             project['plans'].append(plan_evidence('factory-orchestrator', row['task_id'], result.metadata))
             return True
         if mode == 'planning':
-            index = len(project['plans']) - 1
-            profile = project['planners'][index]
-            node = self._node(conn, root, definition, context, project, 'project-' + profile, 'prepare', profile,
-                              ARCHITECT if profile == 'architect' else DIRECTOR, self._inputs(project))
+            captured = {p['profile'] for p in project['plans']}
+            missing = [p for p in project['planners'] if p != 'architect' and p not in captured]
+            if missing:
+                # Directors only read the request and scope and write nothing shared, so they plan concurrently.
+                inputs, progressed = self._inputs(project), False
+                for profile in missing:
+                    node = self._node(conn, root, definition, context, project, 'project-' + profile, 'prepare', profile, DIRECTOR, inputs)
+                    if node:
+                        project['plans'].append(plan_evidence(profile, node[0]['task_id'], node[1].metadata))
+                        progressed = True
+                return progressed
+            gen, replan = project.get('gen', 0), project.get('replan')
+            node = self._node(conn, root, definition, context, project, 'project-architect', 'prepare', 'architect',
+                              ARCHITECT + ('\n' + REPLAN if replan else ''),
+                              [*self._inputs(project), *(replan or {}).get('inputs', [])], cycle=gen)
             if not node:
                 return False
             row, result = node
-            project['plans'].append(plan_evidence(profile, row['task_id'], result.metadata))
-            if profile == 'architect':
-                project['ac_ids'] = result.metadata['ac_ids']
-                project['tasks'] = validate_plan(retained_json(result.metadata['artifacts'], 'project-plan.json'), project['scope'], project['ac_ids'])
-                project.update(mode='tasks', index=0)
-                self._state.event(conn, root['root_id'], 'project_plan_captured', dict(tasks=project['tasks'], plans=project['plans']))
+            added = scope_additions(result.metadata.get('scope_additions'), project['scope'])
+            if added:
+                # The orchestrator's choice is not final: the architect may widen it once, never narrow it.
+                if project.get('scope_amended'):
+                    raise ConfigurationError('Project scope can be amended only once')
+                project['scope'] = {**project['scope'], **dict.fromkeys(added, True)}
+                project.update(scope_amended=added, planners=planning_profiles(project['scope']))
+                self._state.event(conn, root['root_id'], 'project_scope_amended', dict(added=added, scope=project['scope'], task_id=row['task_id']))
+                if {'art', 'audio'} & set(added):
+                    project['gen'] = gen + 1
+                    return True
+            evidence = plan_evidence('architect', row['task_id'], result.metadata)
+            tasks = validate_plan(retained_json(result.metadata['artifacts'], 'project-plan.json'), project['scope'], result.metadata['ac_ids'])
+            previous = {t['id']: t for t in project['tasks']}
+            if any(done['id'] != 'integration' and previous.get(done['id']) not in tasks for done in project['completed']):
+                raise ConfigurationError('Replan changed a task that already passed')
+            project['plans'] = [p for p in project['plans'] if p['profile'] != 'architect'] + [evidence]
+            project.update(ac_ids=result.metadata['ac_ids'], tasks=tasks, mode='plan_review')
+            self._state.event(conn, root['root_id'], 'project_plan_captured', dict(tasks=tasks, plans=project['plans'], generation=gen))
+            return True
+        if mode == 'plan_review':
+            # The plan is the most expensive thing to get wrong, so it is reviewed before any task is written.
+            gen = project.get('gen', 0)
+            reviewer = next(s.profile for s in definition.reviewers if s.profile in ('claude-reviewer', 'codex-reviewer'))
+            node = self._node(conn, root, definition, context, project, 'project-plan-review', 'prepare', reviewer, PLAN_REVIEW,
+                              self._inputs(project), cycle=gen)
+            if not node:
+                return False
+            row, result = node
+            if not any(Path(p).name.startswith('PLAN-REVIEW') and Path(p).suffix == '.md' for p in result.metadata['artifacts']):
+                raise ConfigurationError('Plan review did not retain PLAN-REVIEW.md')
+            blocking = [reviewer + ':' + f for f in blocking_findings(result.metadata.get('findings', []))]
+            if blocking:
+                if not self._replan(conn, root, project, None, 'Plan review findings', blocking, [row['task_id']]):
+                    raise ConfigurationError('Plan review findings remain after the replan limit')
+                return True
+            project.pop('replan', None)
+            project['mode'] = 'tasks'
+            self._state.event(conn, root['root_id'], 'project_plan_approved', dict(task_id=row['task_id'], reviewer=reviewer, generation=gen))
             return True
         if mode == 'tasks':
-            if project['index'] == len(project['tasks']):
+            task = self._current(project)
+            if task is None:
                 # A read-only verification is insufficient: the developer assembles the final project first.
                 project['integration'] = dict(id='integration', title='Final project integration', owner='developer',
                     dependencies=[t['id'] for t in project['tasks']], acceptance={ac: 'Project PLAN.md: ' + ac for ac in project['ac_ids']}, needs=project['scope'])
                 project['mode'] = 'integration'
                 return True
-            task = project['tasks'][project['index']]
         else:
             task = project['integration']
         if 'work' not in project:
@@ -174,7 +260,7 @@ class ProjectController:
         context = {**context, 'scope': [f.split('|', 1)[0] for f in work['blocking']] or list(task['acceptance']), 'blocking': work['blocking'],
                    'baseline': work.get('manifest', 'none'), 'baseline_tgz': work.get('snapshot') or 'none',
                    'manifest': work.get('manifest', 'none')}
-        prefix = 'task-' + task['id']
+        prefix = self._prefix(project, task)
         if work['step'] in ('writing', 'repairing'):
             repair = work['step'] == 'repairing'
             profile = work['repairs'][0] if repair else task['owner']
@@ -183,11 +269,17 @@ class ProjectController:
                             'Do not change the approved plan to make a mismatch pass. ' if repair else '')
             instructions += 'Read every inherited plan and TASK acceptance criteria. Use the relevant production skill for assets. '
             instructions += 'Integrate required art and audio outputs; run applicable checks and rebuild the cumulative project manifest.'
+            instructions += '\n' + PLAN_DEFECT
             node = self._node(conn, root, definition, context, project, key, 'repair' if repair else 'implement', profile,
                               instructions, work['writer_inputs'], task=task, cycle=cycle)
             if not node:
                 return False
             row, result = node
+            defect = self._defect([result])
+            if defect:
+                if not self._replan(conn, root, project, task, 'Plan defect: ' + defect, work['blocking'], [row['task_id']]):
+                    raise ConfigurationError('Plan defect reported after the replan limit: ' + defect)
+                return True
             if set(result.metadata['ac_ids']) != set(task['acceptance']):
                 raise ConfigurationError('Writer acceptance differs from the captured small-task plan')
             work.update(writer_key=key, writer_task=row['task_id'], manifest=result.metadata['manifest_sha12'])
@@ -206,7 +298,7 @@ class ProjectController:
         # Verification is a prerequisite, not a parallel member of the review panel.
         node = self._node(conn, root, definition, context, project, prefix + '-verify', 'verify', 'verifier',
                           'Verify only TASK acceptance IDs against the exact cumulative manifest. Run tests, integration checks, asset lint gates and release audit. '
-                          'Record repair_domains (code/art/audio) for failed asset or integration checks. Missing tools are environment gaps, never passes.',
+                          'Record repair_domains (code/art/audio) for failed asset or integration checks. Missing tools are environment gaps, never passes.\n' + PLAN_DEFECT,
                           inputs, task=task, cycle=cycle)
         if not node:
             return False
@@ -215,14 +307,14 @@ class ProjectController:
             raise ProjectBlocked('Verification requires unavailable environment or tools')
         preliminary = evaluate_cycle(writer, [verifier], work.get('last_gate'), definition.max_repairs, cycle, {**context, 'unity_ci': False})
         if preliminary.decision != 'pass':
-            return self._decision(conn, root, project, task, writer, [verifier], preliminary, [verifier_row], definition)
+            return self._decision(conn, root, project, task, writer, [verifier], preliminary, [verifier_row], definition, reviewed=False)
         if verifier.metadata['verdict'] != 'PASS':
             raise ConfigurationError('Review requires an explicit successful verifier')
         work.update(step='reviewing', snapshot=verifier.metadata.get('snapshot'))
-        profiles = review_profiles(task['needs'], [s.profile for s in definition.reviewers])
+        profiles = self._panel([s.profile for s in definition.reviewers], task, work)
         readers, rows, waiting = [verifier], [verifier_row], False
         for profile in profiles:
-            instructions = 'Review only your discipline against TASK acceptance and the inherited plans; report actionable findings.'
+            instructions = 'Review only your discipline against TASK acceptance and the inherited plans; report actionable findings.\n' + PLAN_DEFECT
             if profile in ('art-reviewer', 'audio-reviewer'):
                 instructions += '\n' + COMPARISON
             selected = next((r.instructions for r in definition.reviewers if r.profile == profile), '')
@@ -242,9 +334,9 @@ class ProjectController:
         if waiting:
             return False
         decision = evaluate_cycle(writer, readers, work.get('last_gate'), definition.max_repairs, cycle, {**context, 'unity_ci': False})
-        return self._decision(conn, root, project, task, writer, readers, decision, rows, definition)
+        return self._decision(conn, root, project, task, writer, readers, decision, rows, definition, reviewed=True)
 
-    def _decision(self, conn, root, project, task, writer, readers, decision, rows, definition):
+    def _decision(self, conn, root, project, task, writer, readers, decision, rows, definition, reviewed):
         work = project['work']
         record = dict(task=task['id'], cycle=work['cycle'], **asdict(decision))
         self._state.event(conn, root['root_id'], 'project_gate', record)
@@ -260,15 +352,41 @@ class ProjectController:
                     tasks=project['completed'], execution_version=2)
                 self._terminal(conn, root, project, 'delivered', 'All tasks and final integration passed')
             else:
-                project['index'] += 1
                 del project['work']
+            return True
+        defect = self._defect(readers)
+        exhausted = decision.decision == 'human_review' and decision.reason == REPAIR_LIMIT
+        if exhausted or (defect and decision.decision == 'repair'):
+            # Patching symptoms of a wrong plan never converges: escalate to the architect before a human.
+            reason = 'Plan defect: ' + defect if defect else 'Repairs did not converge within the captured limit'
+            if not self._replan(conn, root, project, task, reason, decision.blocking, [work['writer_task'], *[r['task_id'] for r in rows]]):
+                self._terminal(conn, root, project, 'human_review', decision.reason if exhausted else reason + ' (replan limit reached)')
             return True
         if decision.decision == 'repair':
             domains = [d for reader in readers for d in reader.metadata.get('repair_domains', [])]
-            profiles = repair_profiles(decision.blocking, task['owner'], domains)
+            integration = task['id'] == 'integration'
+            # Integration failures belong to whoever produced the failing acceptance criterion, not to a default fixer.
+            ac_owners = {ac: sorted({t['owner'] for t in project['tasks'] if ac in t['acceptance']}) for ac in project['ac_ids']} if integration else None
+            profiles = repair_profiles(decision.blocking, task['owner'], domains, ac_owners)
             allowed = {'fixer', *(['artist'] if project['scope']['art'] else []), *(['sound-designer'] if project['scope']['audio'] else [])}
             if not set(profiles) <= allowed:
                 raise ConfigurationError('Repair expands the captured project scope')
+            panel = attribution = None
+            if integration:
+                attribution = {ac: [t['id'] for t in project['tasks'] if ac in t['acceptance']]
+                               for ac in sorted({finding_ac(f) for f in decision.blocking} - {None})}
+            else:
+                # Re-review only what the repair touches. Reviews that never ran stay owed.
+                full = self._panel([s.profile for s in definition.reviewers], task, {})
+                owed = [] if reviewed else work.get('panel') if work.get('reviewed') else None
+                if owed is not None:
+                    wanted = {*owed, *rereview_profiles(full, decision.blocking, profiles)}
+                    panel = [p for p in full if p in wanted] or None
+                work['reviewed'] = bool(reviewed or work.get('reviewed'))
+            record.update(repairs=list(profiles), rereview=panel or 'all', attribution=attribution)
+            self._state.event(conn, root['root_id'], 'project_repair_routed', dict(task=task['id'], cycle=work['cycle'],
+                              repairs=list(profiles), rereview=panel or 'all', attribution=attribution))
+            work.update(panel=panel, attribution=attribution)
             work.update(step='repairing', cycle=work['cycle']+1, blocking=list(decision.blocking), repairs=profiles,
                         writer_inputs=list(dict.fromkeys([*self._inputs(project), work['writer_task'], *[r['task_id'] for r in rows]])),
                         last_gate=asdict(decision))
@@ -330,20 +448,29 @@ class ProjectController:
             raise ConfigurationError('Only an infrastructure-blocked project can resume; changed scope requires a new task')
         project.update(mode=project['resume_mode'], active_keys=[], recoveries=project.get('recoveries', 0)+1, recovery_note=note)
         project.pop('terminal', None);project.pop('retro', None)
+        gen = project.get('gen', 0)
         if 'work' in project:
             work = project['work']
-            task = project['integration'] if project['mode'] == 'integration' else project['tasks'][project['index']]
+            task = self._current(project)
+            prefix = self._prefix(project, task)
             if work['step'] in ('verifying', 'reviewing'):
                 work['step'] = 'verifying'
-                keys = ['task-' + task['id'] + '-verify', *['task-' + task['id'] + '-' + p for p in review_profiles(task['needs'], [s['profile'] for s in root['definition']['reviewers']])]]
+                keys = [prefix + '-verify', *[prefix + '-' + p for p in self._panel([s['profile'] for s in root['definition']['reviewers']], task, work)]]
                 project['retry_keys'] = [f'{key}:{work["cycle"]}' for key in keys]
             else:
                 profile = work['repairs'][0] if work['step'] == 'repairing' else task['owner']
-                key = 'task-' + task['id'] + ('-repair-' + profile if work['step'] == 'repairing' else '-implement')
+                key = prefix + ('-repair-' + profile if work['step'] == 'repairing' else '-implement')
                 project['retry_keys'] = [f'{key}:{work["cycle"]}']
+        elif project['mode'] == 'scope':
+            project['retry_keys'] = ['project-scope:0']
+        elif project['mode'] == 'plan_review':
+            project['retry_keys'] = [f'project-plan-review:{gen}']
+        elif project['mode'] == 'planning':
+            captured = {p['profile'] for p in project['plans']}
+            missing = [p for p in project['planners'] if p != 'architect' and p not in captured]
+            project['retry_keys'] = [f'project-{p}:0' for p in missing] or [f'project-architect:{gen}']
         else:
-            profile = 'scope' if project['mode'] == 'scope' else project['planners'][len(project['plans'])-1]
-            project['retry_keys'] = [f'project-{profile}:0']
+            project['retry_keys'] = []
         self._save(conn, root, project)
         conn.execute("UPDATE factory_workflow_roots SET phase='project',reason='' WHERE root_id=?", (root['root_id'],))
         self._state.event(conn, root['root_id'], 'human_resume', dict(note=note, execution_version=2))

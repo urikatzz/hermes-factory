@@ -17,15 +17,17 @@ This checkout complements an existing Hermes Factory installation. It is not a s
 
 ## Agents and workflow
 
-Factory v2 plans the project first, then gives each small task its own Factory cycle. The orchestrator calls the art/audio directors when needed; the architect consumes their plans before defining code, integration, task dependencies, and acceptance criteria.
+Factory v2 plans the project first, then gives each small task its own Factory cycle. The orchestrator calls the art/audio directors when needed, and they plan concurrently. The architect consumes their plans before defining code, integration, task dependencies, and acceptance criteria, and can call in a director the orchestrator skipped. A code reviewer checks the plan before any task starts.
 
 <p align="center">
-  <img src="docs/images/factory-agents.svg" alt="Factory v2: relevant directors before architecture, small dependent tasks, verification before reviews, specialist repairs, final integration, and factory-retro." width="100%">
+  <img src="docs/images/factory-agents.svg" alt="Factory v2: relevant directors before architecture, plan review, small dependent tasks, verification before reviews, specialist repairs with scoped re-reviews, bounded replanning, final integration, and factory-retro." width="100%">
 </p>
 
-Each task inherits the director and architecture plans. Its writer produces the result, then `verifier` must pass before code/security reviews and the relevant UX/UI/art/audio reviews start. Code repairs go to `fixer`, visual repairs to `artist`, and sound repairs to `sound-designer`. Repaired work repeats verification and all selected reviews. Tasks run serially in the shared project directory; dependent code tasks wait for their asset tasks to pass.
+Each task inherits the director and architecture plans. Its writer produces the result, then `verifier` must pass before code/security reviews and the relevant UX/UI/art/audio reviews start. Code repairs go to `fixer`, visual repairs to `artist`, and sound repairs to `sound-designer`. Each task gets one code reviewer; a second selected one joins only high-risk tasks and final integration. Repaired work repeats verification, then only the reviews the repair affects. Tasks run serially in the shared project directory; dependent code tasks wait for their asset tasks to pass.
 
-Final integration runs another full cycle over the assembled project. Art approval requires rendered evidence against the art director's plan, including in-engine images for final integration. Audio approval requires actual listening evidence; waveform and loudness checks alone cannot establish a match. Missing tools stop approval and require human recovery.
+Repairs are bounded by the template's repair limit. A task that exhausts it, or any stage that reports a plan defect, goes back to the architect, who revises the remaining task graph without touching tasks that already passed. A project gets two such replans before it stops for a human.
+
+Final integration runs another full cycle over the assembled project, always with the complete review panel. A failing acceptance criterion is repaired by the specialist of the task that produced it. Art approval requires rendered evidence against the art director's plan, including in-engine images for final integration. Audio approval requires actual listening evidence; waveform and loudness checks alone cannot establish a match. Missing tools stop approval and require human recovery.
 
 The additional `factory-retro` agent analyzes successful and failed runs and proposes improvements to Factory itself. It cannot apply changes or waive failed checks. `pr-writer` remains a separate publishing helper: it drafts the description, while the publisher performs Git and PR operations when invoked. Existing tasks retain their captured v1 workflows.
 

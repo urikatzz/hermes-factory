@@ -82,7 +82,7 @@ def main():
                         aid=kb.store_attachment_bytes(conn,task.id,name,data,uploaded_by='synthetic-test')
                         artifacts.append(kb.get_attachment(conn,aid).stored_path)
                     if kind=='prepare':
-                        retain('RETRO.md' if stage['profile']=='factory-retro' else 'PLAN.md',b'AC1: Test behavior\n')
+                        retain('RETRO.md' if stage['profile']=='factory-retro' else 'PLAN-REVIEW.md' if stage['stage_key']=='project-plan-review' else 'PLAN.md',b'AC1: Test behavior\n')
                     if stage['profile']=='architect':
                         retain('project-plan.json',json.dumps(dict(tasks=[dict(id='code',title='Native small task',owner='developer',dependencies=[],acceptance={'AC1':'Test behavior'},needs=dict(art=False,audio=False,ui=False,ux=False))])).encode())
                     if kind in ('review','verify'):
@@ -102,8 +102,9 @@ def main():
                 if kb.get_task(conn,root).status=='done':break
             assert kb.get_task(conn,root).status=='done',WorkflowState().read_root(conn,root)
             assert any(r[0]=='factory-retro' for r in conn.execute('SELECT profile FROM factory_workflow_stages'))
+            assert conn.execute("SELECT 1 FROM factory_workflow_stages WHERE stage_key='project-plan-review'").fetchone()
             print(json.dumps(dict(native_board=True,root_guard=True,v2_scope_card=True,stage_claim_guard=True,
-                                  full_task_cycle=True,final_integration=True,retro=True,synthetic_stages=completed,model_calls=0)))
+                                  plan_review=True,full_task_cycle=True,final_integration=True,retro=True,synthetic_stages=completed,model_calls=0)))
         conn.close()
 
 

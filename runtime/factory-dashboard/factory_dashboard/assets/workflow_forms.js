@@ -11,7 +11,7 @@ const FactoryWorkflowForms=(()=>{
  function summaryText(workflow){
   if(!workflow||workflow.legacy)return 'Legacy workflow';
   const d=workflow.definition||workflow;
-  if(d.execution_version===2)return `${d.name} · revision ${d.revision} · Project workflow v2\nOrchestrator → relevant art/audio directors → architect → small dependent tasks\nEach task: writer → verifier PASS → code + security + relevant specialist/UX/UI reviews\nRepair: fixer / artist / sound-designer → verifier → selected reviews · up to ${d.max_repairs} cycles\nFinal integration → verifier → selected reviews → factory-retro`;
+  if(d.execution_version===2)return `${d.name} · revision ${d.revision} · Project workflow v2\nOrchestrator → relevant art/audio directors → architect → plan review → small dependent tasks\nEach task: writer → verifier PASS → one code reviewer + security + relevant specialist/UX/UI reviews\nRepair: fixer / artist / sound-designer → verifier → affected reviews · up to ${d.max_repairs} cycles, then back to the architect (2 replans per project)\nFinal integration → verifier → complete review panel → factory-retro`;
   return `${d.name} · revision ${d.revision}\n${d.prepare.profile} → ${d.implement.profile} → [${d.reviewers.map(r=>r.profile).join(' + ')} + ${d.verify.profile}]\nRepair: ${d.repair.profile} · up to ${d.max_repairs} cycles`;
  }
  function renderSummary(container,workflow){
@@ -39,7 +39,7 @@ const FactoryWorkflowForms=(()=>{
    const description=field(form,'Description','textarea',doc.description);description.maxLength=1000;description.oninput=()=>documentValue.description=description.value;
    const type=field(form,'Suggested task type','select',doc.task_type,['feature','bug','chore','art','audio']);type.onchange=()=>documentValue.task_type=type.value;
    const execution=field(form,'Execution policy','select',String(doc.execution_version||1),['1','2']);execution.onchange=()=>{documentValue.execution_version=Number(execution.value);draw(documentValue);};
-   if(doc.execution_version===2)form.append(el('p','Project v2 captures scope, director plans and an architect task graph. Every task verifies before its selected reviews; final integration and retro follow. Stage defaults below supply matching instructions; writers and reviewers are selected per task.','muted'));
+   if(doc.execution_version===2)form.append(el('p','Project v2 captures scope, director plans and an architect task graph. The plan is reviewed before work starts. Every task verifies before its reviews; a second selected code reviewer joins only high-risk tasks and final integration. Final integration and retro follow. Stage defaults below supply matching instructions; writers and reviewers are selected per task.','muted'));
    for(const [key,label] of [['prepare','1 · Preparation'],['implement','2 · Implementation'],['verify','Independent verification'],['repair','Repair after failed review']]){
     const section=el('fieldset');section.append(el('legend',label));form.append(section);
     const profile=field(section,'Profile','select',doc[key].profile,allowedProfiles(data.capabilities,key));profile.onchange=()=>documentValue[key].profile=profile.value;

@@ -37,10 +37,23 @@ For perceptual review, obey the card's retained comparison.json contract. Final 
 rendering. Audio review requires a capable listening tool or retained human listening evaluation. Never claim to hear
 audio from waveforms or loudness. Missing perception is unavailable evidence, not a NIT, a waiver or an approval.
 Asset mismatch findings route to artist/sound-designer, code findings to fixer. Never redefine director intent to pass.
+A plan reviewer retains PLAN-REVIEW.md and reports plan defects as findings; it writes no plan of its own.
+If a failure comes from a wrong task plan or acceptance criterion, set metadata.plan_defect instead of forcing a repair.
+The architect sets metadata.scope_additions when the captured scope omits art, audio, UI or UX the work needs.
 factory-retro proposes improvements only; changing Factory behavior requires a separate approved implementation task.
 All existing Git/publishing restrictions, approval floors and factory-worker handoff identity checks still apply.
 
 '''
+PLANNING_LINES = '''A plan reviewer retains PLAN-REVIEW.md and reports plan defects as findings; it writes no plan of its own.
+If a failure comes from a wrong task plan or acceptance criterion, set metadata.plan_defect instead of forcing a repair.
+The architect sets metadata.scope_additions when the captured scope omits art, audio, UI or UX the work needs.
+'''
+BIBLE_LINES = '''If a project lacks a required art/audio bible, directors plan a style-bible creation task before asset work; they do not
+require an already-existing game. Preserve any existing approved bible unless the captured task explicitly changes it.
+'''
+# Blocks written by earlier releases; anything else was edited by hand and is left for manual review.
+RELEASED = (MANAGED.replace(PLANNING_LINES, ''), MANAGED.replace(PLANNING_LINES, '').replace(BIBLE_LINES, ''))
+assert len({MANAGED, *RELEASED}) == 3
 
 
 def digest(data):
@@ -56,8 +69,7 @@ def managed_text(original, *, skill=False):
         if end < 0:
             raise ConfigurationError('Edited project managed block requires manual review')
         end += len(ending)
-        previous = MANAGED.replace('If a project lacks a required art/audio bible, directors plan a style-bible creation task before asset work; they do not\nrequire an already-existing game. Preserve any existing approved bible unless the captured task explicitly changes it.\n', '')
-        if original[start:end] not in (MANAGED, previous):
+        if original[start:end] not in (MANAGED, *RELEASED):
             raise ConfigurationError('Edited project managed block requires manual review')
         return original[:start] + MANAGED + original[end:]
     if skill:
@@ -107,7 +119,9 @@ def release_files(home):
         target = home / 'factory-dashboard' / relative
         if target.exists() and relative.as_posix() in baseline:
             actual = digest(target.read_bytes())
-            if actual not in (baseline[relative.as_posix()], digest(path.read_bytes())):
+            known = baseline[relative.as_posix()]
+            # A list records every released digest of a file that changed in more than one release.
+            if actual not in (*([known] if isinstance(known, str) else known), digest(path.read_bytes())):
                 raise ConfigurationError('Installed source changed since baseline: ' + str(relative))
         files[target] = path.read_bytes()
     source_store = TaskSettingsStore(home / 'state/factory/task-settings.db', create=False)

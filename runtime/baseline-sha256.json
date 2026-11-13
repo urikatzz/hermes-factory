@@ -9,7 +9,7 @@
   "factory_dashboard/assets/task_forms.js": "751766dfd54578b31d3aba1285608ae7d4f180e07c939ae9a599c3286ea55b16",
   "factory_dashboard/assets/timeline.css": "b947ee8ab53b24a5eae1f61b4dfa8a5df511f9a63a87d3d6b3d3a5f287ebfbcb",
   "factory_dashboard/assets/timeline.js": "cf869b854b86c65e5106c253ecf6c4c91fc91d0bf42b11374682b9bf4117d4bc",
-  "factory_dashboard/assets/workflow_forms.js": "4013ce8ff44e733e44426a65fa084de9749d14f6c5aba11ed1d7ec213ff67c88",
+  "factory_dashboard/assets/workflow_forms.js": ["4013ce8ff44e733e44426a65fa084de9749d14f6c5aba11ed1d7ec213ff67c88", "1ee2bd75a82ad0ac9deca92f4a7292c3309fdc18d3917d84d8102f9bed818d35"],
   "factory_dashboard/catalog_export.py": "fe86f0e14cd6f6bc479176de0af0b9411d635c1ad48a5f997715ab7f2fa61c8a",
   "factory_dashboard/collector.py": "9d9741626af95fad5cd04b227b8af2ee44099d43e8d88fcbb71235d0508692b0",
   "factory_dashboard/demo.py": "26cfd388b254caed113db6fa7b48c2db54c99b31c903bd4d142a378b6a8c3961",

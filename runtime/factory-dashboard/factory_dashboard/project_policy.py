@@ -10,6 +10,12 @@ V2_PROFILES = (
     'verifier', 'factory-retro',
 )
 DOMAINS = ('art', 'audio', 'ui', 'ux')
+# Architect reruns caused by plan-review findings, declared plan defects or exhausted task repairs.
+MAX_REPLANS = 2
+REPAIR_OWNERS = {'developer': 'fixer', 'artist': 'artist', 'sound-designer': 'sound-designer'}
+# Reviewers whose discipline a specialist repair changes.
+REPAIR_REVIEWERS = {'fixer': ('claude-reviewer', 'codex-reviewer', 'security-reviewer'),
+                    'artist': ('art-reviewer',), 'sound-designer': ('audio-reviewer',)}
 
 
 def validate_scope(scope):
@@ -24,13 +30,47 @@ def planning_profiles(scope):
             *(['audio-director'] if scope['audio'] else []), 'architect']
 
 
-def review_profiles(needs, selected=()):
+def review_profiles(needs, selected=(), second_opinion=False):
+    """One code reviewer per task; the second selected one joins high-risk tasks and final integration."""
     validate_scope(needs)
-    code = [p for p in selected if p in ('claude-reviewer', 'codex-reviewer')]
-    profiles = [*(code or ['claude-reviewer']), 'security-reviewer']
+    code = [p for p in selected if p in ('claude-reviewer', 'codex-reviewer')] or ['claude-reviewer']
+    profiles = [*(code if second_opinion else code[:1]), 'security-reviewer']
     profiles += [p for domain, p in [('ux', 'ux-reviewer'), ('ui', 'ui-reviewer'),
                                   ('art', 'art-reviewer'), ('audio', 'audio-reviewer')] if needs[domain]]
     return list(dict.fromkeys(profiles))
+
+
+def blocking_findings(findings):
+    result = []
+    for finding in findings:
+        _, severity, ac, _, _ = finding.split('|', 4)
+        if severity in ('BLOCKER', 'HIGH') or (severity == 'MEDIUM' and ac != '-'):
+            result.append(finding)
+    return result
+
+
+def finding_ac(finding):
+    """Acceptance ID of a gate finding: 'AC1: fail' or 'profile:F1|HIGH|AC1|path|text'."""
+    parts = finding.split('|', 4)
+    value = parts[2] if len(parts) == 5 else finding.split(':', 1)[0]
+    return value if re.fullmatch(r'AC(?:[0-9]+|-GATE)', value) else None
+
+
+def scope_additions(value, scope):
+    """Domains the architect found necessary after the orchestrator left them out. Widening only."""
+    if value in (None, []):
+        return []
+    if not isinstance(value, list) or len(set(value)) != len(value) or any(d not in DOMAINS or scope[d] for d in value):
+        raise ConfigurationError('scope_additions must list missing art, audio, ui or ux domains')
+    return list(value)
+
+
+def rereview_profiles(panel, findings, repairs):
+    """After a repair: reviewers who raised blocking findings plus those covering the repaired discipline."""
+    wanted = {f.split(':', 1)[0] for f in findings if re.match(r'[a-z]+-reviewer:F[0-9]+\|', f)}
+    for profile in repairs:
+        wanted.update(REPAIR_REVIEWERS[profile])
+    return [p for p in panel if p in wanted]
 
 
 def validate_plan(document, scope, project_ac_ids):
@@ -43,8 +83,10 @@ def validate_plan(document, scope, project_ac_ids):
     by_id = {}
     covered = set()
     for task in tasks:
-        if not isinstance(task, dict) or set(task) != {'id', 'title', 'owner', 'dependencies', 'acceptance', 'needs'}:
+        if not isinstance(task, dict) or set(task) - {'risk'} != {'id', 'title', 'owner', 'dependencies', 'acceptance', 'needs'}:
             raise ConfigurationError('Invalid task fields')
+        if task.get('risk', 'normal') not in ('normal', 'high'):
+            raise ConfigurationError('Task risk must be normal or high')
         key = task['id']
         if not isinstance(key, str) or not re.fullmatch('[a-z][a-z0-9-]{0,23}', key) or key == 'integration' or key in by_id:
             raise ConfigurationError('Invalid or duplicate task ID')
@@ -103,7 +145,9 @@ def validate_plan(document, scope, project_ac_ids):
     return ordered
 
 
-def repair_profiles(findings, owner, repair_domains=()):
+def repair_profiles(findings, owner, repair_domains=(), ac_owners=None):
+    """ac_owners (final integration) maps an acceptance ID to the owners of the tasks that produced it."""
+    fallback = REPAIR_OWNERS.get(owner, 'fixer')
     profiles = []
     for domain in repair_domains:
         if domain not in ('code', 'art', 'audio'):
@@ -116,9 +160,10 @@ def repair_profiles(findings, owner, repair_domains=()):
         elif re.match(r'[a-z]+-reviewer:F[0-9]+\|', finding):
             profiles.append('fixer')
         elif not repair_domains:
-            profiles.append({'artist': 'artist', 'sound-designer': 'sound-designer'}.get(owner, 'fixer'))
+            owners = (ac_owners or {}).get(finding_ac(finding))
+            profiles.extend(REPAIR_OWNERS[o] for o in owners) if owners else profiles.append(fallback)
     if not profiles:
-        profiles.append({'artist': 'artist', 'sound-designer': 'sound-designer'}.get(owner, 'fixer'))
+        profiles.append(fallback)
     ordered = [p for p in ('artist', 'sound-designer', 'fixer') if p in profiles]
     if len(ordered) > 1 and 'fixer' not in ordered:
         ordered.append('fixer')
