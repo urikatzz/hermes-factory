@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="2013" viewBox="0 0 1200 2013" role="img" aria-labelledby="title desc">
 <title id="title">Hermes Factory project and task workflow</title>
 <desc id="desc">Orchestrator selects relevant art and audio directors, then the architect consumes their plans and decomposes the project; a plan review precedes any work. Each dependent small task has a writer, verification before independent reviews, specialist repair routing with scoped re-reviews, and a bounded path back to the architect. Final integration repeats the checks with the complete panel; factory-retro proposes improvements.</desc>
-<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10" fill="#778bab"/></marker></defs>
-<style>text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif}.title{fill:#f2f5ff;font-size:34px;font-weight:700}.name{fill:#eef3ff;font-size:22px;font-weight:650}.body{fill:#b1c0d8;font-size:16px}.small{fill:#b1c0d8;font-size:14px}.label{font-size:12px;font-weight:700;letter-spacing:1.7px}.line{fill:none;stroke:#778bab;stroke-width:2;marker-end:url(#a)}</style>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10" fill="#778bab"/></marker><marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10" fill="#ffc773"/></marker></defs>
+<style>text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif}.title{fill:#f2f5ff;font-size:34px;font-weight:700}.name{fill:#eef3ff;font-size:22px;font-weight:650}.body{fill:#b1c0d8;font-size:16px}.small{fill:#b1c0d8;font-size:14px}.label{font-size:12px;font-weight:700;letter-spacing:1.7px}.back{fill:none;stroke:#ffc773;stroke-width:2.5;stroke-dasharray:7 5;marker-end:url(#b)}.line{fill:none;stroke:#778bab;stroke-width:2;marker-end:url(#a)}</style>
 <rect width="1200" height="2013" rx="24" fill="#0b1220"/>
 
 <text x="48" y="48" class="label" fill="#93a9cd">HERMES / PROJECT WORKFLOW V2</text>
@@ -45,10 +45,10 @@
 <rect x="248" y="650" width="3" height="56" rx="1.5" fill="#80d8a0"/>
 <text x="268" y="665" class="name">Plan review</text>
 <text x="268" y="694" class="body">A code reviewer checks the task graph and acceptance criteria before any work starts.</text>
-<path d="M248 678 H224 V542 H248" class="line"/>
+<path d="M248 678 H224 V542 H248" class="back"/>
 <text x="212" y="614" class="label" fill="#ffc773" text-anchor="end">BLOCKING FINDINGS</text>
-<path d="M1152 1000 H1176 V542 H952" class="line"/>
-<text x="968" y="530" class="label" fill="#ffc773">REPLAN · MAX 2</text>
+<path d="M1152 1000 H1176 V542 H952" class="back"/>
+<text x="1170" y="530" class="label" fill="#ffc773" text-anchor="end">REPLAN PATH · MAX 2</text>
 <path d="M600 722 V764" class="line"/>
 <rect x="48" y="764" width="1104" height="128" rx="14" fill="#101b2d" stroke="#25344e"/>
 <text x="72" y="795" class="label" fill="#93a9cd">CAPTURED TASK GRAPH / EXAMPLE</text>
@@ -69,6 +69,7 @@
 <path d="M600 892 V930" class="line"/>
 <rect x="48" y="930" width="1104" height="572" rx="14" fill="#101b2d" stroke="#365077"/>
 <text x="72" y="965" class="label" fill="#90aaff">EVERY SMALL TASK GETS ITS OWN FACTORY CYCLE</text>
+<text x="1128" y="965" class="label" fill="#ffc773" text-anchor="end">REPAIR LIMIT HIT OR PLAN DEFECT → BACK TO ARCHITECT</text>
 <text x="72" y="993" class="body">Only the agents needed by this task participate. Dependencies must finish their full cycle first.</text>
 <rect x="80" y="1022" width="328" height="108" rx="14" fill="#152137" stroke="#2b3b55"/>
 <rect x="80" y="1038" width="3" height="76" rx="1.5" fill="#90aaff"/>
@@ -105,7 +106,7 @@
 <text x="100" y="1370" class="body">Code → fixer · art → artist</text>
 <text x="100" y="1393" class="body">Sound → sound-designer</text>
 <path d="M80 1359 H64 V1214 H80" class="line"/>
-<text x="80" y="1296" class="label" fill="#ffc773">FAIL OR REVIEW FINDINGS</text>
+<text x="80" y="1296" class="label" fill="#ffc773">FAIL OR FINDINGS · LOOP BOUND: MAX 0–3 REPAIRS</text>
 <path d="M480 1336 H432 V1359 H408" class="line"/>
 <text x="490" y="1418" class="body">Any repair → fresh verifier → only the affected reviews.</text>
 <text x="490" y="1446" class="small">Missing render/listening tools → human recovery; no approval.</text>
