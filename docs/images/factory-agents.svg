@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="1240" viewBox="0 0 1120 1240" role="img" aria-labelledby="title desc">
+<title id="title">Hermes Factory agents and workflow</title>
+<desc id="desc">Task intake branches into art and audio agents. Each branch prepares, produces and reviews assets. Independent code review and verification feed a controller that accepts work, requests repairs, or asks for human intervention. Publishing uses a PR writer and publisher.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10" fill="#7588a6"/></marker></defs>
+<style>
+text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif}
+.heading{fill:#f1f5ff;font-size:30px;font-weight:700;letter-spacing:-.6px}
+.sub{fill:#a6b6d0;font-size:15px}.label{font-size:12px;font-weight:700;letter-spacing:2px}
+.name{fill:#f1f5ff;font-size:21px;font-weight:650}.body{fill:#afbed6;font-size:15px}
+.line{fill:none;stroke:#7588a6;stroke-width:2;marker-end:url(#arrow)}
+</style>
+<rect width="1120" height="1240" rx="24" fill="#0b1220"/>
+<text x="56" y="63" class="label" fill="#829bc0">HERMES / FACTORY</text>
+<text x="56" y="107" class="heading">Specialist agents. Shared quality gates.</text>
+<text x="56" y="137" class="sub">From a captured task to reviewed assets and a draft pull request.</text>
+
+<rect x="310" y="175" width="500" height="84" rx="14" fill="#152137" stroke="#2b3b55"/>
+<rect x="310" y="191" width="3" height="52" rx="1.5" fill="#90aaff"/>
+<text x="332" y="204" class="name">Task intake</text>
+<text x="332" y="231" class="body">Capture scope, acceptance criteria, workflow and settings.</text>
+<path d="M560 259 V281 H304 V310" class="line"/>
+<path d="M560 281 H816 V310" class="line"/>
+<rect x="56" y="311" width="496" height="440" rx="18" fill="#101b2d" stroke="#25344e"/>
+<text x="80" y="345" class="label" fill="#b69cff">01 / GAME ART</text>
+<rect x="568" y="311" width="496" height="440" rx="18" fill="#101b2d" stroke="#25344e"/>
+<text x="592" y="345" class="label" fill="#51d6c2">02 / GAME AUDIO</text>
+<rect x="80" y="366" width="448" height="94" rx="14" fill="#152137" stroke="#2b3b55"/>
+<rect x="80" y="382" width="3" height="62" rx="1.5" fill="#b69cff"/>
+<text x="102" y="395" class="name">art-director</text>
+<text x="102" y="422" class="body">Read the style bible; define the asset plan.</text>
+<rect x="80" y="486" width="448" height="105" rx="14" fill="#152137" stroke="#2b3b55"/>
+<rect x="80" y="502" width="3" height="73" rx="1.5" fill="#b69cff"/>
+<text x="102" y="515" class="name">artist</text>
+<text x="102" y="542" class="body">Produce sprites and models.</text>
+<text x="102" y="564" class="body">Fit, export, and repair assets.</text>
+<rect x="80" y="617" width="448" height="105" rx="14" fill="#152137" stroke="#2b3b55"/>
+<rect x="80" y="633" width="3" height="73" rx="1.5" fill="#b69cff"/>
+<text x="102" y="646" class="name">art-reviewer</text>
+<text x="102" y="673" class="body">Check lint, rendered views,</text>
+<text x="102" y="695" class="body">and visual style rules.</text>
+<rect x="592" y="366" width="448" height="94" rx="14" fill="#152137" stroke="#2b3b55"/>
+<rect x="592" y="382" width="3" height="62" rx="1.5" fill="#51d6c2"/>
+<text x="614" y="395" class="name">audio-director</text>
+<text x="614" y="422" class="body">Read the audio bible; plan recipes and cues.</text>
+<rect x="592" y="486" width="448" height="105" rx="14" fill="#152137" stroke="#2b3b55"/>
+<rect x="592" y="502" width="3" height="73" rx="1.5" fill="#51d6c2"/>
+<text x="614" y="515" class="name">sound-designer</text>
+<text x="614" y="542" class="body">Synthesize SFX; write music cues.</text>
+<text x="614" y="564" class="body">Process supplied tracks and repair assets.</text>
+<rect x="592" y="617" width="448" height="105" rx="14" fill="#152137" stroke="#2b3b55"/>
+<rect x="592" y="633" width="3" height="73" rx="1.5" fill="#51d6c2"/>
+<text x="614" y="646" class="name">audio-reviewer</text>
+<text x="614" y="673" class="body">Check measurements, recipes, cues,</text>
+<text x="614" y="695" class="body">and audio rule compliance.</text>
+<path d="M304 460 V486" class="line"/>
+<path d="M304 591 V617" class="line"/>
+<path d="M816 460 V486" class="line"/>
+<path d="M816 591 V617" class="line"/>
+<path d="M80 539 H40 V819 H80" class="line"/>
+<path d="M1040 539 H1080 V819 H1040" class="line"/>
+<text x="56" y="786" class="label" fill="#90aaff">03 / INDEPENDENT CHECKS ON THE SAME MANIFEST</text>
+<rect x="80" y="801" width="448" height="88" rx="14" fill="#152137" stroke="#2b3b55"/>
+<rect x="80" y="817" width="3" height="56" rx="1.5" fill="#90aaff"/>
+<text x="102" y="830" class="name">claude-reviewer</text>
+<text x="102" y="857" class="body">Review scripts, JSON, and import settings.</text>
+<rect x="592" y="801" width="448" height="88" rx="14" fill="#152137" stroke="#2b3b55"/>
+<rect x="592" y="817" width="3" height="56" rx="1.5" fill="#90aaff"/>
+<text x="614" y="830" class="name">verifier</text>
+<text x="614" y="857" class="body">Run acceptance checks and the asset lint gate.</text>
+<path d="M304 722 V737 H552 V931" class="line"/>
+<path d="M816 722 V737 H568 V931" class="line"/>
+<path d="M304 889 V910 H538 V931" class="line"/>
+<path d="M816 889 V910 H582 V931" class="line"/>
+<rect x="310" y="931" width="500" height="84" rx="14" fill="#152137" stroke="#2b3b55"/>
+<rect x="310" y="947" width="3" height="52" rx="1.5" fill="#ffc773"/>
+<text x="332" y="960" class="name">Factory controller</text>
+<text x="332" y="987" class="body">Evaluate all required evidence.</text>
+<path d="M310 973 H284" class="line"/>
+<path d="M810 973 H836" class="line"/>
+<rect x="56" y="931" width="228" height="84" rx="14" fill="#241e32" stroke="#5c477e"/>
+<text x="74" y="958" class="label" fill="#c4a7ff">REPAIR</text>
+<text x="74" y="983" class="body">Original asset producer</text>
+<text x="74" y="1003" class="body">Repeat all selected checks</text>
+<rect x="836" y="931" width="228" height="84" rx="14" fill="#282319" stroke="#66512f"/>
+<text x="854" y="958" class="label" fill="#ffc773">HUMAN REVIEW</text>
+<text x="854" y="983" class="body">Intervention needed or</text>
+<text x="854" y="1003" class="body">repair limit reached</text>
+<path d="M560 1015 V1055" class="line"/>
+<text x="578" y="1042" class="sub">Accepted · publishing invoked</text>
+<rect x="80" y="1055" width="448" height="105" rx="14" fill="#152137" stroke="#2b3b55"/>
+<rect x="80" y="1071" width="3" height="73" rx="1.5" fill="#80d8a0"/>
+<text x="102" y="1084" class="name">pr-writer</text>
+<text x="102" y="1111" class="body">Draft changes, evidence, risks,</text>
+<text x="102" y="1133" class="body">and retrospective for the PR body.</text>
+<rect x="592" y="1055" width="448" height="105" rx="14" fill="#152137" stroke="#2b3b55"/>
+<rect x="592" y="1071" width="3" height="73" rx="1.5" fill="#80d8a0"/>
+<text x="614" y="1084" class="name">Factory publisher</text>
+<text x="614" y="1111" class="body">Perform Git operations and</text>
+<text x="614" y="1133" class="body">open a draft pull request.</text>
+<path d="M560 1055 H304" class="line"/>
+<path d="M528 1107 H592" class="line"/>
+<text x="56" y="1200" class="sub">Agents execute the work. Runtime components coordinate gates and publishing.</text>
+</svg>
