@@ -17,13 +17,15 @@ This checkout complements an existing Hermes Factory installation. It is not a s
 
 ## Agents and workflow
 
-The installed Factory coordinates agents through a captured workflow. This diagram shows the Game Art and Game Audio templates, with each agent's job inside its box. Reviewers and the verifier inspect the same implementation manifest; the controller evaluates their evidence before allowing delivery or another repair cycle.
+The Factory's selectable roster contains 16 agents spanning orchestration, software development, game art, game audio, review, and verification. Each card below describes an agent's responsibility. Captured workflows choose the participating agents and stage order; a task does not run every profile.
 
 <p align="center">
-  <img src="docs/images/factory-agents.svg" alt="Hermes Factory workflow: art and audio specialists prepare, produce, and review assets; independent checks feed the controller, repair loop, and PR publishing." width="100%">
+  <img src="docs/images/factory-agents.svg" alt="All 16 Factory agents grouped by orchestration, software, art, audio, independent review, and verification, with repair and publishing outcomes." width="100%">
 </p>
 
-The controller and publisher are runtime components. The `pr-writer` drafts the description; the publisher performs Git and PR operations. The Game Art and Game Audio templates allow up to two repair cycles. Other templates can select different preparation, implementation, and review profiles; every workflow requires verification and at least one code reviewer. Existing tasks keep their captured settings when templates change.
+The `factory-orchestrator` coordinates work; the runtime controller enforces evidence gates and repair limits. Software templates can use `architect`, `developer`, and `fixer`, with independent code, security, UX, and UI reviewers as selected. Art and audio templates use their own directors, producers, and specialist reviewers. Every workflow requires verification and at least one code reviewer. Existing tasks retain their captured settings when templates change.
+
+The `pr-writer` is an additional publishing helper outside the selectable stage roster. It drafts the PR description; the publisher performs Git and PR operations. Game Art and Game Audio templates allow up to two repair cycles, with the asset producer repairing findings before all selected checks run again.
 
 ## Requirements
 
