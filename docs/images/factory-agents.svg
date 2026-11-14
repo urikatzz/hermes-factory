@@ -1,9 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="2368" viewBox="0 0 1200 2368" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="2476" viewBox="0 0 1200 2476" role="img" aria-labelledby="title desc">
 <title id="title">Hermes Factory project and task workflow</title>
-<desc id="desc">Orchestrator selects relevant art and audio directors, then the architect consumes their plans and decomposes the project; a plan review precedes any work. Each dependent small task has a writer, verification before independent reviews, specialist repair routing with scoped re-reviews, and a bounded path back to the architect. Final integration repeats the checks with the complete panel; factory-retro proposes improvements. A human submits the request, approves the art director's plan before architecture, and reviews or recovers the project when it escalates or blocks.</desc>
+<desc id="desc">Orchestrator selects relevant art and audio directors, then the architect consumes their plans and decomposes the project into many small tasks, several per discipline; a plan review precedes any work. Each dependent small task has a writer, verification before independent reviews, specialist repair routing with scoped re-reviews, and a bounded path back to the architect. Final integration repeats the checks with the complete panel; factory-retro proposes improvements. A human submits the request, approves the art director's plan before architecture, and reviews or recovers the project when it escalates or blocks.</desc>
 <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10" fill="#778bab"/></marker><marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10" fill="#ffc773"/></marker></defs>
-<style>text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif}.title{fill:#f2f5ff;font-size:34px;font-weight:700}.name{fill:#eef3ff;font-size:22px;font-weight:650}.body{fill:#b1c0d8;font-size:16px}.small{fill:#b1c0d8;font-size:14px}.label{font-size:12px;font-weight:700;letter-spacing:1.7px}.back{fill:none;stroke:#ffc773;stroke-width:2.5;stroke-dasharray:7 5;marker-end:url(#b)}.line{fill:none;stroke:#778bab;stroke-width:2;marker-end:url(#a)}</style>
-<rect width="1200" height="2368" rx="24" fill="#0b1220"/>
+<style>text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif}.title{fill:#f2f5ff;font-size:34px;font-weight:700}.name{fill:#eef3ff;font-size:22px;font-weight:650}.body{fill:#b1c0d8;font-size:16px}.small{fill:#b1c0d8;font-size:14px}.label{font-size:12px;font-weight:700;letter-spacing:1.7px}.chip{fill:#eef3ff;font-size:17px;font-weight:650}.back{fill:none;stroke:#ffc773;stroke-width:2.5;stroke-dasharray:7 5;marker-end:url(#b)}.line{fill:none;stroke:#778bab;stroke-width:2;marker-end:url(#a)}</style>
+<rect width="1200" height="2476" rx="24" fill="#0b1220"/>
 
 <text x="48" y="48" class="label" fill="#93a9cd">HERMES / PROJECT WORKFLOW V2</text>
 <text x="1152" y="48" class="label" fill="#ff8fb1" text-anchor="end">PINK = HUMAN IN THE LOOP</text>
@@ -60,98 +60,120 @@
 <text x="268" y="952" class="body">A code reviewer checks the task graph and acceptance criteria before any work starts.</text>
 <path d="M248 936 H224 V800 H248" class="back"/>
 <text x="212" y="872" class="label" fill="#ffc773" text-anchor="end">BLOCKING FINDINGS</text>
-<path d="M1152 1258 H1176 V800 H952" class="back"/>
+<path d="M1152 1366 H1176 V800 H952" class="back"/>
 <text x="1170" y="788" class="label" fill="#ffc773" text-anchor="end">REPLAN PATH · MAX 2</text>
 <path d="M600 980 V1022" class="line"/>
-<rect x="48" y="1022" width="1104" height="128" rx="14" fill="#101b2d" stroke="#25344e"/>
-<text x="72" y="1053" class="label" fill="#93a9cd">CAPTURED TASK GRAPH / EXAMPLE</text>
-<rect x="72" y="1072" width="300" height="74" rx="14" fill="#152137" stroke="#2b3b55"/>
-<rect x="72" y="1088" width="3" height="26" rx="1.5" fill="#b69cff"/>
-<text x="92" y="1103" class="name">Task A · art assets</text>
-<text x="92" y="1132" class="body">artist</text>
-<rect x="444" y="1072" width="300" height="74" rx="14" fill="#152137" stroke="#2b3b55"/>
-<rect x="444" y="1088" width="3" height="26" rx="1.5" fill="#51d6c2"/>
-<text x="464" y="1103" class="name">Task B · sound assets</text>
-<text x="464" y="1132" class="body">sound-designer</text>
-<rect x="816" y="1072" width="312" height="74" rx="14" fill="#152137" stroke="#2b3b55"/>
-<rect x="816" y="1088" width="3" height="26" rx="1.5" fill="#90aaff"/>
-<text x="836" y="1103" class="name">Task C · integrate code</text>
-<text x="836" y="1132" class="body">developer · depends on A + B</text>
-<path d="M372 1102 H408 V1064 H792 V1089 H816" class="line"/>
-<path d="M744 1114 H816" class="line"/>
-<path d="M600 1150 V1188" class="line"/>
-<rect x="48" y="1188" width="1104" height="572" rx="14" fill="#101b2d" stroke="#365077"/>
-<text x="72" y="1223" class="label" fill="#90aaff">EVERY SMALL TASK GETS ITS OWN FACTORY CYCLE</text>
-<text x="1128" y="1223" class="label" fill="#ffc773" text-anchor="end">REPAIR LIMIT HIT OR PLAN DEFECT → BACK TO ARCHITECT</text>
-<text x="72" y="1251" class="body">Only the agents needed by this task participate. Dependencies must finish their full cycle first.</text>
-<rect x="80" y="1280" width="328" height="108" rx="14" fill="#152137" stroke="#2b3b55"/>
-<rect x="80" y="1296" width="3" height="76" rx="1.5" fill="#90aaff"/>
-<text x="100" y="1311" class="name">Task writer</text>
-<text x="100" y="1340" class="body">developer / artist / sound-designer</text>
-<text x="100" y="1363" class="body">Implement the captured task plan.</text>
-<path d="M244 1388 V1418" class="line"/>
-<rect x="80" y="1418" width="328" height="108" rx="14" fill="#152137" stroke="#2b3b55"/>
-<rect x="80" y="1434" width="3" height="76" rx="1.5" fill="#80d8a0"/>
-<text x="100" y="1449" class="name">verifier</text>
-<text x="100" y="1478" class="body">Run acceptance, tests and lint gates.</text>
-<text x="100" y="1501" class="body">Reviewers are never started on FAIL.</text>
-<path d="M408 1472 H466" class="line"/>
-<text x="420" y="1454" class="label" fill="#80d8a0">PASS</text>
-<rect x="480" y="1280" width="624" height="354" rx="14" fill="#152137" stroke="#2b3b55"/>
-<text x="504" y="1312" class="label" fill="#80d8a0">INDEPENDENT REVIEWS / AFTER VERIFIER PASS</text>
-<text x="504" y="1351" class="name">claude-reviewer</text>
-<text x="504" y="1375" class="small">Code correctness and design</text>
-<text x="800" y="1351" class="name">codex-reviewer</text>
-<text x="800" y="1375" class="small">High-risk tasks and integration only</text>
-<text x="504" y="1426" class="name">security-reviewer</text>
-<text x="504" y="1450" class="small">Security boundaries and risks</text>
-<text x="800" y="1426" class="name">ux-reviewer</text>
-<text x="800" y="1450" class="small">User journeys, when relevant</text>
-<text x="504" y="1501" class="name">ui-reviewer</text>
-<text x="504" y="1525" class="small">Interface quality, when relevant</text>
-<text x="800" y="1501" class="name">art-reviewer</text>
-<text x="800" y="1525" class="small">Jev score ≥ 80% first, then director intent</text>
-<text x="504" y="1576" class="name">audio-reviewer</text>
-<text x="504" y="1600" class="small">Listened result vs director intent · tool or <tspan fill="#ff8fb1">human listening evaluation</tspan></text>
-<rect x="80" y="1568" width="328" height="100" rx="14" fill="#152137" stroke="#2b3b55"/>
-<rect x="80" y="1584" width="3" height="68" rx="1.5" fill="#ffc773"/>
-<text x="100" y="1599" class="name">fixer + specialist repairs</text>
-<text x="100" y="1628" class="body">Code → fixer · art → artist</text>
-<text x="100" y="1651" class="body">Sound → sound-designer</text>
-<path d="M80 1617 H64 V1472 H80" class="line"/>
-<text x="80" y="1554" class="label" fill="#ffc773">FAIL OR FINDINGS · LOOP BOUND: MAX 0–3 REPAIRS</text>
-<path d="M480 1594 H432 V1617 H408" class="line"/>
-<text x="490" y="1676" class="body">Any repair → fresh verifier → only the affected reviews.</text>
-<text x="490" y="1704" class="small" style="fill:#ff8fb1">Missing render/listening tools → human recovery; no approval.</text>
-<text x="490" y="1730" class="small">Repair limit or plan defect → architect replans (max 2 per project), then <tspan fill="#ff8fb1">human review</tspan>.</text>
-<path d="M600 1760 V1798" class="line"/>
-<rect x="248" y="1798" width="704" height="131" rx="14" fill="#152137" stroke="#2b3b55"/>
-<rect x="248" y="1814" width="3" height="99" rx="1.5" fill="#80d8a0"/>
-<text x="268" y="1829" class="name">Final project integration</text>
-<text x="268" y="1858" class="body">developer assembles the completed tasks; verifier first, then the full panel.</text>
-<text x="268" y="1881" class="body">Art: actual in-engine rendering. Sound: real listening evidence.</text>
-<text x="268" y="1904" class="body">A failing criterion is repaired by the specialist of the task that owns it.</text>
-<path d="M600 1929 V1967" class="line"/>
-<rect x="248" y="1967" width="704" height="108" rx="14" fill="#152137" stroke="#2b3b55"/>
-<rect x="248" y="1983" width="3" height="76" rx="1.5" fill="#ffc773"/>
-<text x="268" y="1998" class="name">factory-retro</text>
-<text x="268" y="2027" class="body">Analyze task failures, repairs, review findings and the overall outcome.</text>
-<text x="268" y="2050" class="body">Propose evidence-backed Factory improvements; never apply them itself.</text>
-<path d="M600 2075 V2109 H320 V2137" class="line"/>
-<path d="M600 2109 H880 V2137" class="line"/>
-<text x="336" y="2100" class="label" fill="#80d8a0">ALL CHECKS PASSED</text>
-<text x="864" y="2100" class="label" fill="#ff8fb1" text-anchor="end">ESCALATED OR BLOCKED</text>
-<rect x="80" y="2137" width="480" height="131" rx="14" fill="#14271f" stroke="#335f49"/>
-<text x="100" y="2168" class="name">Delivery</text>
-<text x="100" y="2197" class="body">Every task and final integration passed.</text>
-<text x="100" y="2220" class="body">Retro preserves the outcome; it cannot waive</text>
-<text x="100" y="2243" class="body">failed checks.</text>
-<rect x="640" y="2137" width="480" height="131" rx="14" fill="#2a1622" stroke="#6b3550"/>
-<rect x="640" y="2153" width="3" height="99" rx="1.5" fill="#ff8fb1"/>
-<text x="660" y="2168" class="name">Human review or recovery</text>
-<text x="660" y="2197" class="body">Review: repairs and replans exhausted, or evidence conflicts.</text>
-<text x="660" y="2220" class="body">Recovery: fix missing tools, then resume with a written note.</text>
-<text x="660" y="2243" class="body">A note cannot waive a defect or change scope.</text>
-<text x="48" y="2306" class="small">Publishing, when separately invoked: pr-writer drafts the description; the publisher opens a draft PR.</text>
-<text x="48" y="2331" class="small">Existing tasks retain their captured v1 workflow. New v2 tasks use this project / task hierarchy.</text>
+<rect x="48" y="1022" width="1104" height="236" rx="14" fill="#101b2d" stroke="#25344e"/>
+<text x="72" y="1053" class="label" fill="#93a9cd">CAPTURED TASK GRAPH / EXAMPLE: ONE FEATURE, MANY SMALL TASKS</text>
+<text x="72" y="1081" class="body">The architect splits a feature into many small tasks, up to 40: each has one owner, its dependencies and acceptance criteria.</text>
+<rect x="72" y="1100" width="246" height="62" rx="12" fill="#152137" stroke="#2b3b55"/>
+<rect x="72" y="1112" width="3" height="38" rx="1.5" fill="#b69cff"/>
+<text x="90" y="1126" class="chip">Player sprites</text>
+<text x="90" y="1148" class="small">artist</text>
+<rect x="342" y="1100" width="246" height="62" rx="12" fill="#152137" stroke="#2b3b55"/>
+<rect x="342" y="1112" width="3" height="38" rx="1.5" fill="#b69cff"/>
+<text x="360" y="1126" class="chip">Enemy sprites</text>
+<text x="360" y="1148" class="small">artist</text>
+<rect x="612" y="1100" width="246" height="62" rx="12" fill="#152137" stroke="#2b3b55"/>
+<rect x="612" y="1112" width="3" height="38" rx="1.5" fill="#51d6c2"/>
+<text x="630" y="1126" class="chip">Hit and jump SFX</text>
+<text x="630" y="1148" class="small">sound-designer</text>
+<rect x="882" y="1100" width="246" height="62" rx="12" fill="#152137" stroke="#2b3b55"/>
+<rect x="882" y="1112" width="3" height="38" rx="1.5" fill="#51d6c2"/>
+<text x="900" y="1126" class="chip">Level music</text>
+<text x="900" y="1148" class="small">sound-designer</text>
+<rect x="72" y="1178" width="246" height="62" rx="12" fill="#152137" stroke="#2b3b55"/>
+<rect x="72" y="1190" width="3" height="38" rx="1.5" fill="#90aaff"/>
+<text x="90" y="1204" class="chip">Player movement</text>
+<text x="90" y="1226" class="small">developer · needs player sprites</text>
+<rect x="342" y="1178" width="246" height="62" rx="12" fill="#152137" stroke="#2b3b55"/>
+<rect x="342" y="1190" width="3" height="38" rx="1.5" fill="#90aaff"/>
+<text x="360" y="1204" class="chip">Enemy AI</text>
+<text x="360" y="1226" class="small">developer · needs enemy sprites</text>
+<rect x="612" y="1178" width="246" height="62" rx="12" fill="#152137" stroke="#2b3b55"/>
+<rect x="612" y="1190" width="3" height="38" rx="1.5" fill="#90aaff"/>
+<text x="630" y="1204" class="chip">Combat and scoring</text>
+<text x="630" y="1226" class="small">developer · needs SFX</text>
+<rect x="882" y="1178" width="246" height="62" rx="12" fill="#152137" stroke="#2b3b55"/>
+<rect x="882" y="1190" width="3" height="38" rx="1.5" fill="#90aaff"/>
+<text x="900" y="1204" class="chip">HUD and menus</text>
+<text x="900" y="1226" class="small">developer · … and more tasks</text>
+<path d="M195 1162 V1178" class="line"/>
+<path d="M465 1162 V1178" class="line"/>
+<path d="M735 1162 V1178" class="line"/>
+<path d="M600 1258 V1296" class="line"/>
+<rect x="48" y="1296" width="1104" height="572" rx="14" fill="#101b2d" stroke="#365077"/>
+<text x="72" y="1331" class="label" fill="#90aaff">EVERY SMALL TASK GETS ITS OWN FACTORY CYCLE</text>
+<text x="1128" y="1331" class="label" fill="#ffc773" text-anchor="end">REPAIR LIMIT HIT OR PLAN DEFECT → BACK TO ARCHITECT</text>
+<text x="72" y="1359" class="body">Only the agents needed by this task participate. Dependencies must finish their full cycle first.</text>
+<rect x="80" y="1388" width="328" height="108" rx="14" fill="#152137" stroke="#2b3b55"/>
+<rect x="80" y="1404" width="3" height="76" rx="1.5" fill="#90aaff"/>
+<text x="100" y="1419" class="name">Task writer</text>
+<text x="100" y="1448" class="body">developer / artist / sound-designer</text>
+<text x="100" y="1471" class="body">Implement the captured task plan.</text>
+<path d="M244 1496 V1526" class="line"/>
+<rect x="80" y="1526" width="328" height="108" rx="14" fill="#152137" stroke="#2b3b55"/>
+<rect x="80" y="1542" width="3" height="76" rx="1.5" fill="#80d8a0"/>
+<text x="100" y="1557" class="name">verifier</text>
+<text x="100" y="1586" class="body">Run acceptance, tests and lint gates.</text>
+<text x="100" y="1609" class="body">Reviewers are never started on FAIL.</text>
+<path d="M408 1580 H466" class="line"/>
+<text x="420" y="1562" class="label" fill="#80d8a0">PASS</text>
+<rect x="480" y="1388" width="624" height="354" rx="14" fill="#152137" stroke="#2b3b55"/>
+<text x="504" y="1420" class="label" fill="#80d8a0">INDEPENDENT REVIEWS / AFTER VERIFIER PASS</text>
+<text x="504" y="1459" class="name">claude-reviewer</text>
+<text x="504" y="1483" class="small">Code correctness and design</text>
+<text x="800" y="1459" class="name">codex-reviewer</text>
+<text x="800" y="1483" class="small">High-risk tasks and integration only</text>
+<text x="504" y="1534" class="name">security-reviewer</text>
+<text x="504" y="1558" class="small">Security boundaries and risks</text>
+<text x="800" y="1534" class="name">ux-reviewer</text>
+<text x="800" y="1558" class="small">User journeys, when relevant</text>
+<text x="504" y="1609" class="name">ui-reviewer</text>
+<text x="504" y="1633" class="small">Interface quality, when relevant</text>
+<text x="800" y="1609" class="name">art-reviewer</text>
+<text x="800" y="1633" class="small">Jev score ≥ 80% first, then director intent</text>
+<text x="504" y="1684" class="name">audio-reviewer</text>
+<text x="504" y="1708" class="small">Listened result vs director intent · tool or <tspan fill="#ff8fb1">human listening evaluation</tspan></text>
+<rect x="80" y="1676" width="328" height="100" rx="14" fill="#152137" stroke="#2b3b55"/>
+<rect x="80" y="1692" width="3" height="68" rx="1.5" fill="#ffc773"/>
+<text x="100" y="1707" class="name">fixer + specialist repairs</text>
+<text x="100" y="1736" class="body">Code → fixer · art → artist</text>
+<text x="100" y="1759" class="body">Sound → sound-designer</text>
+<path d="M80 1725 H64 V1580 H80" class="line"/>
+<text x="80" y="1662" class="label" fill="#ffc773">FAIL OR FINDINGS · LOOP BOUND: MAX 0–3 REPAIRS</text>
+<path d="M480 1702 H432 V1725 H408" class="line"/>
+<text x="490" y="1784" class="body">Any repair → fresh verifier → only the affected reviews.</text>
+<text x="490" y="1812" class="small" style="fill:#ff8fb1">Missing render/listening tools → human recovery; no approval.</text>
+<text x="490" y="1838" class="small">Repair limit or plan defect → architect replans (max 2 per project), then <tspan fill="#ff8fb1">human review</tspan>.</text>
+<path d="M600 1868 V1906" class="line"/>
+<rect x="248" y="1906" width="704" height="131" rx="14" fill="#152137" stroke="#2b3b55"/>
+<rect x="248" y="1922" width="3" height="99" rx="1.5" fill="#80d8a0"/>
+<text x="268" y="1937" class="name">Final project integration</text>
+<text x="268" y="1966" class="body">developer assembles the completed tasks; verifier first, then the full panel.</text>
+<text x="268" y="1989" class="body">Art: actual in-engine rendering. Sound: real listening evidence.</text>
+<text x="268" y="2012" class="body">A failing criterion is repaired by the specialist of the task that owns it.</text>
+<path d="M600 2037 V2075" class="line"/>
+<rect x="248" y="2075" width="704" height="108" rx="14" fill="#152137" stroke="#2b3b55"/>
+<rect x="248" y="2091" width="3" height="76" rx="1.5" fill="#ffc773"/>
+<text x="268" y="2106" class="name">factory-retro</text>
+<text x="268" y="2135" class="body">Analyze task failures, repairs, review findings and the overall outcome.</text>
+<text x="268" y="2158" class="body">Propose evidence-backed Factory improvements; never apply them itself.</text>
+<path d="M600 2183 V2217 H320 V2245" class="line"/>
+<path d="M600 2217 H880 V2245" class="line"/>
+<text x="336" y="2208" class="label" fill="#80d8a0">ALL CHECKS PASSED</text>
+<text x="864" y="2208" class="label" fill="#ff8fb1" text-anchor="end">ESCALATED OR BLOCKED</text>
+<rect x="80" y="2245" width="480" height="131" rx="14" fill="#14271f" stroke="#335f49"/>
+<text x="100" y="2276" class="name">Delivery</text>
+<text x="100" y="2305" class="body">Every task and final integration passed.</text>
+<text x="100" y="2328" class="body">Retro preserves the outcome; it cannot waive</text>
+<text x="100" y="2351" class="body">failed checks.</text>
+<rect x="640" y="2245" width="480" height="131" rx="14" fill="#2a1622" stroke="#6b3550"/>
+<rect x="640" y="2261" width="3" height="99" rx="1.5" fill="#ff8fb1"/>
+<text x="660" y="2276" class="name">Human review or recovery</text>
+<text x="660" y="2305" class="body">Review: repairs and replans exhausted, or evidence conflicts.</text>
+<text x="660" y="2328" class="body">Recovery: fix missing tools, then resume with a written note.</text>
+<text x="660" y="2351" class="body">A note cannot waive a defect or change scope.</text>
+<text x="48" y="2414" class="small">Publishing, when separately invoked: pr-writer drafts the description; the publisher opens a draft PR.</text>
+<text x="48" y="2439" class="small">Existing tasks retain their captured v1 workflow. New v2 tasks use this project / task hierarchy.</text>
 </svg>
