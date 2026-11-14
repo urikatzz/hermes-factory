@@ -58,9 +58,21 @@ class ProjectControllerTests(unittest.TestCase):
         for profile in [*(['art-director'] if art else []), *(['audio-director'] if audio else [])]:
             self.board.complete(next(r for r in self.board.ready() if r['profile'] == profile))
         self.tick()
+        if art:
+            self.approve()
         self.architect(tasks)
         self.board.complete(self.only('claude-reviewer'))
         self.tick()
+
+    def approve(self, note='Approved: matches the intended look'):
+        self.assertEqual(self.state.read_root(self.conn, self.root)['phase'], 'blocked')
+        self.controller.resume(self.conn, self.root, note)
+
+    def similarity(self, folder, score=92, status=None):
+        path = Path(folder) / 'similarity.json'
+        path.write_text(json.dumps(dict(schema='factory-similarity/v1', model='typesafe/jev-router', threshold=80, blocked_tools=[],
+            assets=[dict(file='sprite.png', score=score, status=status or ('pass' if score is not None and score >= 80 else 'fail'))])))
+        return str(path)
 
     def panel(self):
         return [r['profile'] for r in self.board.ready()]
@@ -213,6 +225,7 @@ class ProjectControllerTests(unittest.TestCase):
         self.board.complete(self.only('factory-orchestrator'),project_scope=NEEDS);self.tick()
         self.architect(scope_additions=['art'])
         self.board.complete(self.only('art-director'));self.tick()
+        self.approve()
         stage=self.only('architect')
         self.assertEqual(stage['cycle'],1)
         self.assertIn('art-director',self.board.cards[stage['task_id']]['body'])
@@ -228,6 +241,32 @@ class ProjectControllerTests(unittest.TestCase):
         self.board.complete(self.board.ready()[1]);self.tick()
         self.only('art-director')
         self.board.complete(self.only('art-director'));self.tick()
+        self.assertEqual(self.board.ready(),[])
+        self.approve()
+        self.only('architect')
+
+    def test_art_plan_waits_for_human_approval_and_rejection_returns_it_with_feedback(self):
+        self.tick()
+        self.board.complete(self.only('factory-orchestrator'),project_scope={**NEEDS,'art':True});self.tick()
+        self.board.complete(self.only('art-director'));self.tick()
+        self.assertEqual(self.board.ready(),[])
+        self.assertEqual(self.board.get_task(self.conn,self.root).status,'blocked')
+        self.assertFalse(self.conn.execute("SELECT 1 FROM factory_workflow_stages WHERE profile IN ('architect','factory-retro')").fetchone())
+        with self.assertRaisesRegex(Exception,'feedback'):
+            self.controller.resume(self.conn,self.root,'REJECT:')
+        self.controller.resume(self.conn,self.root,'REJECT: Too dark, use the pastel palette')
+        stage=self.only('art-director')
+        self.assertEqual(stage['cycle'],1)
+        self.assertIn('Too dark, use the pastel palette',self.board.cards[stage['task_id']]['body'])
+        self.board.complete(stage);self.tick()
+        self.assertEqual(self.board.ready(),[])
+        self.approve('Approved')
+        self.assertIn('human_approvals',self.board.cards[self.only('architect')['task_id']]['body'])
+
+    def test_audio_only_project_needs_no_human_plan_approval(self):
+        self.tick()
+        self.board.complete(self.only('factory-orchestrator'),project_scope={**NEEDS,'audio':True});self.tick()
+        self.board.complete(self.only('audio-director'));self.tick()
         self.only('architect')
 
     def test_repair_after_review_reruns_only_affected_reviewers(self):
@@ -280,6 +319,7 @@ class ProjectControllerTests(unittest.TestCase):
         self.tick()
         self.board.complete(self.only('factory-orchestrator'),project_scope={**NEEDS,'art':True});self.tick()
         self.board.complete(self.only('art-director'));self.tick()
+        self.approve()
         self.architect([SPRITES,code],ac_ids=['AC1','AC2'])
         self.board.complete(self.only('claude-reviewer'));self.tick()
         for writer,ac in (('artist','AC1'),('developer','AC2')):
@@ -301,7 +341,35 @@ class ProjectControllerTests(unittest.TestCase):
         report=folder/'comparison.json'
         report.write_text(json.dumps(dict(schema='factory-comparison/v1',plan_sha256=director['sha256'],manifest_sha12='abcdef123456',
             mode=mode,source='tool',outcome='pass',criteria=[dict(rule='S1',expected='Round',observed='Round',outcome='pass')],evidence=[str(image)])))
-        self.board.complete(row,artifacts=[str(report),str(image)])
+        self.board.complete(row,artifacts=[str(report),str(image),self.similarity(folder)])
+
+    def art_review(self):
+        self.plan(art=True,tasks=[SPRITES])
+        self.board.complete(self.only('artist'));self.tick()
+        self.board.complete(self.only('verifier'));self.tick()
+        for row in self.board.ready():
+            if row['profile']!='art-reviewer':self.board.complete(row)
+        folder=Path(self.temp.name)/'gate';folder.mkdir()
+        return self.only('art-reviewer'),folder
+
+    def test_low_similarity_returns_to_artist_without_a_detailed_comparison(self):
+        row,folder=self.art_review()
+        self.board.complete(row,verdict='CHANGES_REQUIRED',findings=['F1|HIGH|AC1|sprite.png|[similarity] 61% match, below 80%: palette'],
+                            artifacts=[self.similarity(folder,61)])
+        self.tick()
+        self.only('artist')
+
+    def test_low_similarity_cannot_be_approved(self):
+        row,folder=self.art_review()
+        self.board.complete(row,artifacts=[self.similarity(folder,61)])
+        self.tick()
+        self.only('factory-retro')
+
+    def test_similarity_score_is_required_before_art_approval(self):
+        row,folder=self.art_review()
+        self.board.complete(row,artifacts=[self.similarity(folder,None,'unverified')])
+        self.tick()
+        self.only('factory-retro')
 
     def test_resume_during_plan_review_retries_the_plan_reviewer(self):
         self.tick()
@@ -352,7 +420,7 @@ class ProjectControllerTests(unittest.TestCase):
             report=folder/'comparison.json'
             report.write_text(json.dumps(dict(schema='factory-comparison/v1',plan_sha256=director['sha256'],manifest_sha12='abcdef123456',
                 mode='rendered_asset',source='tool',outcome='fail',criteria=[dict(rule='S1',expected='Round',observed='Square',outcome='fail')],evidence=[str(image)])))
-            self.board.complete(row,verdict='CHANGES_REQUIRED',findings=['F1|HIGH|AC1|sprite.png|Silhouette differs from director plan'],artifacts=[str(report),str(image)])
+            self.board.complete(row,verdict='CHANGES_REQUIRED',findings=['F1|HIGH|AC1|sprite.png|Silhouette differs from director plan'],artifacts=[str(report),str(image),self.similarity(folder)])
         self.tick();self.only('artist')
         self.board.complete(self.only('artist'));self.tick()
         self.board.complete(self.only('verifier'));self.tick()

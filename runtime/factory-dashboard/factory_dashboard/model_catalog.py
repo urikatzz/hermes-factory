@@ -7,6 +7,10 @@ from .model_policy import ConfigurationError, ModelSelection, identifier
 
 class ModelCatalog:
     def __init__(self, data: dict):
+        self._source = None
+        self._load(data)
+
+    def _load(self, data: dict):
         self._profiles = {}
         self._defaults = {}
         profiles = data.get('profiles')
@@ -26,12 +30,32 @@ class ModelCatalog:
 
     @classmethod
     def from_file(cls, path: Path):
-        return cls(json.loads(path.read_text()))
+        path = Path(path)
+        catalog = cls(json.loads(path.read_text()))
+        catalog._source = (path, path.stat().st_mtime_ns)
+        return catalog
+
+    def _refresh(self):
+        """Pick up a re-exported catalog without a restart; an unreadable or invalid file keeps the last good one."""
+        if not self._source:
+            return
+        path, seen = self._source
+        try:
+            stamp = path.stat().st_mtime_ns
+            if stamp == seen:
+                return
+            self._source = (path, stamp)
+            fresh = type(self)(json.loads(path.read_text()))
+        except (OSError, ValueError, ConfigurationError):
+            return
+        self._profiles, self._defaults = fresh._profiles, fresh._defaults
 
     def defaults(self) -> dict[str, ModelSelection]:
+        self._refresh()
         return dict(self._defaults)
 
     def choices(self, profiles: tuple[str, ...]) -> list[ModelSelection]:
+        self._refresh()
         if not profiles:
             raise ConfigurationError('No assigned worker profiles are recorded for this task')
         unknown = set(profiles) - self._profiles.keys()

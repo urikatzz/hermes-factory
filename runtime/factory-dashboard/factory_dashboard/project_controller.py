@@ -5,8 +5,8 @@ from pathlib import Path
 import time
 
 from .model_policy import ConfigurationError
-from .project_cards import ARCHITECT, COMPARISON, DIRECTOR, PLAN_DEFECT, PLAN_REVIEW, REPLAN, RETRO, SCOPE, project_card
-from .project_evidence import plan_evidence, retained_json, validate_comparison
+from .project_cards import ARCHITECT, COMPARISON, SIMILARITY, DIRECTOR, PLAN_DEFECT, PLAN_REVIEW, REPLAN, RETRO, SCOPE, project_card
+from .project_evidence import plan_evidence, retained_json, validate_comparison, validate_similarity
 from .project_policy import (MAX_REPLANS, blocking_findings, finding_ac, planning_profiles, repair_profiles, rereview_profiles,
                              review_profiles, scope_additions, validate_plan, validate_scope)
 
@@ -50,6 +50,9 @@ class ProjectController:
             self._retro(conn, root, definition, context, project)
         self._save(conn, root, project)
         self._state.mark_reconciled(conn, root['root_id'])
+        if project.get('awaiting') and not project.get('terminal'):
+            # A pause for a human decision, not a failure: no retro, nothing retired.
+            return self._controller._stop(conn, root, 'blocked', 'Awaiting human approval of the art-director plan: ' + project['awaiting']['path'])
         return self._state.read_root(conn, root['root_id'])
 
     def _save(self, conn, root, project):
@@ -185,11 +188,19 @@ class ProjectController:
                 # Directors only read the request and scope and write nothing shared, so they plan concurrently.
                 inputs, progressed = self._inputs(project), False
                 for profile in missing:
-                    node = self._node(conn, root, definition, context, project, 'project-' + profile, 'prepare', profile, DIRECTOR, inputs)
+                    node = self._node(conn, root, definition, context, project, 'project-' + profile, 'prepare', profile, DIRECTOR, inputs,
+                                      cycle=project.get('director_gen', {}).get(profile, 0))
                     if node:
                         project['plans'].append(plan_evidence(profile, node[0]['task_id'], node[1].metadata))
                         progressed = True
                 return progressed
+            art = next((p for p in project['plans'] if p['profile'] == 'art-director'), None)
+            if art and project.get('approvals', {}).get('art-director', {}).get('sha256') != art['sha256']:
+                # Visual direction is a human call: nothing is architected on an art plan nobody approved.
+                if project.get('awaiting', {}).get('sha256') != art['sha256']:
+                    project['awaiting'] = dict(profile='art-director', sha256=art['sha256'], path=art['path'], task_id=art['task_id'])
+                    self._state.event(conn, root['root_id'], 'project_awaiting_human', project['awaiting'])
+                return False
             gen, replan = project.get('gen', 0), project.get('replan')
             node = self._node(conn, root, definition, context, project, 'project-architect', 'prepare', 'architect',
                               ARCHITECT + ('\n' + REPLAN if replan else ''),
@@ -317,6 +328,8 @@ class ProjectController:
             instructions = 'Review only your discipline against TASK acceptance and the inherited plans; report actionable findings.\n' + PLAN_DEFECT
             if profile in ('art-reviewer', 'audio-reviewer'):
                 instructions += '\n' + COMPARISON
+            if profile == 'art-reviewer' and task['id'] != 'integration':
+                instructions += '\n' + SIMILARITY
             selected = next((r.instructions for r in definition.reviewers if r.profile == profile), '')
             instructions += '\n' + selected
             node = self._node(conn, root, definition, context, project, prefix + '-' + profile, 'review', profile, instructions,
@@ -327,7 +340,9 @@ class ProjectController:
             row, result = node
             if result.metadata.get('blocked_tools'):
                 raise ProjectBlocked('Review requires unavailable tools: ' + profile)
-            if profile in ('art-reviewer', 'audio-reviewer'):
+            # Below 80% the reviewer stops at the score, so there is no detailed comparison to validate.
+            close_enough = profile != 'art-reviewer' or task['id'] == 'integration' or validate_similarity(result)
+            if profile in ('art-reviewer', 'audio-reviewer') and close_enough:
                 validate_comparison(profile, result, project['plans'], task['id'] == 'integration')
             readers.append(result)
             rows.append(row)
@@ -444,6 +459,26 @@ class ProjectController:
     def resume(self, conn, root, note):
         row = conn.execute('SELECT document FROM factory_project_execution WHERE root_id=?', (root['root_id'],)).fetchone()
         project = json.loads(row[0]) if row else {}
+        awaiting = project.get('awaiting')
+        if root['phase'] == 'blocked' and awaiting and not project.get('terminal'):
+            # The note is the decision: 'REJECT: <feedback>' returns the plan to the director, anything else approves it.
+            profile, text = awaiting['profile'], note.strip()
+            rejected = text.upper().startswith('REJECT:')
+            if rejected and not text[7:].strip():
+                raise ConfigurationError('A rejection requires feedback for the director')
+            del project['awaiting']
+            if rejected:
+                project['plans'] = [p for p in project['plans'] if p['profile'] != profile]
+                project.setdefault('director_feedback', {})[profile] = text[7:].strip()
+                project.setdefault('director_gen', {})[profile] = project.get('director_gen', {}).get(profile, 0) + 1
+            else:
+                project.setdefault('approvals', {})[profile] = dict(sha256=awaiting['sha256'], note=text)
+            self._save(conn, root, project)
+            conn.execute("UPDATE factory_workflow_roots SET phase='project',reason='' WHERE root_id=?", (root['root_id'],))
+            decision = dict(profile=profile, decision='rejected' if rejected else 'approved', sha256=awaiting['sha256'], note=text, execution_version=2)
+            self._state.event(conn, root['root_id'], 'human_plan_decision', decision)
+            self._board._append_event(conn, root['root_id'], 'workflow_resumed', dict(note=note))
+            return
         if root['phase'] != 'blocked' or project.get('terminal', {}).get('phase') != 'blocked':
             raise ConfigurationError('Only an infrastructure-blocked project can resume; changed scope requires a new task')
         project.update(mode=project['resume_mode'], active_keys=[], recoveries=project.get('recoveries', 0)+1, recovery_note=note)
@@ -468,7 +503,7 @@ class ProjectController:
         elif project['mode'] == 'planning':
             captured = {p['profile'] for p in project['plans']}
             missing = [p for p in project['planners'] if p != 'architect' and p not in captured]
-            project['retry_keys'] = [f'project-{p}:0' for p in missing] or [f'project-architect:{gen}']
+            project['retry_keys'] = [f"project-{p}:{project.get('director_gen', {}).get(p, 0)}" for p in missing] or [f'project-architect:{gen}']
         else:
             project['retry_keys'] = []
         self._save(conn, root, project)

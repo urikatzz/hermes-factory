@@ -24,6 +24,8 @@ class InstallTests(unittest.TestCase):
             text = (skill / 'SKILL.md').read_text()
             self.assertIn(f'python3 {skill}/scripts/art_lint.py', text)
             self.assertNotIn('${HERMES_SKILL_DIR}/scripts/art_lint.py', text)
+            self.assertIn(f'python3 {skill}/scripts/art_similarity.py', text)
+            self.assertTrue((skill / 'scripts/art_similarity.py').is_file())
             self.assertTrue((skill / 'SOUL.md').is_file())
             self.assertFalse(list(skill.rglob('__pycache__')))
             self.assertFalse((skill / 'factory_art/install').exists())

@@ -19,7 +19,15 @@ def main():
     from hermes_cli.config import load_config_readonly
     from hermes_cli.profiles import resolve_profile_env
     from hermes_cli.kanban_db_dispatch import _worker_profile_scope
-    from hermes_cli.models import list_available_providers, normalize_provider, _PROVIDER_MODELS
+    from hermes_cli.models import curated_models_for_provider, list_available_providers, normalize_provider, _PROVIDER_MODELS
+
+    def provider_models(provider):
+        # Ask the connected provider for its current models; the bundled table is only a fallback and goes stale.
+        try:
+            entries=curated_models_for_provider(provider)
+        except Exception:
+            entries=[]
+        return entries or _PROVIDER_MODELS.get(provider,[])
 
     def read_profile(role):
         with _worker_profile_scope(resolve_profile_env(role)):
@@ -30,7 +38,7 @@ def main():
             choices=[]
             for provider in list_available_providers():
                 if provider['authenticated']:
-                    for entry in _PROVIDER_MODELS.get(provider['id'],[]):
+                    for entry in provider_models(provider['id']):
                         name=entry[0] if isinstance(entry,(tuple,list)) else entry
                         if isinstance(name,str): choices.append({'provider':provider['id'],'model':name})
             return {'model':model,'factory_models':choices}

@@ -36,10 +36,12 @@ PREPARE_OUTPUT = 'Create PLAN.md with numbered AC1..ACn and a Manifest include l
 
 DIRECTOR = '''Read the request and inherited scope. Retain PLAN.md with observable director criteria, target asset paths,
 style bible references, integration constraints, and how the final rendered/listened result will be compared.
-Art: include visual references and specify intended in-engine appearance. Audio: specify audible intent and listening examples.
+Art: include visual references and specify intended in-engine appearance. Every asset class needs at least one reference image in the style bible: review scores each render against it and blocks below 80% similarity. Audio: specify audible intent and listening examples.
 Read any existing bible without changing its approved rules. If the required bible is absent, propose a style-bible creation task
 before asset production, with validation criteria, class limits, and references; do not require a separate preexisting project.
-Do not approve the assets or implement them in this planning stage.'''
+Do not approve the assets or implement them in this planning stage.
+A human must approve the art director's plan before architecture starts. If PROJECT_CONTEXT.human_feedback is present,
+a human rejected the previous plan: revise it to address that feedback.'''
 
 COMPARISON = '''Compare the actual result against the inherited director plan, in addition to lint and normal review.
 For art tasks retain rendered asset images; for final integration retain actual in-engine screenshots.
@@ -52,6 +54,11 @@ source="tool"|"human", outcome="pass"|"fail", criteria=[{rule,expected,observed,
 evidence=[absolute retained image/listening evaluation paths]. Include the comparison file and all cited evidence as completion artifacts.
 For a mismatch report actionable findings with the relevant task AC and CHANGES_REQUIRED so the engine invokes the artist or sound-designer.
 An unclear or contradictory director plan requires human review; never silently redefine intent.'''
+
+SIMILARITY = '''Before any detailed judgement run the art-review similarity gate: the Jev model scores each rendered asset against its
+reference images. Retain similarity.json as a completion artifact. If any asset scores below 80% or has no reference image, stop there:
+report those scores as blocking findings with CHANGES_REQUIRED and skip comparison.json. Only when every asset reaches 80% do the
+detailed comparison to find what is still missing. If the model is unavailable report blocked_tools; never estimate the score yourself.'''
 
 RETRO = '''Analyze the retained project/task history: verification failures, review findings, repair cycles, missing tools,
 stage outcomes and final integration. Retain RETRO.md with evidence references, root causes, and prioritized Factory improvements.
@@ -69,6 +76,10 @@ def project_card(definition, stage, cycle, context, inputs, project, task=None):
                    completed_tasks=project.get('completed', []), terminal=project.get('terminal'))
     if project.get('replan'):
         details['replan'] = project['replan']
+    if project.get('approvals'):
+        details['human_approvals'] = project['approvals']
+    if stage.profile in project.get('director_feedback', {}):
+        details['human_feedback'] = project['director_feedback'][stage.profile]
     if task and project.get('work', {}).get('attribution'):
         details['repair_attribution'] = project['work']['attribution']
     if project.get('recovery_note'):
