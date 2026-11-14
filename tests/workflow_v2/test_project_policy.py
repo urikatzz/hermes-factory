@@ -43,6 +43,15 @@ class ProjectPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ConfigurationError, 'depend'):
             validate_plan(bad, scope, ['AC1', 'AC2'])
 
+    def test_plan_ignores_extra_top_level_keys_but_requires_tasks(self):
+        from factory_dashboard.project_policy import validate_plan
+        scope = dict(art=False, audio=False, ui=False, ux=False)
+        task = dict(id='code', title='Wire scene', owner='developer', dependencies=[],
+                    acceptance={'AC1': 'Room plays'}, needs=scope)
+        self.assertEqual(len(validate_plan(dict(plan='x', root='y', tasks=[task]), scope, ['AC1'])), 1)
+        with self.assertRaises(ConfigurationError):
+            validate_plan(dict(plan='x'), scope, ['AC1'])
+
     def test_each_task_selects_code_security_and_relevant_specialist_reviews(self):
         from factory_dashboard.project_policy import review_profiles
         self.assertEqual(review_profiles(dict(art=False, audio=False, ui=False, ux=False)),

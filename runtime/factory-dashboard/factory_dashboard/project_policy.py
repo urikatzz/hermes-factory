@@ -74,8 +74,8 @@ def rereview_profiles(panel, findings, repairs):
 
 def validate_plan(document, scope, project_ac_ids):
     validate_scope(scope)
-    if not isinstance(document, dict) or set(document) != {'tasks'}:
-        raise ConfigurationError('Project plan must contain tasks only')
+    if not isinstance(document, dict) or 'tasks' not in document:
+        raise ConfigurationError('Project plan must contain a tasks list')  # extra informational top-level keys are ignored
     tasks = document['tasks']
     if not isinstance(tasks, list) or not 1 <= len(tasks) <= 40:
         raise ConfigurationError('Project plan requires 1 to 40 small tasks')
