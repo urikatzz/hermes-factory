@@ -3,7 +3,7 @@ import sys
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, '/Users/example/.hermes/factory-dashboard')
+sys.path.insert(0, str(Path.home() / '.hermes' / 'factory-dashboard'))
 from factory_dashboard.workflow_templates import _preset
 from factory_dashboard.workflow_types import WorkflowDefinition
 from factory_ecc.guidance import transform_workflow

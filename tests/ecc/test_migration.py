@@ -6,7 +6,7 @@ import unittest
 from dataclasses import asdict
 from pathlib import Path
 
-sys.path.insert(0, '/Users/example/.hermes/factory-dashboard')
+sys.path.insert(0, str(Path.home() / '.hermes' / 'factory-dashboard'))
 from factory_dashboard.task_settings_store import TaskSettingsStore
 from factory_dashboard.workflow_templates import WorkflowTemplates
 from factory_dashboard.policy_store import RevisionConflict
