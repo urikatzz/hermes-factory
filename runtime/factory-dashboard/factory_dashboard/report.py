@@ -214,6 +214,10 @@ class ReportBuilder:
             parent=task_view(root)
             stages=sorted(children[root_id],key=lambda t:(_stage(t.get('title') or '')['sort'],timestamp(t.get('created_at')) or 0,t['id']))
             parent['stages']=[task_view(t) for t in stages]
+            # The workflow controller parks the root as 'blocked' ('controller owns progression') for its whole life;
+            # while one of its stages is queued or running the run is live, so show it as running.
+            if parent.get('status')=='blocked' and any(t.get('status') in ('running','ready') for t in stages) and not any(t.get('status')=='blocked' for t in stages):
+                parent['status']='running'
             all_tasks=[root,*stages]
             all_runs=[r for t in all_tasks for r in runs_by_task[t['id']]]
             parent['usage']=usage_for(all_runs)
