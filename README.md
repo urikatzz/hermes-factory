@@ -4,17 +4,6 @@ Tools and extensions for Hermes Factory workflows: game art and audio production
 
 This checkout complements an existing Hermes Factory installation. It is not a standalone Hermes server or dashboard application. Asset linting, sound synthesis, and benchmark tooling can run directly from the checkout; workflow migrations and installed worker skills require the corresponding Factory runtime.
 
-## What's included
-
-| Area | Purpose |
-| --- | --- |
-| Art review | Check PNG sprites, rendered 3D models, and JSON game text against a project's style bible. |
-| Art production | Sprite fitting, image-generation wrappers, and Blender/Tripo model tooling. |
-| Audio review | Measure game audio against class requirements and generate waveform and spectrum images. |
-| Audio production | Synthesize sound effects from JSON recipes and process user-supplied music into game tracks. |
-| Factory integration | Migrate Game Art and Game Audio workflow types and check installed configurations. |
-| Evaluation | Prepare pinned benchmark cases and grading inputs, then report retained trial evidence. |
-
 ## Agents and workflow
 
 Factory v2 plans the project first, then gives each small task its own Factory cycle. The orchestrator calls the art/audio directors when needed, and they plan concurrently. A human must approve the art director's plan, or reject it with feedback, before architecture starts. The architect consumes their plans before defining code, integration, task dependencies, and acceptance criteria, and can call in a director the orchestrator skipped. A code reviewer checks the plan before any task starts.
