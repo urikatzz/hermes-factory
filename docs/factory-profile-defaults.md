@@ -23,7 +23,7 @@ Rules learned the hard way:
 | developer | anthropic | claude-sonnet-5-5 | medium | worker |
 | factory-orchestrator | openai-codex | gpt-6-astra | medium | orchestrator, worker |
 | factory-retro | anthropic | claude-sonnet-5-5 | low | worker |
-| fixer | anthropic | claude-sonnet-5-5 | medium | - |
+| fixer | anthropic | claude-sonnet-5-5 | medium | worker |
 | pr-writer | anthropic | claude-sonnet-5-5 | low | publisher |
 | security-reviewer | anthropic | claude-sonnet-5-5 | low | worker |
 | sound-designer | openai-codex | gpt-6-luna | medium | worker |
