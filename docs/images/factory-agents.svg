@@ -142,14 +142,14 @@
 <text x="80" y="1662" class="label" fill="#ffc773">FAIL OR FINDINGS · LOOP BOUND: MAX 0–3 REPAIRS</text>
 <path d="M480 1702 H432 V1725 H408" class="line"/>
 <text x="490" y="1784" class="body">Any repair → fresh verifier → only the affected reviews.</text>
-<text x="490" y="1812" class="small" style="fill:#ff8fb1">Missing render/listening tools → human recovery; no approval.</text>
+<text x="490" y="1812" class="small" style="fill:#ff8fb1">Missing render tools → human recovery; no approval.</text>
 <text x="490" y="1838" class="small">Repair limit or plan defect → architect replans (max 2 per project), then <tspan fill="#ff8fb1">human review</tspan>.</text>
 <path d="M600 1868 V1906" class="line"/>
 <rect x="248" y="1906" width="704" height="131" rx="14" fill="#152137" stroke="#2b3b55"/>
 <rect x="248" y="1922" width="3" height="99" rx="1.5" fill="#80d8a0"/>
 <text x="268" y="1937" class="name">Final project integration</text>
 <text x="268" y="1966" class="body">developer assembles the completed tasks; verifier first, then the full panel.</text>
-<text x="268" y="1989" class="body">Art: actual in-engine rendering. Sound: real listening evidence.</text>
+<text x="268" y="1989" class="body">Art: actual in-engine rendering. Sound: audio lint gate.</text>
 <text x="268" y="2012" class="body">A failing criterion is repaired by the specialist of the task that owns it.</text>
 <path d="M600 2037 V2075" class="line"/>
 <rect x="248" y="2075" width="704" height="108" rx="14" fill="#152137" stroke="#2b3b55"/>
