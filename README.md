@@ -1,30 +1,24 @@
 # Hermes Factory Toolkit
 
-Tools and extensions for Hermes Factory workflows: game art and audio production, asset review, workflow migrations, and offline evaluation. The repository also retains design documents, rollout evidence, and dashboard snapshots.
+Tools and extensions for Hermes Factory workflows: game art and audio production, asset review, workflow migrations, and offline evaluation.
 
 This checkout complements an existing Hermes Factory installation. It is not a standalone Hermes server or dashboard application. Asset linting, sound synthesis, and benchmark tooling can run directly from the checkout; workflow migrations and installed worker skills require the corresponding Factory runtime.
 
 ## Agents and workflow
 
-Factory v2 plans the project first, then gives each small task its own Factory cycle. The orchestrator calls the art/audio directors when needed, and they plan concurrently. A human must approve the art director's plan, or reject it with feedback, before architecture starts. The architect consumes their plans before defining code, integration, task dependencies, and acceptance criteria, and can call in a director the orchestrator skipped. A code reviewer checks the plan before any task starts.
+Factory v2 plans the project first: the art/audio directors plan when needed, a human approves the art plan, the architect splits the work into small dependent tasks, and a code reviewer checks the plan. Each task then runs its own cycle of writing, verification, reviews, and bounded specialist repairs; a task that cannot be repaired goes back to the architect for a replan.
 
 <p align="center">
   <img src="docs/images/factory-agents.svg" alt="Factory v2: relevant directors before architecture, plan review, small dependent tasks, verification before reviews, specialist repairs with scoped re-reviews, bounded replanning, final integration, factory-retro, and the human touchpoints: request, art plan approval, review and recovery." width="100%">
 </p>
 
-Each task inherits the director and architecture plans. Its writer produces the result, then `verifier` must pass before code/security reviews and the relevant UX/UI/art/audio reviews start. Code repairs go to `fixer`, visual repairs to `artist`, and sound repairs to `sound-designer`. Each task gets one code reviewer; a second selected one joins only high-risk tasks and final integration. Repaired work repeats verification, then only the reviews the repair affects. Tasks run serially in the shared project directory; dependent code tasks wait for their asset tasks to pass.
+Final integration repeats the cycle over the assembled project with the complete review panel, and `factory-retro` then proposes improvements to Factory itself. Existing tasks retain their captured v1 workflows.
 
-Repairs are bounded by the template's repair limit. A task that exhausts it, or any stage that reports a plan defect, goes back to the architect, who revises the remaining task graph without touching tasks that already passed. A project gets two such replans before it stops for a human.
-
-Final integration runs another full cycle over the assembled project, always with the complete review panel. A failing acceptance criterion is repaired by the specialist of the task that produced it. Art review first scores each rendered asset against its reference images with the Jev model on OpenRouter; below 80% it goes straight back to the artist, and only closer matches get the detailed review. Art approval requires rendered evidence against the art director's plan, including in-engine images for final integration. Audio approval requires actual listening evidence; waveform and loudness checks alone cannot establish a match. Missing tools stop approval and require human recovery.
-
-The additional `factory-retro` agent analyzes successful and failed runs and proposes improvements to Factory itself. It cannot apply changes or waive failed checks. `pr-writer` remains a separate publishing helper: it drafts the description, while the publisher performs Git and PR operations when invoked. Existing tasks retain their captured v1 workflows.
-
-See the [project workflow guide](docs/project-workflows.md) for the execution contract, installation, and verification. The repository-owned runtime is in [`runtime/factory-dashboard`](runtime/factory-dashboard).
+See the [project workflow guide](docs/project-workflows.md) for the execution contract, installation, and verification. The runtime source in [`runtime/factory-dashboard`](runtime/factory-dashboard) is installed into an existing Hermes home rather than run from this checkout.
 
 ## Requirements
 
-- **Python 3.11+** for the Python tools. The core lint, synthesis, and benchmark code uses the standard library; there is no package installation step.
+- **Python 3.11+** for the Python tools. The core lint, synthesis, and benchmark code uses only the standard library.
 - **FFmpeg** for decoding and processing audio and measuring loudness.
 - **Blender** for rendering and inspecting 3D assets.
 - **A POSIX shell and `rsync`** for the installer scripts.
@@ -93,7 +87,7 @@ The [audio production instructions](audio_production/install/SKILL.md) describe 
 
 ## Install worker skills
 
-With an existing Hermes Factory environment, install the review and production bundles:
+Install the review and production bundles:
 
 ```sh
 sh scripts/install_art_review.sh
@@ -104,7 +98,7 @@ sh scripts/install_audio_production.sh
 
 The default destination is `~/.hermes/factory-skills/worker`. Set `HERMES_FACTORY_SKILLS` to use another worker-skill directory. Installers refuse to overwrite an existing destination.
 
-Installing skill files does not configure worker profiles or activate workflow types. Review the [art](docs/superpowers/specs/2026-10-26-game-art-factory-design.md) and [audio](docs/superpowers/specs/2026-11-06-game-audio-factory-design.md) integration designs before changing an installed environment. Migration scripts accept explicit runtime paths and provide preview modes; inspect their arguments first:
+Installing skill files does not configure worker profiles or activate workflow types. Review the [art](docs/superpowers/specs/2026-10-26-game-art-factory-design.md) and [audio](docs/superpowers/specs/2026-11-06-game-audio-factory-design.md) integration designs before changing an installed environment. Migration scripts accept explicit runtime paths and provide preview modes:
 
 ```sh
 python3 scripts/migrate_game_art.py --help
@@ -129,6 +123,7 @@ scripts/                 Command-line entry points and installers
 tests/                   unittest suites grouped by subsystem
 benchmarks/              Pinned cases, graders, and synthetic examples
 docs/                    Guides, designs, implementation plans, and results
+runtime/                 Factory dashboard runtime and worker skills installed into Hermes
 reports/                 Retained HTML dashboard snapshots
 artifacts/               Archived builds and rollout evidence
 ```
@@ -148,10 +143,8 @@ Additional suites are in `tests/production`, `tests/factory_art_type`, and `test
 ## Further reading
 
 - [Workflow templates and captured task settings](docs/factory-workflows.md)
-- [Benchmarking, research guidance, and evidence formats](docs/factory-ecc.md)
-- [Art verifier setup and limitations](docs/art-verifier.md)
 - [Factory dashboard snapshots](docs/factory-dashboard.md)
 - [Timeline controls](docs/factory-timeline-controls.md)
 - [PR writer behavior](docs/factory-pr-writer.md)
 
-Some operational guides reference scripts in the owning Hermes home or a separate dashboard worktree. Those commands require that external installation; retained artifacts and reports record particular rollouts rather than the current state of a running Factory.
+Some operational guides reference scripts in the owning Hermes home or a separate dashboard worktree. Retained artifacts and reports record particular rollouts rather than the current state of a running Factory.
