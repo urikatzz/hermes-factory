@@ -89,6 +89,8 @@ def validate_plan(document, scope, project_ac_ids):
         key = task['id']
         if not isinstance(key, str) or not re.fullmatch('[a-z][a-z0-9-]{0,23}', key) or key == 'integration' or key in by_id:
             raise ConfigurationError('Invalid or duplicate task ID')
+        if isinstance(task['title'], str) and len(task['title']) > 200:
+            task['title'] = task['title'][:197].rstrip() + '...'  # over-long titles are trimmed, not fatal
         if not isinstance(task['title'], str) or not task['title'].strip() or len(task['title']) > 200:
             raise ConfigurationError('Invalid task title')
         if task['owner'] not in ('developer', 'artist', 'sound-designer'):

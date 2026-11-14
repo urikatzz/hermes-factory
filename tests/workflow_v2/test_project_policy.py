@@ -52,6 +52,14 @@ class ProjectPolicyTests(unittest.TestCase):
         with self.assertRaises(ConfigurationError):
             validate_plan(dict(plan='x'), scope, ['AC1'])
 
+    def test_overlong_task_title_is_trimmed_not_rejected(self):
+        from factory_dashboard.project_policy import validate_plan
+        scope = dict(art=False, audio=False, ui=False, ux=False)
+        task = dict(id='code', title='x' * 300, owner='developer', dependencies=[],
+                    acceptance={'AC1': 'Room plays'}, needs=scope)
+        plan = validate_plan(dict(tasks=[task]), scope, ['AC1'])
+        self.assertLessEqual(len(plan[0]['title']), 200)
+
     def test_each_task_selects_code_security_and_relevant_specialist_reviews(self):
         from factory_dashboard.project_policy import review_profiles
         self.assertEqual(review_profiles(dict(art=False, audio=False, ui=False, ux=False)),

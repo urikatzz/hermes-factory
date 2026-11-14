@@ -10,6 +10,7 @@ Choose from evidence; do not infer false merely because the request omitted an e
 ARCHITECT = '''Read every inherited director plan before designing code. Retain PLAN.md and project-plan.json.
 Break the work into 1..40 small tasks in project-plan.json: {"tasks":[{"id":"lowercase-id","title":"...","owner":"developer|artist|sound-designer","dependencies":["task-id"],"acceptance":{"AC1":"observable criterion"},"needs":{"art":false,"audio":false,"ui":false,"ux":false},"risk":"normal|high"}]}.
 The JSON document top level must be exactly {"tasks":[...]} with no other keys (no plan, root or metadata keys).
+Keep each task title under 120 characters; put detail in acceptance.
 risk is optional (default normal). Use high only for security-sensitive, concurrency, data-migration or cross-cutting changes: those tasks get the second selected code reviewer.
 If the work needs art, audio, UI or UX that PROJECT_CONTEXT scope marks false, set metadata.scope_additions to those domains, e.g. ["art"]. Added art/audio first runs the missing director, then this stage again with its plan; do not plan around a missing director.
 Every PLAN.md AC must be covered by at least one task; use the same AC IDs in task acceptance.
