@@ -43,11 +43,11 @@ Dependency-ready tasks run serially because they write into one shared project d
 
 The sequence is writer → verifier → selected review panel. Verification must explicitly PASS with complete acceptance coverage, a matching manifest, successful release audit, and no failed checks or unavailable tools. No reviewer cards are materialized before this gate passes. Unlike the legacy policy, v2 does not waive an unavailable Unity environment into a verifier pass.
 
-Code review and security review are required. Each task gets one code reviewer: the first Claude/Codex reviewer selected in the captured template. A second selected code reviewer is a second opinion and joins only tasks the architect marked `risk: high` and final integration. UX and UI reviewers run when the task declares those needs. Art/audio reviewers run for relevant tasks.
+Code review and security review are required. Each task gets one code reviewer: the first Claude/Codex reviewer selected in the captured template. A second selected code reviewer is a second opinion and joins only tasks the architect marked `risk: high` and final integration. UX and UI reviewers run when the task declares those needs. The art reviewer runs for tasks that need art. Audio has no specialist reviewer: the sound-designer and the verifier run the audio lint gate, and the code reviewer reads recipes and cue sheets.
 
-Blocking findings route to the owning specialist: art-reviewer → artist, audio-reviewer → sound-designer, and code/security/UX/UI findings → fixer. The verifier can declare `repair_domains: ["code", "art", "audio"]` to identify asset failures. Mixed repairs run serially and finish with a cumulative implementation manifest.
+Blocking findings route to the owning specialist: art-reviewer → artist, and code/security/UX/UI findings → fixer. The verifier can declare `repair_domains: ["code", "art", "audio"]` to identify asset failures. Mixed repairs run serially and finish with a cumulative implementation manifest.
 
-Every repair restarts verification. The reviews that follow are scoped to what the repair touched: the reviewers who raised blocking findings, plus the reviewers of the repaired discipline (fixer → code and security reviewers, artist → art-reviewer, sound-designer → audio-reviewer). Approvals from untouched disciplines carry over within the task. Reviews that never ran stay owed: a repair after a failed first verification is still followed by the complete panel. Each gate event records `rereview` so carried approvals are visible. Final integration never carries an approval: every integration cycle runs the complete panel, including the second code reviewer, on the exact manifest that is delivered.
+Every repair restarts verification. The reviews that follow are scoped to what the repair touched: the reviewers who raised blocking findings, plus the reviewers of the repaired discipline (fixer → code and security reviewers, artist → art-reviewer, sound-designer → code reviewers). Approvals from untouched disciplines carry over within the task. Reviews that never ran stay owed: a repair after a failed first verification is still followed by the complete panel. Each gate event records `rereview` so carried approvals are visible. Final integration never carries an approval: every integration cycle runs the complete panel, including the second code reviewer, on the exact manifest that is delivered.
 
 The captured template's repair limit applies to each task and final integration separately.
 
@@ -55,14 +55,14 @@ Repairing cannot fix a wrong plan, so two cases return the project to the archit
 
 ## Comparing director intent to the result
 
-Asset lint remains required, but it cannot establish perceptual approval. Specialist reviewers retain `comparison.json`, bound to the director PLAN's SHA256 and the reviewed implementation manifest, with expected/observed criteria, outcomes and retained evidence paths.
+Asset lint remains required, but it cannot establish perceptual approval. The art reviewer retains `comparison.json`, bound to the director PLAN's SHA256 and the reviewed implementation manifest, with expected/observed criteria, outcomes and retained evidence paths.
 
 - Art tasks start with a similarity gate. `art_similarity.py` sends each rendered asset and its style-bible reference images to the Jev model on OpenRouter (`typesafe/jev-router`, `OPENROUTER_API_KEY` in the art-reviewer profile) and retains `similarity.json` with a 0-100 score per asset. Below 80%, or with no reference image for the asset class, the reviewer stops there: the score becomes a blocking finding, the artist repairs, and no detailed comparison is spent. A missing reference is also reported as a plan defect. Only at 80% or above does the reviewer do the detailed comparison to find what is still missing. The controller requires the record, refuses an approval that contradicts a score, and treats an unavailable model as a blocked tool, never a pass. The score is a model's judgement, not a pixel measurement. Final integration is exempt: in-engine screenshots are not comparable to per-asset references.
 - Art tasks require rendered asset images (`rendered_asset`); final integration requires actual in-engine images (`rendered_in_engine`).
-- Audio requires `listened` evidence from an available capable tool or a retained human listening evaluation. Waveform images, spectra, loudness and transcription alone are insufficient. The currently installed reviewer has no listening tool; it must report the capability gap rather than fabricate an observation.
+- Audio has no perceptual comparison. The audio lint gate measures files; nobody in the workflow listens to them.
 - A director mismatch requires a blocking finding and `CHANGES_REQUIRED`, which routes repair to the asset producer. Conflicting or insufficient plans require human review, not a silent change to intended style or sound.
 
-Evidence is operator/worker-retained reporting, not an independent authentication system. A claim of human listening must actually come from a human evaluation; the controller validates identity, shape, retention and linkage, not the truth of a subjective observation.
+Evidence is operator/worker-retained reporting, not an independent authentication system. The controller validates identity, shape, retention and linkage, not the truth of a subjective observation.
 
 ## Integration and retrospective
 

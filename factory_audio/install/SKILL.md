@@ -1,6 +1,6 @@
 ---
 name: audio-review
-description: Procedure and scripts for the audio-reviewer - measure sound effects and music against a repo's audio/style bible, then judge each asset against its recipe or cue and the AUDIO.md rules.
+description: Procedure and scripts for checking game audio - measure sound effects and music against a repo's audio/style bible, then judge each asset against its recipe or cue and the AUDIO.md rules.
 ---
 
 # Audio review

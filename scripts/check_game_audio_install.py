@@ -12,11 +12,10 @@ import sqlite3
 import sys
 import tempfile
 
-AUDIO_PROFILES = ('audio-director', 'sound-designer', 'audio-reviewer')
-EXPECTED_MODELS = {'audio-director': ('anthropic', 'claude-opus-5-5'), 'sound-designer': ('openai-codex', 'gpt-6-luna'),
-                   'audio-reviewer': ('anthropic', 'claude-sonnet-5-5')}
+AUDIO_PROFILES = ('audio-director', 'sound-designer')
+EXPECTED_MODELS = {'audio-director': ('anthropic', 'claude-opus-5-5'), 'sound-designer': ('openai-codex', 'gpt-6-luna')}
 STAGES = {'prepare': ('audio-director', 'scratch'), 'implement': ('sound-designer', 'dir'), 'repair': ('sound-designer', 'dir'),
-          'audio-reviewer': ('audio-reviewer', 'scratch'), 'claude-reviewer': ('claude-reviewer', 'scratch'),
+          'claude-reviewer': ('claude-reviewer', 'scratch'),
           'verify': ('verifier', 'scratch')}
 
 
@@ -113,8 +112,6 @@ def main():
             problems.append(f'profile {profile} uses provider {provider}')
         if (provider, model) != EXPECTED_MODELS[profile]:
             problems.append(f'profile {profile} uses {provider}/{model}, expected {"/".join(EXPECTED_MODELS[profile])}')
-        if profile == 'audio-reviewer' and '    - vision' not in text:
-            problems.append(f'profile {profile} lacks the vision toolset (waveform pictures)')
         if 'dispatch_in_gateway: false' not in text:
             problems.append(f'profile {profile} must keep dispatch_in_gateway: false')
         if not (folder / 'plugins/factory-models').is_dir():

@@ -67,18 +67,19 @@ def validate_similarity(result):
 
 def validate_comparison(profile, result, plans, integration):
     """A linter success is never perceptual approval. Missing evidence stops the run."""
-    director = {'art-reviewer': 'art-director', 'audio-reviewer': 'audio-director'}[profile]
-    plan = next((p for p in plans if p['profile'] == director), None)
+    if profile != 'art-reviewer':
+        raise ConfigurationError('No perceptual comparison is defined for ' + profile)
+    plan = next((p for p in plans if p['profile'] == 'art-director'), None)
     if plan is None:
         raise ConfigurationError('Specialist review has no captured director plan')
     record = retained_json(result.metadata['artifacts'], 'comparison.json')
     if not isinstance(record, dict) or set(record) != {'schema', 'plan_sha256', 'manifest_sha12', 'mode', 'source', 'outcome', 'criteria', 'evidence'}:
         raise ConfigurationError('Invalid perceptual comparison record')
-    mode = 'listened' if profile == 'audio-reviewer' else ('rendered_in_engine' if integration else 'rendered_asset')
+    mode = 'rendered_in_engine' if integration else 'rendered_asset'
     if record['schema'] != 'factory-comparison/v1' or record['plan_sha256'] != plan['sha256'] or record['manifest_sha12'] != result.metadata['manifest_sha12']:
         raise ConfigurationError('Comparison does not match the retained director plan and manifest')
     if record['mode'] != mode or record['source'] not in ('tool', 'human'):
-        raise ConfigurationError('Required rendered/listening evidence is unavailable')
+        raise ConfigurationError('Required rendered evidence is unavailable')
     evidence = record['evidence']
     if not isinstance(evidence, list) or not evidence or any(not isinstance(p, str) or not p.strip() for p in evidence):
         raise ConfigurationError('Comparison evidence must be retained attachments')
@@ -93,10 +94,8 @@ def validate_comparison(profile, result, plans, integration):
         retained.append(matches[0])
     evidence = retained
     record['evidence'] = retained
-    if profile == 'art-reviewer' and not any(Path(p).suffix.lower() in ('.png', '.jpg', '.jpeg', '.webp') for p in evidence):
+    if not any(Path(p).suffix.lower() in ('.png', '.jpg', '.jpeg', '.webp') for p in evidence):
         raise ConfigurationError('Rendered visual comparison requires a retained image')
-    if profile == 'audio-reviewer' and not any(Path(p).suffix.lower() in ('.md', '.txt', '.json') for p in evidence):
-        raise ConfigurationError('Audio requires a retained listening evaluation, not only waveform pictures')
     if any(not Path(p).is_file() or Path(p).is_symlink() for p in evidence):
         raise ConfigurationError('Comparison evidence is unavailable')
     criteria = record['criteria']

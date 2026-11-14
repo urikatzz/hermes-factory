@@ -5,9 +5,8 @@ from factory_type_migration.migration import TypeSpec, write_receipt  # noqa: F4
 NEW_ROLES = {
     'audio-director': {'provider': 'anthropic', 'model': 'claude-opus-5-5', 'effort': 'high'},
     'sound-designer': {'provider': 'openai-codex', 'model': 'gpt-6-luna', 'effort': 'medium'},
-    'audio-reviewer': {'provider': 'anthropic', 'model': 'claude-sonnet-5-5', 'effort': 'high'},
 }
-CHOICES_FROM = {'audio-director': 'architect', 'sound-designer': 'developer', 'audio-reviewer': 'verifier'}
+CHOICES_FROM = {'audio-director': 'architect', 'sound-designer': 'developer'}
 SPEC = TypeSpec('audio', 'Game Audio', NEW_ROLES, CHOICES_FROM, 'factory-game-audio')
 
 

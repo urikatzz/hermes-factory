@@ -9,14 +9,14 @@ from factory_dashboard.task_settings_store import TaskSettingsStore
 from factory_dashboard.workflow_templates import WorkflowTemplates, _preset
 from factory_dashboard.workflow_types import WorkflowDefinition
 
-AUDIO = ('audio-director', 'sound-designer', 'audio-reviewer')
+AUDIO = ('audio-director', 'sound-designer')
 
 
 class AudioTypeTest(unittest.TestCase):
     def test_capabilities(self):
         self.assertEqual(wt.CAPABILITIES['audio-director'], ('prepare',))
         self.assertEqual(wt.CAPABILITIES['sound-designer'], ('implement', 'repair'))
-        self.assertEqual(wt.CAPABILITIES['audio-reviewer'], ('review',))
+        self.assertNotIn('audio-reviewer', wt.CAPABILITIES)
         self.assertEqual(wt.TASK_TYPES, ('feature', 'bug', 'chore', 'art', 'audio'))
 
     def test_preset(self):
@@ -25,7 +25,7 @@ class AudioTypeTest(unittest.TestCase):
         self.assertEqual(doc['prepare']['profile'], 'audio-director')
         self.assertEqual(doc['implement']['profile'], 'sound-designer')
         self.assertEqual(doc['repair']['profile'], 'sound-designer')
-        self.assertEqual([r['profile'] for r in doc['reviewers']], ['audio-reviewer', 'claude-reviewer'])
+        self.assertEqual([r['profile'] for r in doc['reviewers']], ['claude-reviewer'])
         self.assertEqual(doc['verify']['profile'], 'verifier')
         self.assertEqual(doc['max_repairs'], 2)
         self.assertIn('audio_lint.py', doc['verify']['instructions'])
@@ -36,15 +36,16 @@ class AudioTypeTest(unittest.TestCase):
         for kind in wt.TASK_TYPES:
             WorkflowDefinition.from_document(_preset(kind))
         doc = _preset('audio')
-        doc['implement'] = dict(doc['implement'], profile='audio-reviewer')
+        doc['implement'] = dict(doc['implement'], profile='claude-reviewer')
         with self.assertRaises(ConfigurationError):
             WorkflowDefinition.from_document(doc)
         self.assertTrue(hasattr(WorkflowTemplates, 'save'))
 
-    def test_audio_reviewer_can_join_any_template(self):
+    def test_audio_reviewer_is_no_longer_a_profile(self):
         doc = _preset('feature')
         doc['reviewers'].append(dict(key='audio-reviewer', kind='review', profile='audio-reviewer', instructions=''))
-        self.assertIn('audio-reviewer', [s.profile for s in WorkflowDefinition.from_document(doc).reviewers])
+        with self.assertRaises(ConfigurationError):
+            WorkflowDefinition.from_document(doc)
 
     def test_art_unchanged(self):
         art = _preset('art')

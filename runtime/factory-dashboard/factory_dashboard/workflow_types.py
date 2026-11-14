@@ -9,7 +9,7 @@ CAPABILITIES = {
     'security-reviewer': ('review',), 'ux-reviewer': ('review',),
     'ui-reviewer': ('review',), 'verifier': ('verify',),
     'art-director': ('prepare',), 'artist': ('implement', 'repair'), 'art-reviewer': ('review',),
-    'audio-director': ('prepare',), 'sound-designer': ('implement', 'repair'), 'audio-reviewer': ('review',),
+    'audio-director': ('prepare',), 'sound-designer': ('implement', 'repair'),
     'factory-orchestrator': ('prepare',), 'factory-retro': ('prepare',),
 }
 TASK_TYPES = ('feature', 'bug', 'chore', 'art', 'audio')

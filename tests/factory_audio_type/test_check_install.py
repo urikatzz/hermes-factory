@@ -35,8 +35,7 @@ ROOT_CONFIG = """kanban:
 {extra}code_execution:
   timeout: 300
 """
-AUDIO = (('audio-director', 'anthropic', 'claude-opus-5-5'), ('sound-designer', 'openai-codex', 'gpt-6-luna'),
-         ('audio-reviewer', 'anthropic', 'claude-sonnet-5-5'))
+AUDIO = (('audio-director', 'anthropic', 'claude-opus-5-5'), ('sound-designer', 'openai-codex', 'gpt-6-luna'))
 
 
 class CheckInstallTests(unittest.TestCase):
@@ -58,12 +57,11 @@ class CheckInstallTests(unittest.TestCase):
         for name, provider, model in AUDIO:
             folder = self.home / 'profiles' / name
             folder.mkdir(parents=True)
-            vision = '    - vision\n' if name == 'audio-reviewer' else ''
-            (folder / 'config.yaml').write_text(PROFILE.format(provider=provider, model=model, vision=vision))
+            (folder / 'config.yaml').write_text(PROFILE.format(provider=provider, model=model, vision=''))
             (folder / 'SOUL.md').write_text('# Role\n')
             shutil.copytree(bundle, folder / 'plugins/factory-models')
         (self.home / 'config.yaml').write_text(ROOT_CONFIG.format(
-            extra='    - audio-director\n    - sound-designer\n    - audio-reviewer\n'))
+            extra='    - audio-director\n    - sound-designer\n'))
         skills = self.home / 'factory-skills/worker'
         for skill in ('audio-review', 'audio-production'):
             (skills / skill / 'scripts').mkdir(parents=True)
@@ -83,7 +81,8 @@ class CheckInstallTests(unittest.TestCase):
                                                       'skills': ['factory-worker']})
         self.assertEqual(report['cards']['implement'], {'assignee': 'sound-designer', 'workspace': 'dir',
                                                         'skills': ['factory-worker']})
-        self.assertEqual(report['cards']['audio-reviewer']['assignee'], 'audio-reviewer')
+        self.assertNotIn('audio-reviewer', report['cards'])
+        self.assertEqual(report['cards']['claude-reviewer']['assignee'], 'claude-reviewer')
 
     def test_problems_are_reported(self):
         (self.home / 'config.yaml').write_text(ROOT_CONFIG.format(extra=''))
@@ -92,7 +91,7 @@ class CheckInstallTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn('profile sound-designer uses provider copilot', report['problems'])
         self.assertIn('profile sound-designer uses copilot/x, expected openai-codex/gpt-6-luna', report['problems'])
-        self.assertIn("root kanban.dispatch_profiles lacks ['audio-director', 'audio-reviewer', 'sound-designer']",
+        self.assertIn("root kanban.dispatch_profiles lacks ['audio-director', 'sound-designer']",
                       report['problems'])
 
     def test_a_missing_audio_review_skill_is_exactly_the_problem(self):

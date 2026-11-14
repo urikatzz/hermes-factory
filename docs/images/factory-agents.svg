@@ -133,8 +133,6 @@
 <text x="504" y="1633" class="small">Interface quality, when relevant</text>
 <text x="800" y="1609" class="name">art-reviewer</text>
 <text x="800" y="1633" class="small">Jev score ≥ 80% first, then director intent</text>
-<text x="504" y="1684" class="name">audio-reviewer</text>
-<text x="504" y="1708" class="small">Listened result vs director intent · tool or <tspan fill="#ff8fb1">human listening evaluation</tspan></text>
 <rect x="80" y="1676" width="328" height="100" rx="14" fill="#152137" stroke="#2b3b55"/>
 <rect x="80" y="1692" width="3" height="68" rx="1.5" fill="#ffc773"/>
 <text x="100" y="1707" class="name">fixer + specialist repairs</text>

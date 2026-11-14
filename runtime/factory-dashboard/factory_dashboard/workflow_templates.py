@@ -27,7 +27,7 @@ GAME_ART = {
 
 AUDIO_LINT = "audio_lint.py from the audio-review skill (the skill's LINT line gives its absolute path)"
 GAME_AUDIO = {
-    'description': 'Audio Director plans, Sound Designer synthesizes WAV effects or processes your Suno files into OGG music, audio-reviewer and claude-reviewer review, verifier runs the audio lint gate.',
+    'description': 'Audio Director plans, Sound Designer synthesizes WAV effects or processes your Suno files into OGG music, claude-reviewer reviews, verifier runs the audio lint gate.',
     'prepare': ('Plan game audio as the audio-director SOUL says. First check the sound bible: python3 <audio_lint.py> <PROJECT_DIR> --check-bible, where audio_lint.py is ' + AUDIO_LINT + '. '
                 'If it exits 1 and the prompt does not ask for a sound bible, complete VERDICT=BLOCKED with blocked_reason "no approved sound bible: submit an Audio task asking for a sound bible". '
                 'Otherwise record audio_task: style|sfx|music-cues|music-import in PLAN.md, one AC per asset or cue plus "audio_lint reports no BLOCKER or HIGH" (not for style or music-cues), and the include list from the SOUL. '
@@ -37,8 +37,7 @@ GAME_AUDIO = {
     'repair': 'Change only the recipes or processing of the assets named in SCOPE findings with the audio-production skill, never audio/style/ outside a style task and never audio/incoming/, and rerun the audio lint gate (with --expect-style-hash when PLAN.md records style_sha256) before completing.',
     'verify': ('Run the audio lint gate on the frozen copy as a required check: python3 <audio_lint.py> <src_dir> --out "$HERMES_KANBAN_WORKSPACE/audio-lint" --fail-on-blocking, where audio_lint.py is ' + AUDIO_LINT + ', adding --expect-style-hash <style_sha256 from PLAN.md> when PLAN.md records one. '
                'Exit 1 means a BLOCKER or HIGH lint finding: record the command in failed_checks and fail the AC it threatens. ffmpeg missing makes affected ACs unverified:environment. Missing Suno files listed under missing are not failures. Attach audio-lint/lint.json.'),
-    'claude-reviewer': 'Review the changed recipes, cue sheets, audio.json and any engine import settings for correctness and consistency with PLAN.md. Do not judge how it sounds; audio-reviewer does that.',
-    'audio-reviewer': 'Follow the audio-review skill in factory mode.',
+    'claude-reviewer': 'Review the changed recipes, cue sheets, audio.json and any engine import settings for correctness and consistency with PLAN.md. Do not judge how it sounds.',
 }
 
 
@@ -48,7 +47,7 @@ def _preset(kind):
         'bug': ('fixer', 'fixer', ('claude-reviewer', 'security-reviewer')),
         'chore': ('developer', 'developer', ('claude-reviewer',)),
         'art': ('art-director', 'artist', ('art-reviewer', 'claude-reviewer')),
-        'audio': ('audio-director', 'sound-designer', ('audio-reviewer', 'claude-reviewer')),
+        'audio': ('audio-director', 'sound-designer', ('claude-reviewer',)),
     }[kind]
     def stage(key, profile, instructions='', stage_kind=None):
         return dict(key=key, kind=stage_kind or key, profile=profile, instructions=instructions)

@@ -48,14 +48,13 @@ class ProjectPolicyTests(unittest.TestCase):
         self.assertEqual(review_profiles(dict(art=False, audio=False, ui=False, ux=False)),
                          ['claude-reviewer', 'security-reviewer'])
         self.assertEqual(review_profiles(dict(art=True, audio=True, ui=True, ux=True)),
-                         ['claude-reviewer', 'security-reviewer', 'ux-reviewer', 'ui-reviewer', 'art-reviewer', 'audio-reviewer'])
+                         ['claude-reviewer', 'security-reviewer', 'ux-reviewer', 'ui-reviewer', 'art-reviewer'])
 
     def test_specialist_findings_route_to_asset_producers_not_code_fixer(self):
         from factory_dashboard.project_policy import repair_profiles
         self.assertEqual(repair_profiles(['art-reviewer:F1|HIGH|AC1|sprite.png|Wrong silhouette'], 'developer'), ['artist'])
-        self.assertEqual(repair_profiles(['audio-reviewer:F2|HIGH|AC1|hit.wav|Wrong tone'], 'developer'), ['sound-designer'])
         self.assertEqual(repair_profiles(['security-reviewer:F1|HIGH|AC1|load.py|Unsafe path'], 'artist'), ['fixer'])
-        self.assertEqual(repair_profiles(['art-reviewer:F1|HIGH|AC1|a|Wrong', 'audio-reviewer:F2|HIGH|AC1|b|Wrong'], 'developer'),
+        self.assertEqual(repair_profiles(['art-reviewer:F1|HIGH|AC1|a|Wrong'], 'developer', repair_domains=['audio']),
                          ['artist', 'sound-designer', 'fixer'])
 
     def test_second_code_reviewer_is_a_second_opinion_not_a_default(self):

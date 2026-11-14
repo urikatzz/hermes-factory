@@ -35,7 +35,7 @@ implementation, set metadata.plan_defect to a one-sentence reason. The engine th
 PREPARE_OUTPUT = 'Create PLAN.md with numbered AC1..ACn and a Manifest include list. Attach PLAN.md; do not modify PROJECT_DIR.'
 
 DIRECTOR = '''Read the request and inherited scope. Retain PLAN.md with observable director criteria, target asset paths,
-style bible references, integration constraints, and how the final rendered/listened result will be compared.
+style bible references, integration constraints, and how the final result will be compared.
 Art: include visual references and specify intended in-engine appearance. Every asset class needs at least one reference image in the style bible: review scores each render against it and blocks below 80% similarity. Audio: specify audible intent and listening examples.
 Read any existing bible without changing its approved rules. If the required bible is absent, propose a style-bible creation task
 before asset production, with validation criteria, class limits, and references; do not require a separate preexisting project.
@@ -45,14 +45,12 @@ a human rejected the previous plan: revise it to address that feedback.'''
 
 COMPARISON = '''Compare the actual result against the inherited director plan, in addition to lint and normal review.
 For art tasks retain rendered asset images; for final integration retain actual in-engine screenshots.
-For sound use actual listening through an available capable tool or retain a human listening evaluation.
-Waveforms, spectra, loudness and transcription alone are NOT listening evidence. Never claim you listened if you cannot.
 If perception is unavailable, report blocked_tools and unverified:environment in the retained report; do not approve.
 Retain comparison.json with exactly: schema="factory-comparison/v1", plan_sha256=<director PLAN hash>,
-manifest_sha12=<reviewed manifest>, mode="rendered_asset" (art task), "rendered_in_engine" (final art), or "listened" (audio),
+manifest_sha12=<reviewed manifest>, mode="rendered_asset" (art task) or "rendered_in_engine" (final art),
 source="tool"|"human", outcome="pass"|"fail", criteria=[{rule,expected,observed,outcome:"pass"|"fail"}],
-evidence=[absolute retained image/listening evaluation paths]. Include the comparison file and all cited evidence as completion artifacts.
-For a mismatch report actionable findings with the relevant task AC and CHANGES_REQUIRED so the engine invokes the artist or sound-designer.
+evidence=[absolute retained image paths]. Include the comparison file and all cited evidence as completion artifacts.
+For a mismatch report actionable findings with the relevant task AC and CHANGES_REQUIRED so the engine invokes the artist.
 An unclear or contradictory director plan requires human review; never silently redefine intent.'''
 
 SIMILARITY = '''Before any detailed judgement run the art-review similarity gate: the Jev model scores each rendered asset against its
@@ -101,6 +99,6 @@ def project_card(definition, stage, cycle, context, inputs, project, task=None):
         card['skills'].append('factory-retro')
     if stage.profile in ('artist', 'sound-designer'):
         card['skills'].append('art-production' if stage.profile == 'artist' else 'audio-production')
-    if stage.profile in ('art-reviewer', 'audio-reviewer'):
-        card['skills'].append('art-review' if stage.profile == 'art-reviewer' else 'audio-review')
+    if stage.profile == 'art-reviewer':
+        card['skills'].append('art-review')
     return card

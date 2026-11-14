@@ -5,7 +5,7 @@ from .model_policy import ConfigurationError
 V2_PROFILES = (
     'factory-orchestrator', 'architect', 'developer', 'fixer',
     'art-director', 'artist', 'art-reviewer',
-    'audio-director', 'sound-designer', 'audio-reviewer',
+    'audio-director', 'sound-designer',
     'claude-reviewer', 'security-reviewer', 'ux-reviewer', 'ui-reviewer',
     'verifier', 'factory-retro',
 )
@@ -13,9 +13,9 @@ DOMAINS = ('art', 'audio', 'ui', 'ux')
 # Architect reruns caused by plan-review findings, declared plan defects or exhausted task repairs.
 MAX_REPLANS = 2
 REPAIR_OWNERS = {'developer': 'fixer', 'artist': 'artist', 'sound-designer': 'sound-designer'}
-# Reviewers whose discipline a specialist repair changes.
+# Reviewers whose discipline a specialist repair changes. Audio has no specialist reviewer: code reviewers read its recipes.
 REPAIR_REVIEWERS = {'fixer': ('claude-reviewer', 'codex-reviewer', 'security-reviewer'),
-                    'artist': ('art-reviewer',), 'sound-designer': ('audio-reviewer',)}
+                    'artist': ('art-reviewer',), 'sound-designer': ('claude-reviewer', 'codex-reviewer')}
 
 
 def validate_scope(scope):
@@ -35,8 +35,7 @@ def review_profiles(needs, selected=(), second_opinion=False):
     validate_scope(needs)
     code = [p for p in selected if p in ('claude-reviewer', 'codex-reviewer')] or ['claude-reviewer']
     profiles = [*(code if second_opinion else code[:1]), 'security-reviewer']
-    profiles += [p for domain, p in [('ux', 'ux-reviewer'), ('ui', 'ui-reviewer'),
-                                  ('art', 'art-reviewer'), ('audio', 'audio-reviewer')] if needs[domain]]
+    profiles += [p for domain, p in [('ux', 'ux-reviewer'), ('ui', 'ui-reviewer'), ('art', 'art-reviewer')] if needs[domain]]
     return list(dict.fromkeys(profiles))
 
 
@@ -155,8 +154,8 @@ def repair_profiles(findings, owner, repair_domains=(), ac_owners=None):
         profiles.append({'code': 'fixer', 'art': 'artist', 'audio': 'sound-designer'}[domain])
     for finding in findings:
         source = finding.split(':', 1)[0]
-        if source in ('art-reviewer', 'audio-reviewer'):
-            profiles.append({'art-reviewer': 'artist', 'audio-reviewer': 'sound-designer'}[source])
+        if source == 'art-reviewer':
+            profiles.append('artist')
         elif re.match(r'[a-z]+-reviewer:F[0-9]+\|', finding):
             profiles.append('fixer')
         elif not repair_domains:

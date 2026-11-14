@@ -326,7 +326,7 @@ class ProjectController:
         readers, rows, waiting = [verifier], [verifier_row], False
         for profile in profiles:
             instructions = 'Review only your discipline against TASK acceptance and the inherited plans; report actionable findings.\n' + PLAN_DEFECT
-            if profile in ('art-reviewer', 'audio-reviewer'):
+            if profile == 'art-reviewer':
                 instructions += '\n' + COMPARISON
             if profile == 'art-reviewer' and task['id'] != 'integration':
                 instructions += '\n' + SIMILARITY
@@ -342,7 +342,7 @@ class ProjectController:
                 raise ProjectBlocked('Review requires unavailable tools: ' + profile)
             # Below 80% the reviewer stops at the score, so there is no detailed comparison to validate.
             close_enough = profile != 'art-reviewer' or task['id'] == 'integration' or validate_similarity(result)
-            if profile in ('art-reviewer', 'audio-reviewer') and close_enough:
+            if profile == 'art-reviewer' and close_enough:
                 validate_comparison(profile, result, project['plans'], task['id'] == 'integration')
             readers.append(result)
             rows.append(row)

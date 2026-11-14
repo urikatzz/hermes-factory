@@ -29,7 +29,7 @@ class ComparisonTests(unittest.TestCase):
     def test_asset_render_is_not_final_in_engine_approval(self):
         result=self.result()
         validate_comparison('art-reviewer',result,[self.plan],False)
-        with self.assertRaisesRegex(ConfigurationError,'rendered/listening'):
+        with self.assertRaisesRegex(ConfigurationError,'rendered evidence'):
             validate_comparison('art-reviewer',result,[self.plan],True)
 
     def test_stale_director_plan_cannot_approve_new_assets(self):
@@ -37,20 +37,8 @@ class ComparisonTests(unittest.TestCase):
         with self.assertRaisesRegex(ConfigurationError,'director plan'):
             validate_comparison('art-reviewer',self.result(),[self.plan],False)
 
-    def test_audio_measurements_cannot_substitute_for_listening(self):
-        self.plan['profile']='audio-director';self.record['mode']='measured'
-        with self.assertRaisesRegex(ConfigurationError,'listening'):
-            validate_comparison('audio-reviewer',self.result(),[self.plan],False)
-
-    def test_audio_can_use_retained_listening_evaluation(self):
-        self.plan['profile']='audio-director';self.record['mode']='listened';self.record['source']='human'
-        note=self.directory/'listening.md';note.write_text('Listener: expected bright coin chime; heard bright coin chime.')
-        self.record['evidence']=[str(note)]
-        validate_comparison('audio-reviewer',self.result(),[self.plan],True)
-
-    def test_listening_claim_with_only_waveform_image_is_rejected(self):
-        self.plan['profile']='audio-director';self.record['mode']='listened'
-        with self.assertRaisesRegex(ConfigurationError,'listening evaluation'):
+    def test_only_the_art_reviewer_has_a_perceptual_comparison(self):
+        with self.assertRaisesRegex(ConfigurationError,'No perceptual comparison'):
             validate_comparison('audio-reviewer',self.result(),[self.plan],False)
 
     def test_a_director_mismatch_cannot_be_reported_as_nonblocking(self):

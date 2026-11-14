@@ -1,5 +1,5 @@
 #!/bin/sh
-# Install the audio-review worker skill: skill text, reviewer soul, factory_audio + factory_art.findings, audio_lint.py.
+# Install the audio-review worker skill: skill text, factory_audio + factory_art.findings, audio_lint.py.
 set -eu
 root=$(cd "$(dirname "$0")/.." && pwd)
 skills=${HERMES_FACTORY_SKILLS:-$HOME/.hermes/factory-skills/worker}
@@ -15,5 +15,4 @@ cp "$root/scripts/audio_lint.py" "$dest/scripts/audio_lint.py"
 chmod +x "$dest/scripts/audio_lint.py"
 esc() { printf '%s' "$1" | sed 's/[|&\\]/\\&/g'; }
 sed -e "s|\${HERMES_SKILL_DIR}|$(esc "$dest")|g" "$root/factory_audio/install/SKILL.md" > "$dest/SKILL.md"
-sed -e "s|\${HERMES_SKILL_DIR}|$(esc "$dest")|g" "$root/factory_audio/install/SOUL.md" > "$dest/SOUL.md"
 echo "installed $dest"

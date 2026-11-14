@@ -34,8 +34,7 @@ If a project lacks a required art/audio bible, directors plan a style-bible crea
 require an already-existing game. Preserve any existing approved bible unless the captured task explicitly changes it.
 Verifier must explicitly pass before reviewers are created. Any repaired implementation starts with verification again.
 For perceptual review, obey the card's retained comparison.json contract. Final art review requires actual in-engine
-rendering. Audio review requires a capable listening tool or retained human listening evaluation. Never claim to hear
-audio from waveforms or loudness. Missing perception is unavailable evidence, not a NIT, a waiver or an approval.
+rendering. Missing perception is unavailable evidence, not a NIT, a waiver or an approval.
 Asset mismatch findings route to artist/sound-designer, code findings to fixer. Never redefine director intent to pass.
 A plan reviewer retains PLAN-REVIEW.md and reports plan defects as findings; it writes no plan of its own.
 If a failure comes from a wrong task plan or acceptance criterion, set metadata.plan_defect instead of forcing a repair.
@@ -52,8 +51,14 @@ BIBLE_LINES = '''If a project lacks a required art/audio bible, directors plan a
 require an already-existing game. Preserve any existing approved bible unless the captured task explicitly changes it.
 '''
 # Blocks written by earlier releases; anything else was edited by hand and is left for manual review.
-RELEASED = (MANAGED.replace(PLANNING_LINES, ''), MANAGED.replace(PLANNING_LINES, '').replace(BIBLE_LINES, ''))
-assert len({MANAGED, *RELEASED}) == 3
+PERCEPTION_LINE = 'rendering. Missing perception is unavailable evidence, not a NIT, a waiver or an approval.\n'
+LISTENING_LINES = '''rendering. Audio review requires a capable listening tool or retained human listening evaluation. Never claim to hear
+audio from waveforms or loudness. Missing perception is unavailable evidence, not a NIT, a waiver or an approval.
+'''
+_WITH_AUDIO_REVIEW = MANAGED.replace(PERCEPTION_LINE, LISTENING_LINES)
+RELEASED = (_WITH_AUDIO_REVIEW, _WITH_AUDIO_REVIEW.replace(PLANNING_LINES, ''),
+            _WITH_AUDIO_REVIEW.replace(PLANNING_LINES, '').replace(BIBLE_LINES, ''))
+assert len({MANAGED, *RELEASED}) == 4
 
 
 def digest(data):
