@@ -36,3 +36,9 @@ Rules learned the hard way:
 | ui-reviewer | anthropic | claude-sonnet-5-5 | low | worker |
 | ux-reviewer | anthropic | claude-sonnet-5-5 | low | worker |
 | verifier | anthropic | claude-sonnet-5-5 | low | worker |
+
+## Automatic recovery
+`factory-resume-rate-limit` (cron, every 2 minutes, no LLM; `runtime/factory-dashboard/scripts/factory_resume_rate_limit.py`,
+deployed to `~/.hermes/scripts/`) resumes a workflow root that stopped only because a worker hit a provider rate limit
+(429 / usage limit). It uses the controller's own resume, waits 10 minutes between tries and gives up after 24.
+It never touches human gates (plan approval) or real failures (`human_review`).
