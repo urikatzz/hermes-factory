@@ -210,6 +210,16 @@ class ProjectControllerTests(unittest.TestCase):
         self.tick()
         self.only('developer')
 
+    def test_invalid_architect_plan_returns_to_architect_instead_of_ending_the_run(self):
+        self.tick()
+        self.board.complete(self.only('factory-orchestrator'),project_scope=NEEDS);self.tick()
+        self.architect(tasks=[{**CODE, 'owner': 'nobody'}])
+        stage=self.only('architect')
+        self.assertEqual(stage['cycle'],1)
+        self.assertIn('Invalid task owner',self.board.cards[stage['task_id']]['body'])
+        self.architect()
+        self.only('claude-reviewer')
+
     def test_plan_review_that_never_passes_stops_for_a_human(self):
         self.tick()
         self.board.complete(self.only('factory-orchestrator'),project_scope=NEEDS);self.tick()

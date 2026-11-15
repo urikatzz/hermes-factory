@@ -220,7 +220,13 @@ class ProjectController:
                     project['gen'] = gen + 1
                     return True
             evidence = plan_evidence('architect', row['task_id'], result.metadata)
-            tasks = validate_plan(retained_json(result.metadata['artifacts'], 'project-plan.json'), project['scope'], result.metadata['ac_ids'])
+            try:
+                tasks = validate_plan(retained_json(result.metadata['artifacts'], 'project-plan.json'), project['scope'], result.metadata['ac_ids'])
+            except ConfigurationError as exc:
+                # A malformed plan goes back to the architect (bounded by MAX_REPLANS) instead of ending the run.
+                if not self._replan(conn, root, project, None, 'Plan failed validation: ' + str(exc), ['architect:F1|HIGH|-|' + str(exc).replace('|', '/') + '|Return a plan that passes validation'], [row['task_id']]):
+                    raise
+                return True
             previous = {t['id']: t for t in project['tasks']}
             if any(done['id'] != 'integration' and previous.get(done['id']) not in tasks for done in project['completed']):
                 raise ConfigurationError('Replan changed a task that already passed')
