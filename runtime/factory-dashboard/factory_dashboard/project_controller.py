@@ -297,7 +297,10 @@ class ProjectController:
                 if not self._replan(conn, root, project, task, 'Plan defect: ' + defect, work['blocking'], [row['task_id']]):
                     raise ConfigurationError('Plan defect reported after the replan limit: ' + defect)
                 return True
-            if set(result.metadata['ac_ids']) != set(task['acceptance']):
+            reported, expected = set(result.metadata['ac_ids']), set(task['acceptance'])
+            # An implement writer reports every task AC; a repair writer may report only the ACs it repaired
+            # (the repair card scopes it to the failing findings). The verifier still re-checks all of them.
+            if (not reported or not reported <= expected) if repair else reported != expected:
                 raise ConfigurationError('Writer acceptance differs from the captured small-task plan')
             work.update(writer_key=key, writer_task=row['task_id'], manifest=result.metadata['manifest_sha12'])
             if repair:

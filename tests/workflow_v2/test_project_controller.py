@@ -100,6 +100,16 @@ class ProjectControllerTests(unittest.TestCase):
         self.board.complete(self.only('fixer'));self.tick()
         self.only('verifier')
 
+    def test_repair_writer_may_report_only_the_acs_it_repaired(self):
+        self.tick()
+        self.board.complete(self.only('factory-orchestrator'),project_scope=NEEDS);self.tick()
+        self.architect([{**CODE, 'acceptance': {'AC1': 'Works', 'AC2': 'Also works'}}],ac_ids=['AC1','AC2'])
+        self.board.complete(self.only('claude-reviewer'));self.tick()
+        self.board.complete(self.only('developer'),ac_ids=['AC1','AC2']);self.tick()
+        self.board.complete(self.only('verifier'), verdict='FAIL', ac_results={'AC1': 'fail', 'AC2': 'pass'});self.tick()
+        self.board.complete(self.only('fixer'),ac_ids=['AC1']);self.tick()
+        self.only('verifier')
+
     def test_restart_does_not_duplicate_cards(self):
         self.plan()
         before = len(self.board.cards)
