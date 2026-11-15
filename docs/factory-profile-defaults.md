@@ -11,6 +11,11 @@ Rules learned the hard way:
 - After editing plugin code under `~/.hermes/plugins/factory-models` run `hermes gateway restart` while no stage is
   running; the gateway keeps the old module loaded.
 
+- Every profile has its OWN copy of the plugin at `~/.hermes/profiles/<name>/plugins/factory-models`, and a worker's
+  completion-time reconcile imports that copy. After changing `~/.hermes/plugins/factory-models`, sync all of them:
+  `for d in ~/.hermes/profiles/*/plugins/factory-models; do rsync -a --delete --exclude __pycache__ ~/.hermes/plugins/factory-models/ $d/; done`
+  Stale copies silently ran old validation for several attempts on 2026-11-15.
+
 | profile | provider | model | effort | skill dirs |
 |---|---|---|---|---|
 | architect | anthropic | claude-sonnet-5-5 | medium | worker |
