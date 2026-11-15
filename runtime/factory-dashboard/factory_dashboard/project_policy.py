@@ -138,11 +138,11 @@ def validate_plan(document, scope, project_ac_ids):
     for task in ordered:
         if task['owner'] == 'developer':
             for domain, owner in [('art', 'artist'), ('audio', 'sound-designer')]:
-                if task['needs'][domain] and not any(by_id[d]['owner'] == owner for d in ancestors[task['id']]):
+                # Only when the plan produces assets of this kind: an art director may legitimately plan integration of
+                # existing assets with no new production, and plan review judges coverage against the director plans.
+                produced = any(t['owner'] == owner for t in ordered)
+                if produced and task['needs'][domain] and not any(by_id[d]['owner'] == owner for d in ancestors[task['id']]):
                     raise ConfigurationError('Code integration must depend on the required asset producer')
-    for domain, owner in [('art', 'artist'), ('audio', 'sound-designer')]:
-        if scope[domain] and not any(t['owner'] == owner for t in ordered):
-            raise ConfigurationError('Project scope requires an asset production task')
     return ordered
 
 

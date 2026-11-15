@@ -60,6 +60,13 @@ class ProjectPolicyTests(unittest.TestCase):
         plan = validate_plan(dict(tasks=[task]), scope, ['AC1'])
         self.assertLessEqual(len(plan[0]['title']), 200)
 
+    def test_integration_only_art_plan_needs_no_artist_task(self):
+        from factory_dashboard.project_policy import validate_plan
+        scope = dict(art=True, audio=False, ui=True, ux=False)
+        task = dict(id='integrate', title='Tint existing sprites', owner='developer', dependencies=[],
+                    acceptance={'AC1': 'Colours match'}, needs=scope)
+        self.assertEqual(len(validate_plan(dict(tasks=[task]), scope, ['AC1'])), 1)
+
     def test_each_task_selects_code_security_and_relevant_specialist_reviews(self):
         from factory_dashboard.project_policy import review_profiles
         self.assertEqual(review_profiles(dict(art=False, audio=False, ui=False, ux=False)),
