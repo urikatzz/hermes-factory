@@ -119,9 +119,10 @@ class Board:
             archive.write_bytes(b'fixture')
             artifacts.append(str(archive))
         metadata['artifacts'] = artifacts
+        suffix = overrides.pop('summary_suffix', '')
         metadata.update(overrides)
         rid = conn.execute('SELECT COALESCE(MAX(id),0)+1 FROM task_runs').fetchone()[0]
-        summary = f'VERDICT={metadata["verdict"]} STAGE={metadata["stage"]} CYCLE={metadata["cycle"]} MANIFEST={metadata["manifest_sha12"]}'
+        summary = f'VERDICT={metadata["verdict"]} STAGE={metadata["stage"]} CYCLE={metadata["cycle"]} MANIFEST={metadata["manifest_sha12"]}' + suffix
         conn.execute('INSERT INTO task_runs VALUES(?,?,?,?,?,?,?)', (rid, tid, task.assignee, 'owned', 'completed', summary, json.dumps(metadata)))
         conn.execute("UPDATE tasks SET status='done',current_run_id=? WHERE id=?", (rid, tid))
         conn.execute('UPDATE factory_workflow_stages SET active_run_id=? WHERE task_id=?', (rid, tid))

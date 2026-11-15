@@ -110,6 +110,11 @@ class ProjectControllerTests(unittest.TestCase):
         self.board.complete(self.only('fixer'),ac_ids=['AC1']);self.tick()
         self.only('verifier')
 
+    def test_summary_note_after_the_header_line_is_accepted(self):
+        self.plan()
+        self.board.complete(self.only('developer'), summary_suffix=' - re-ran the baseline gates first');self.tick()
+        self.only('verifier')
+
     def test_restart_does_not_duplicate_cards(self):
         self.plan()
         before = len(self.board.cards)
