@@ -18,6 +18,18 @@ _REQUIRED = {'tasks': {'id','title','status','assignee','created_at'},
              'task_events': set(_EVENT)}
 
 
+def _project_header(body):
+    """Project directory and mode named in a Factory task header; empty for other tasks."""
+    header = (body or '').partition('REQUEST:')[0]
+    fields = {}
+    for line in header.splitlines():
+        key, sep, value = line.partition(':')
+        if sep:
+            fields[key.strip()] = value.strip()
+    directory = fields.get('PROJECT_DIR') or fields.get('PROJECT') or ''
+    return {'project_dir': directory if directory.startswith('/') else None, 'project_mode': fields.get('PROJECT_MODE')}
+
+
 def now():
     return datetime.now(timezone.utc).isoformat()
 
@@ -80,8 +92,13 @@ class SnapshotCollector:
                             warn(path,'missing_columns:'+table+':'+','.join(sorted(missing)))
                         # Names here are fixed code literals; no metadata enters SQL.
                         actual = [c for c in selected if c in columns]
-                        rows = [dict(r) for r in conn.execute('SELECT '+','.join(actual)+' FROM '+table)]
+                        # Only the request header of a task body is read, to learn which project directory a run works in.
+                        head = ',substr(body,1,2000) AS _body_head' if table == 'tasks' and 'body' in columns else ''
+                        rows = [dict(r) for r in conn.execute('SELECT '+','.join(actual)+head+' FROM '+table)]
                         result[table] = [{c:r.get(c) for c in selected} for r in rows]
+                        if head:
+                            for out, row in zip(result[table], rows):
+                                out.update(_project_header(row.get('_body_head')))
                     after=path.stat()
                     if (after.st_dev,after.st_ino)!=(info.st_dev,info.st_ino):
                         raise OSError('Database identity changed during collection')

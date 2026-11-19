@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 import math
 import json
 import re
+from pathlib import Path
 from statistics import median
 from urllib.parse import urlsplit
 
@@ -63,6 +64,28 @@ def is_factory_root(task):
         except (ValueError, TypeError):
             return False
     return task.get('assignee') == 'factory-orchestrator' and isinstance(skills, list) and 'software-factory' in skills
+
+
+def _project(root):
+    """Where this run's project lives on this computer and which repository it belongs to (read-only)."""
+    directory = root.get('project_dir')
+    if not directory:
+        guess = Path.home() / 'factory' / root['id']
+        directory = str(guess) if guess.is_dir() else None
+    info = {'dir': directory, 'mode': root.get('project_mode'), 'exists': bool(directory and Path(directory).is_dir()), 'repo': None, 'remote': None}
+    if not directory:
+        return info
+    info['repo'] = Path(directory).name
+    try:
+        text = (Path(directory) / '.git' / 'config').read_text(errors='replace')
+        match = re.search(r'\[remote "origin"\][^\[]*?url\s*=\s*(\S+)', text)
+        if match:
+            remote = re.sub(r'^(?:git@[^:]+:|https?://[^/]+/|ssh://[^/]+/)', '', match[1]).removesuffix('.git')
+            info['remote'] = remote
+            info['repo'] = remote
+    except OSError:
+        pass
+    return info
 
 
 def _stage(title):
@@ -220,6 +243,7 @@ class ReportBuilder:
                 parent['status']='running'
             all_tasks=[root,*stages]
             all_runs=[r for t in all_tasks for r in runs_by_task[t['id']]]
+            parent['project']=_project(root)
             parent['usage']=usage_for(all_runs)
             parent['execution_retries']=sum(max(0,len(runs_by_task[t['id']])-1) for t in stages)
             parent['fix_stages']=sum(t['stage']['label']=='FIX' for t in parent['stages'])
