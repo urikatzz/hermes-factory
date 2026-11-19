@@ -200,3 +200,28 @@ def route_findings(findings, owner, repair_domains=(), ac_owners=None):
 def repair_profiles(findings, owner, repair_domains=(), ac_owners=None):
     """Repair profiles in repair order (see route_findings)."""
     return list(route_findings(findings, owner, repair_domains, ac_owners))
+
+
+# Repair budgets. A product repair answers a genuine defect in the work and consumes the captured repair budget. A repair that answers only
+# a verification-harness failure is an orchestration recovery: it has its own, smaller, bounded budget so that infrastructure trouble
+# can never use up the product budget. Both are recorded on the task so every charge is auditable.
+MAX_ORCHESTRATION_RECOVERIES = 2
+_HARNESS_ONLY = re.compile(r'AC(?:[0-9]+|-GATE): unverified:harness')
+_VERDICT_MARKER = ('Verifier or release audit failed',)
+
+
+def repair_origin(blocking):
+    """'orchestration' when every blocking item is a harness-unverified criterion (or the verdict marker that follows from it), else 'product'.
+    A failed check, a failed criterion or any reviewer or verifier finding is a product defect."""
+    meaningful = [item for item in blocking if item not in _VERDICT_MARKER]
+    if meaningful and all(_HARNESS_ONLY.fullmatch(item) for item in meaningful):
+        return 'orchestration'
+    return 'product'
+
+
+def budget_used(work):
+    """(product repairs charged, orchestration recoveries charged). A task recorded before charges existed counts each cycle as product."""
+    charges = work.get('charges')
+    if charges is None:
+        return work.get('cycle', 0), 0
+    return sum(c['kind'] == 'product' for c in charges), sum(c['kind'] == 'orchestration' for c in charges)

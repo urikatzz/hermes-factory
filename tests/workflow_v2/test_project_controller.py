@@ -7,6 +7,7 @@ import unittest
 from board_fixture import Board
 from factory_dashboard.model_policy import ConfigurationError
 from factory_dashboard.project_decisions import normalize_constraint
+from factory_dashboard.project_policy import budget_used
 from factory_dashboard.workflow_controller import WorkflowController
 from factory_dashboard.workflow_state import WorkflowState
 from factory_dashboard.workflow_templates import _preset
@@ -767,6 +768,97 @@ class ProjectControllerTests(unittest.TestCase):
         self.assertEqual(self.project()['work']['extra_repairs'], 1)
         with self.assertRaises(ConfigurationError):
             normalize_constraint(dict(kind='palette', reason='long enough reason', colors=['red']))
+
+    # --- separate repair budgets: product defects versus orchestration recoveries ---
+    def limit_repairs(self, n):
+        self.definition['max_repairs'] = n
+        self.conn.execute('UPDATE factory_workflow_roots SET definition=?', (json.dumps(self.definition),))
+
+    def used(self):
+        return budget_used(self.project()['work'])
+
+    HARNESS = dict(verdict='FAIL', ac_results={'AC1': 'unverified:harness'})
+
+    def test_a_harness_only_failure_is_an_orchestration_recovery_and_leaves_the_product_budget_untouched(self):
+        self.limit_repairs(0)  # a product repair would be out of budget immediately
+        self.plan(); self.board.complete(self.only('developer')); self.tick()
+        self.board.complete(self.only('verifier'), **self.HARNESS); self.tick()
+        self.board.complete(self.only('fixer')); self.tick()
+        self.assertEqual(self.used(), (0, 1))
+        charge = self.project()['work']['charges'][0]
+        self.assertEqual(charge['kind'], 'orchestration')
+        self.assertIn('unverified:harness', charge['reason'])
+        self.only('verifier')
+
+    def test_orchestration_recoveries_are_bounded_then_a_human_decides(self):
+        self.limit_repairs(0)
+        self.plan(); self.board.complete(self.only('developer')); self.tick()
+        for _ in range(2):
+            self.board.complete(self.only('verifier'), **self.HARNESS); self.tick()
+            self.board.complete(self.only('fixer')); self.tick()
+        self.board.complete(self.only('verifier'), **self.HARNESS); self.tick()
+        self.assertEqual(self.project()['terminal']['phase'], 'human_review')
+        self.assertIn('Orchestration recovery limit', self.project()['terminal']['reason'])
+        self.assertEqual(self.used(), (0, 2))
+        self.assertFalse([r for r in self.board.ready() if r['profile'] in ('fixer', 'architect')])
+
+    def test_a_product_defect_consumes_the_product_budget_and_is_recorded(self):
+        self.limit_repairs(1)
+        self.plan(); self.board.complete(self.only('developer')); self.tick()
+        self.board.complete(self.only('verifier'), verdict='FAIL', ac_results={'AC1': 'fail'}); self.tick()
+        self.assertEqual(self.used(), (1, 0))
+        self.assertEqual(self.project()['work']['charges'][0]['kind'], 'product')
+        self.board.complete(self.only('fixer')); self.tick()
+        self.board.complete(self.only('verifier'), verdict='FAIL', ac_results={'AC1': 'fail'}); self.tick()
+        self.only('architect')  # the product budget really was spent: back to the architect
+
+    def test_a_failed_check_alongside_a_harness_gap_is_still_a_product_defect(self):
+        self.limit_repairs(2)
+        self.plan(); self.board.complete(self.only('developer')); self.tick()
+        self.board.complete(self.only('verifier'), verdict='FAIL', ac_results={'AC1': 'unverified:harness'},
+                            failed_checks=[dict(cmd='unity PlayMode', preexisting=False)]); self.tick()
+        self.assertEqual(self.used(), (1, 0))
+
+    def test_handoff_retries_and_human_resumes_are_logged_and_never_charge_a_repair(self):
+        self.plan(); self.board.complete(self.only('developer')); self.tick()
+        self.board.complete(self.only('verifier'), **self.BAD_INCIDENT); self.tick()
+        self.board.complete(self.only('verifier')); self.tick()
+        self.assertEqual(self.used(), (0, 0))
+        kinds = [e['kind'] for e in self.project()['orchestration_log']]
+        self.assertEqual(kinds, ['handoff_retry'])
+
+    def test_repairs_that_never_ran_are_not_charged_when_a_decision_rewinds_them(self):
+        self.stalled_artist()
+        self.assertEqual(len(self.project()['work']['charges']), 1)
+        self.controller.resume(self.conn, self.root, 'Waive and re-judge the existing evidence', self.DECISION)
+        self.assertEqual([c['kind'] for c in self.project()['work']['charges']], ['product'])  # only the code repair that is now dispatched
+
+    def test_a_task_recorded_before_charges_existed_counts_each_earlier_cycle_as_a_product_repair(self):
+        self.assertEqual(budget_used(dict(cycle=3)), (3, 0))
+        self.assertEqual(budget_used(dict(cycle=3, charges=[dict(kind='product'), dict(kind='orchestration'), dict(kind='product')])), (2, 1))
+
+    def test_exhaustion_after_a_granted_repair_stops_for_a_human_without_replan_or_another_repair(self):
+        self.limit_repairs(0)
+        self.plan(); self.board.complete(self.only('developer')); self.tick()
+        project = self.project(); project['work'].update(extra_repairs=1, on_exhaustion='human_review')
+        self.conn.execute('UPDATE factory_project_execution SET document=?', (json.dumps(project),)); self.conn.commit()
+        self.board.complete(self.only('verifier'), verdict='FAIL', ac_results={'AC1': 'fail'}); self.tick()
+        self.board.complete(self.only('fixer')); self.tick()
+        self.board.complete(self.only('verifier'), verdict='FAIL', ac_results={'AC1': 'fail'}); self.tick()
+        self.assertEqual(self.project()['terminal']['phase'], 'human_review')
+        self.assertIn('human review was requested', self.project()['terminal']['reason'])
+        self.assertFalse([r for r in self.board.ready() if r['profile'] in ('architect', 'fixer')])
+
+    def test_without_the_decision_exhaustion_still_replans(self):
+        self.limit_repairs(0)
+        self.plan(); self.board.complete(self.only('developer')); self.tick()
+        self.board.complete(self.only('verifier'), verdict='FAIL', ac_results={'AC1': 'fail'}); self.tick()
+        self.only('architect')
+
+    def test_a_decision_records_the_exhaustion_choice_on_the_task_in_progress(self):
+        self.stalled_artist()
+        self.controller.resume(self.conn, self.root, 'One more repair, then a human', dict(self.DECISION, extra_repairs=1, on_exhaustion='human_review'))
+        self.assertEqual((self.project()['work']['extra_repairs'], self.project()['work']['on_exhaustion']), (1, 'human_review'))
 
     def test_visual_mismatch_calls_artist_then_verifier_not_developer(self):
         tasks=[dict(id='sprites',title='Make sprites',owner='artist',dependencies=[],acceptance={'AC1':'Sprite'},

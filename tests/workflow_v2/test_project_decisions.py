@@ -167,6 +167,15 @@ class StructuredConstraintTests(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(ConfigurationError):
                 validate_spec_conflicts(bad)
 
+    def test_exhaustion_handling_and_grants_need_a_valid_value_and_a_recorded_note(self):
+        self.assertEqual(normalize_decisions(dict(on_exhaustion='human_review'), 'n')['on_exhaustion'], 'human_review')
+        self.assertIsNone(normalize_decisions(dict(extra_repairs=1), 'n')['on_exhaustion'])
+        for bad in ('stop', 'replan ', 1, True):
+            with self.subTest(bad=bad), self.assertRaises(ConfigurationError):
+                normalize_decisions(dict(on_exhaustion=bad), 'n')
+        with self.assertRaises(ConfigurationError):
+            normalize_decisions(dict(extra_repairs=1), '  ')
+
     def test_extra_repairs_are_bounded(self):
         self.assertEqual(normalize_decisions(dict(extra_repairs=1), 'n')['extra_repairs'], 1)
         for bad in (-1, 3, '1', 1.5, True):

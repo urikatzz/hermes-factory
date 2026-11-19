@@ -10,7 +10,7 @@ from .project_cards import (ARCHITECT, COMPARISON, CONFLICT_CHECK, SIMILARITY, D
 from .project_decisions import (constraint_view, constraints_of, normalize_decisions, preserved_conflict, record_applied, relevant_constraints,
                                 validate_plan_constraints, validate_spec_conflicts)
 from .project_evidence import plan_evidence, retained_json, validate_comparison, validate_similarity
-from .project_policy import (MAX_REPLANS, blocking_findings, finding_ac, planning_profiles, route_findings, rereview_profiles,
+from .project_policy import (MAX_ORCHESTRATION_RECOVERIES, MAX_REPLANS, blocking_findings, budget_used, repair_origin, finding_ac, planning_profiles, route_findings, rereview_profiles,
                              review_profiles, scope_additions, validate_plan, validate_scope)
 
 REPAIR_LIMIT = 'Captured repair limit reached'
@@ -115,6 +115,7 @@ class ProjectController:
                 raise ConfigurationError(result.reason + ': ' + key)
             # A malformed handoff is a worker slip, not a failed milestone: retry only this stage, telling the worker exactly what to fix.
             project['handoff_retries'][token] = tries + 1
+            project.setdefault('orchestration_log', []).append(dict(kind='handoff_retry', key=key, attempt=tries + 1, reason=result.reason, at=int(time.time())))
             project.setdefault('handoff_rejections', {})[key] = self._rejection(conn, row, result, kind, key, cycle, root, tries + 1)
             project.setdefault('retry_keys', []).append(token)
             self._state.event(conn, root['root_id'], 'handoff_rejected', dict(key=key, task_id=row['task_id'], reason=result.reason, attempt=tries + 1))
@@ -377,7 +378,7 @@ class ProjectController:
         blockers = tool_blockers(verifier.metadata)
         if any(v == 'unverified:environment' for v in verifier.metadata['ac_results'].values()) or blockers:
             raise ProjectBlocked('Verification requires unavailable environment or tools' + (': ' + '; '.join(blockers) if blockers else ''))
-        preliminary = evaluate_cycle(writer, [verifier], work.get('last_gate'), definition.max_repairs + work.get('extra_repairs', 0), cycle, {**context, 'unity_ci': False, 'waivers': project.get('waivers', [])})
+        preliminary = self._evaluate(writer, [verifier], work, definition, context, project)
         if preliminary.decision == 'repair' and not self._spec_check(conn, root, definition, context, project, task, work, cycle, prefix,
                                                                       [verifier], preliminary, [*inputs, verifier_row['task_id']]):
             return False
@@ -413,11 +414,21 @@ class ProjectController:
             rows.append(row)
         if waiting:
             return False
-        decision = evaluate_cycle(writer, readers, work.get('last_gate'), definition.max_repairs + work.get('extra_repairs', 0), cycle, {**context, 'unity_ci': False, 'waivers': project.get('waivers', [])})
+        decision = self._evaluate(writer, readers, work, definition, context, project)
         if decision.decision == 'repair' and not self._spec_check(conn, root, definition, context, project, task, work, cycle, prefix,
                                                                    readers, decision, [*inputs, verifier_row['task_id']]):
             return False
         return self._decision(conn, root, project, task, writer, readers, decision, rows, definition, reviewed=True)
+
+    def _evaluate(self, writer, readers, work, definition, context, project):
+        """The gate decision with the product repair budget only: orchestration recoveries never count against it."""
+        product_used, _ = budget_used(work)
+        limit = definition.max_repairs + work.get('extra_repairs', 0)
+        args = dict(context={**context, 'unity_ci': False, 'waivers': project.get('waivers', [])})
+        decision = evaluate_cycle(writer, readers, work.get('last_gate'), limit, product_used, **args)
+        if decision.decision == 'human_review' and decision.reason == REPAIR_LIMIT and repair_origin(decision.blocking) == 'orchestration':
+            decision = evaluate_cycle(writer, readers, work.get('last_gate'), 10 ** 6, 0, **args)  # not a product defect: the product budget does not apply
+        return decision
 
     def _spec_check(self, conn, root, definition, context, project, task, work, cycle, prefix, readers, decision, inputs):
         """Before a repair is authorized: a finding that can only be fixed by breaking an approved requirement is a specification
@@ -489,6 +500,10 @@ class ProjectController:
         exhausted = decision.decision == 'human_review' and decision.reason == REPAIR_LIMIT
         if exhausted or (defect and decision.decision == 'repair'):
             # Patching symptoms of a wrong plan never converges: escalate to the architect before a human.
+            if exhausted and work.get('on_exhaustion') == 'human_review':
+                # A human chose, in a recorded decision, to review this task instead of replanning or granting another repair.
+                self._terminal(conn, root, project, 'human_review', 'Repair budget exhausted after a granted extra repair; human review was requested instead of a replan or another repair')
+                return True
             reason = 'Plan defect: ' + defect if defect else 'Repairs did not converge within the captured limit'
             if not self._replan(conn, root, project, task, reason, decision.blocking, [work['writer_task'], *[r['task_id'] for r in rows]]):
                 self._terminal(conn, root, project, 'human_review', decision.reason if exhausted else reason + ' (replan limit reached)')
@@ -528,6 +543,16 @@ class ProjectController:
             self._state.event(conn, root['root_id'], 'project_repair_routed', dict(task=task['id'], cycle=work['cycle'],
                               repairs=list(profiles), rereview=panel or 'all', attribution=attribution))
             work.update(panel=panel, attribution=attribution)
+            origin = repair_origin(decision.blocking)
+            if 'charges' not in work:  # keep a recorded task's earlier repairs on the audit trail
+                work['charges'] = [dict(cycle=i, kind='product', reason='recorded before charges existed') for i in range(work['cycle'])]
+            if origin == 'orchestration' and budget_used(work)[1] >= MAX_ORCHESTRATION_RECOVERIES:
+                self._terminal(conn, root, project, 'human_review', 'Orchestration recovery limit reached: ' + '; '.join(decision.blocking)[:300])
+                return True
+            charge = dict(cycle=work['cycle'], kind=origin, reason=(origin + ' repair for: ' + '; '.join(decision.blocking))[:400])
+            work['charges'].append(charge)
+            self._state.event(conn, root['root_id'], 'project_repair_charged', dict(task=task['id'], charge=charge, used=list(budget_used(work)),
+                              product_limit=definition.max_repairs + work.get('extra_repairs', 0), orchestration_limit=MAX_ORCHESTRATION_RECOVERIES))
             work.update(step='repairing', cycle=work['cycle']+1, blocking=list(decision.blocking), repairs=profiles, repair_findings=routes,
                         writer_inputs=list(dict.fromkeys([*self._inputs(project), work['writer_task'], *[r['task_id'] for r in rows]])),
                         last_gate=asdict(decision))
@@ -647,12 +672,15 @@ class ProjectController:
         project['waivers'].extend(w for w in decided['waivers'] if w['id'] not in known)
         stored = [constraint_view(c) for c in project.setdefault('constraints', [])]  # decisions recorded before ids existed get one now
         project['constraints'] = stored + [c for c in decided['constraints'] if c['id'] not in {k['id'] for k in stored}]
+        if decided['on_exhaustion'] and 'work' in project:
+            project['work']['on_exhaustion'] = decided['on_exhaustion']
         if decided['extra_repairs']:
             # Granted to the task in progress only: it lives in that task's work record and disappears with it.
             project['work']['extra_repairs'] = project['work'].get('extra_repairs', 0) + decided['extra_repairs']
         if decisions:
             self._state.event(conn, root['root_id'], 'human_decision', dict(note=note, waivers=[w['id'] for w in decided['waivers']],
-                              constraints=decided['constraints'], extra_repairs=decided['extra_repairs'], execution_version=2))
+                              constraints=decided['constraints'], extra_repairs=decided['extra_repairs'],
+                              on_exhaustion=decided['on_exhaustion'], execution_version=2))
         gen = project.get('gen', 0)
         if 'work' in project:
             work = project['work']
@@ -663,6 +691,8 @@ class ProjectController:
                 # judge the evidence that already exists again, instead of repeating verification or review work. The stalled card is left
                 # on the board (blocked, harmless): archiving needs its own transaction, which this one already holds.
                 work.update(step='reviewing', cycle=work['cycle'] - 1, repairs=[])
+                if work.get('charges'):
+                    work['charges'].pop()  # the repair that never ran was never spent
                 work.pop('repair_findings', None)
                 project['retry_keys'] = []
             elif reevaluate:
@@ -686,6 +716,7 @@ class ProjectController:
             project['retry_keys'] = [f"project-{p}:{project.get('director_gen', {}).get(p, 0)}" for p in missing] or [f'project-architect:{gen}']
         else:
             project['retry_keys'] = []
+        project.setdefault('orchestration_log', []).append(dict(kind='human_resume', reevaluate=bool(reevaluate), retry_keys=list(project.get('retry_keys', [])), at=int(time.time())))
         self._save(conn, root, project)
         conn.execute("UPDATE factory_workflow_roots SET phase='project',reason='' WHERE root_id=?", (root['root_id'],))
         self._state.event(conn, root['root_id'], 'human_resume', dict(note=note, execution_version=2))
