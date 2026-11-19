@@ -288,7 +288,9 @@ class ProjectController:
             instructions += 'Integrate required art and audio outputs; run applicable checks and rebuild the cumulative project manifest.'
             instructions += ('\nIf a test, build or gate fails, including tests you just wrote, diagnose it and fix the test or the code, '
                              'then re-run, repeating until every gate you can run passes. A failure you can fix is never a reason for '
-                             'VERDICT=BLOCKED; use BLOCKED only for a missing tool or capability you cannot provide.')
+                             'VERDICT=BLOCKED; use BLOCKED only for a missing tool or capability you cannot provide. '
+                             'The approved plan paths named in your card are your plan: read them there, and if you need the plan under '
+                             'PROJECT_DIR/.factory copy it yourself. A plan attachment that looks missing is never a reason for BLOCKED.')
             instructions += '\n' + PLAN_DEFECT
             node = self._node(conn, root, definition, context, project, key, 'repair' if repair else 'implement', profile,
                               instructions, work['writer_inputs'], task=task, cycle=cycle)
