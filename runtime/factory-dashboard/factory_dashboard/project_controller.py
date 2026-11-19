@@ -373,6 +373,7 @@ class ProjectController:
         if not node:
             return False
         verifier_row, verifier = node
+        verifier = self._scoped_verifier(verifier, task)
         blockers = tool_blockers(verifier.metadata)
         if any(v == 'unverified:environment' for v in verifier.metadata['ac_results'].values()) or blockers:
             raise ProjectBlocked('Verification requires unavailable environment or tools' + (': ' + '; '.join(blockers) if blockers else ''))
@@ -580,6 +581,18 @@ class ProjectController:
             self._controller._stop(conn, root, phase if phase in ('blocked', 'human_review') else 'human_review', terminal['reason'])
         project.update(mode='finished', active_keys=[])
         return False
+
+    @staticmethod
+    def _scoped_verifier(verifier, task):
+        """Only this task's acceptance IDs are judged. A verifier that also lists other project IDs (task text often says "ac_status covers
+        AC1..ACn") is not blocked by criteria that belong to other tasks; what it reported for them is kept, but ignored. A task ID it
+        omits still fails the gate's coverage check."""
+        results = verifier.metadata.get('ac_results') if verifier.valid else None
+        if not isinstance(results, dict) or set(results) <= set(task['acceptance']):
+            return verifier
+        kept = {ac: outcome for ac, outcome in results.items() if ac in task['acceptance']}
+        ignored = {ac: outcome for ac, outcome in results.items() if ac not in task['acceptance']}
+        return replace(verifier, metadata={**verifier.metadata, 'ac_results': kept, 'ac_results_ignored': ignored})
 
     @staticmethod
     def _scoped_writer(writer, task):

@@ -638,6 +638,33 @@ class ProjectControllerTests(unittest.TestCase):
         self.board.complete(self.only('verifier'), ac_ids=['AC1', 'AC2'], ac_results={'AC1': 'pass', 'AC2': 'pass'}); self.tick()
         self.assertEqual([r['profile'] for r in self.board.ready()], ['claude-reviewer', 'security-reviewer'])
 
+    def two_task_plan(self):
+        two = dict(CODE, acceptance={'AC1': 'Works', 'AC2': 'Also works'})
+        later = dict(CODE, id='later', title='Later work', dependencies=['code'], acceptance={'AC3': 'Third'})
+        self.tick()
+        self.board.complete(self.only('factory-orchestrator'), project_scope=dict(art=False, audio=False, ui=False, ux=False)); self.tick()
+        self.architect([two, later], ac_ids=['AC1', 'AC2', 'AC3'])
+        self.board.complete(self.only('claude-reviewer')); self.tick()
+        self.board.complete(self.only('developer'), ac_ids=['AC1', 'AC2']); self.tick()
+
+    def test_a_verifier_listing_other_tasks_criteria_is_judged_only_on_this_tasks_criteria(self):
+        self.two_task_plan()
+        self.board.complete(self.only('verifier'), ac_ids=['AC1', 'AC2', 'AC3'],
+                            ac_results={'AC1': 'pass', 'AC2': 'pass', 'AC3': 'unverified:environment'}); self.tick()
+        self.assertNotIn('terminal', self.project())
+        self.assertEqual([r['profile'] for r in self.board.ready()], ['claude-reviewer', 'security-reviewer'])
+
+    def test_this_tasks_own_unverified_environment_criterion_still_blocks_and_a_missing_one_still_fails(self):
+        self.two_task_plan()
+        self.board.complete(self.only('verifier'), ac_results={'AC1': 'pass', 'AC2': 'unverified:environment', 'AC3': 'pass'}); self.tick()
+        self.assertEqual(self.project()['terminal']['phase'], 'blocked')
+
+    def test_a_verifier_that_omits_one_of_this_tasks_criteria_is_not_accepted(self):
+        self.two_task_plan()
+        self.board.complete(self.only('verifier'), ac_results={'AC1': 'pass', 'AC3': 'pass'}); self.tick()
+        self.assertEqual(self.project()['terminal']['phase'], 'human_review')
+        self.assertIn('coverage', self.project()['terminal']['reason'])
+
     def test_repair_writer_naming_an_unknown_ac_or_none_of_the_tasks_is_still_rejected(self):
         self.failed_then_repaired(['AC1', 'AC9'])
         self.assertEqual(self.project()['terminal']['phase'], 'human_review')
