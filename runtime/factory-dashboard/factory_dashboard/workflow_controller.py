@@ -190,15 +190,17 @@ class WorkflowController:
         self._state.event(conn,root['root_id'],phase,dict(reason=str(reason),resume_phase=root['phase']))
         return self._state.read_root(conn,root['root_id'])
 
-    def resume(self,conn,root_id,note):
+    def resume(self,conn,root_id,note,decisions=None):
         if not isinstance(note,str) or not note.strip() or len(note)>2000:
             raise ConfigurationError('A short recovery decision is required')
         with self._board.write_txn(conn):
             root=self._state.read_root(conn,root_id)
             if root and root['definition'].get('execution_version', 1) == 2:
                 from .project_controller import ProjectController
-                ProjectController(self).resume(conn, root, note)
+                ProjectController(self).resume(conn, root, note, decisions)
                 return self.reconcile(conn, root_id)
+            if decisions:
+                raise ConfigurationError('Waivers and constraints are supported only by v2 project workflows')
             if not root or root['phase']!='blocked':
                 raise ConfigurationError('Only blocked infrastructure stages can be retried; a different workflow requires a new task')
             event=conn.execute("SELECT document FROM factory_workflow_events WHERE root_id=? AND kind='blocked' ORDER BY id DESC LIMIT 1",(root_id,)).fetchone()

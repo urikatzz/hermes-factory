@@ -7,11 +7,47 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-from factory_art.similarity import SimilarityUnavailable, run_similarity
+from factory_art.similarity import KEY_VARS, SimilarityUnavailable, api_key, run_similarity
 
 
 def answer(score, differences=()):
     return {'choices': [{'message': {'content': json.dumps({'score': score, 'differences': list(differences)})}}]}
+
+
+class CredentialPropagationTests(unittest.TestCase):
+    def test_dedicated_variable_wins_and_provider_variable_is_the_fallback(self):
+        self.assertEqual(api_key({'FACTORY_SIMILARITY_API_KEY': ' dedicated ', 'OPENROUTER_API_KEY': 'provider'}), 'dedicated')
+        self.assertEqual(api_key({'OPENROUTER_API_KEY': 'provider'}), 'provider')
+        self.assertEqual(api_key({'FACTORY_SIMILARITY_API_KEY': '  ', 'OPENROUTER_API_KEY': 'provider'}), 'provider')
+        self.assertIsNone(api_key({}))
+        self.assertIsNone(api_key({'FACTORY_SIMILARITY_API_KEY': '', 'OPENROUTER_API_KEY': None}))
+
+    def test_cli_with_only_the_dedicated_variable_reaches_the_model_path(self):
+        # Without a key the gate is blocked; with only the dedicated name the process must at least try the network path.
+        env = {'PATH': '/usr/bin:/bin', 'FACTORY_SIMILARITY_API_KEY': 'k', 'HOME': '/nonexistent'}
+        with tempfile.TemporaryDirectory() as d:
+            lint = Path(d) / 'lint.json'
+            lint.write_text(json.dumps({'assets': []}))
+            result = subprocess.run([sys.executable, str(ROOT / 'scripts/art_similarity.py'), str(lint), '--out', str(Path(d) / 's.json')],
+                                    capture_output=True, text=True, env=env)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertNotIn('no credential', result.stderr)
+            bare = subprocess.run([sys.executable, str(ROOT / 'scripts/art_similarity.py'), str(lint), '--out', str(Path(d) / 's2.json')],
+                                  capture_output=True, text=True, env={'PATH': '/usr/bin:/bin', 'HOME': '/nonexistent'})
+            self.assertIn('no credential', bare.stderr)
+
+    def test_dedicated_name_is_not_a_hermes_provider_credential(self):
+        # The point of the dedicated name: Hermes' own guard must accept it for env_passthrough.
+        hermes = Path.home() / '.hermes/hermes-agent'
+        if not (hermes / 'tools/env_passthrough.py').exists():
+            self.skipTest('Hermes source not available')
+        sys.path.insert(0, str(hermes))
+        try:
+            from tools.env_passthrough import _is_hermes_provider_credential
+        except Exception as error:  # pragma: no cover - environment dependent
+            self.skipTest(str(error))
+        self.assertFalse(_is_hermes_provider_credential(KEY_VARS[0]))
+        self.assertTrue(_is_hermes_provider_credential('OPENROUTER_API_KEY'))
 
 
 class SimilarityTests(unittest.TestCase):

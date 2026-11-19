@@ -10,6 +10,18 @@ MODEL = 'typesafe/jev-router'
 THRESHOLD = 80
 TOOL = 'jev-similarity'
 URL = 'https://openrouter.ai/api/v1/chat/completions'
+# Hermes refuses to forward provider credential names (OPENROUTER_API_KEY, ...) into a worker's terminal, by design.
+# The gate therefore reads a dedicated variable that a profile can list in terminal.env_passthrough, then falls back.
+KEY_VARS = ('FACTORY_SIMILARITY_API_KEY', 'OPENROUTER_API_KEY')
+
+
+def api_key(environ):
+    """The first non-empty similarity credential in environ, or None."""
+    for name in KEY_VARS:
+        value = (environ.get(name) or '').strip()
+        if value:
+            return value
+    return None
 MAX_REFERENCES = 4
 MIME = {'.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp'}
 PROMPT = '''The first image is a rendered game asset. The remaining images are the approved references for it.

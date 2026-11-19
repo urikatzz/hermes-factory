@@ -1,6 +1,7 @@
 """Pure policy for same-manifest review, bounded repairs and human escalation."""
 from dataclasses import dataclass
 
+from .project_decisions import waiver_for
 from .tool_incidents import tool_blockers
 
 
@@ -55,7 +56,12 @@ def evaluate_cycle(writer, readers, previous_cycle, max_repairs, repairs_used, c
             finding=data['source_profile']+':'+finding
             _,severity,ac,_,_ = finding.split('|',4)
             if severity in ('BLOCKER','HIGH') or (severity=='MEDIUM' and ac!='-'):
-                blocking.append(finding)
+                waiver=waiver_for(finding,context.get('waivers'))
+                if waiver:
+                    # A scoped human waiver: the finding keeps its original text and is never counted as passed.
+                    waived.append(f"{finding}: waived by human decision {waiver['id']}: {waiver['reason']}")
+                else:
+                    blocking.append(finding)
             else:
                 waived.append(finding+': non-blocking finding retained')
         if data.get('findings_truncated',0)>0:

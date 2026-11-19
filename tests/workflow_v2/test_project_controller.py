@@ -5,12 +5,14 @@ import tempfile
 import unittest
 
 from board_fixture import Board
+from factory_dashboard.model_policy import ConfigurationError
 from factory_dashboard.workflow_controller import WorkflowController
 from factory_dashboard.workflow_state import WorkflowState
 from factory_dashboard.workflow_templates import _preset
 
 NEEDS = dict(art=False, audio=False, ui=False, ux=False)
 CODE = dict(id='code', title='Build code', owner='developer', dependencies=[], acceptance={'AC1': 'Works'}, needs=NEEDS)
+MIXED = dict(id='mixed', title='Mixed presentation', owner='developer', dependencies=[], acceptance={'AC1': 'Works'}, needs={**NEEDS, 'art': True, 'ui': True})
 SPRITES = dict(id='sprites', title='Make sprites', owner='artist', dependencies=[], acceptance={'AC1': 'Sprite'}, needs={**NEEDS, 'art': True})
 
 
@@ -461,6 +463,101 @@ class ProjectControllerTests(unittest.TestCase):
         self.assertEqual(terminal['phase'],'human_review')
         self.assertIn('tool incident',terminal['reason'])
         self.assertFalse([r for r in self.board.ready() if r['kind']=='review'])
+
+    # --- human decisions: scoped waivers, constraint conflicts and per-agent repair (the milestone-1 incident) ---
+    def mixed(self, task=MIXED, **verify):
+        self.tick()
+        self.board.complete(self.only('factory-orchestrator'), project_scope=dict(art=True, audio=False, ui=True, ux=False)); self.tick()
+        self.board.complete(self.only('art-director')); self.tick()
+        self.approve()
+        self.architect([task])
+        self.board.complete(self.only('claude-reviewer')); self.tick()
+        self.board.complete(self.only('developer')); self.tick()
+        self.board.complete(self.only('verifier'), **verify); self.tick()
+
+    def review_round(self, art=True, ui=True):
+        folder = Path(self.temp.name) / f'gate-{len(list(Path(self.temp.name).iterdir()))}'
+        folder.mkdir()
+        for row in self.board.ready():
+            if row['profile'] == 'art-reviewer' and art:
+                self.board.complete(row, verdict='CHANGES_REQUIRED', artifacts=[self.similarity(folder, 5)],
+                                    findings=['F2|HIGH|AC1|sprite.png|[similarity] 5% match to the reference, below 80%'])
+            elif row['profile'] == 'ui-reviewer' and ui:
+                self.board.complete(row, verdict='CHANGES_REQUIRED', findings=['F1|MEDIUM|AC1|Assets/Scripts/Builder.cs:HealthBar|Bar inside the ceiling band'])
+            else:
+                self.complete_review(row)
+        self.tick()
+
+    def test_repairs_are_split_by_agent_and_each_card_carries_only_its_findings(self):
+        self.mixed(); self.review_round()
+        artist = self.only('artist')
+        body = self.board.cards[artist['task_id']]['body']
+        self.assertIn('art-reviewer:F2', body)
+        self.assertNotIn('ui-reviewer:F1', body)
+        self.board.complete(artist); self.tick()
+        fixer = self.only('fixer')
+        body = self.board.cards[fixer['task_id']]['body']
+        self.assertIn('ui-reviewer:F1', body)
+        self.assertNotIn('art-reviewer:F2', body)
+
+    def test_a_passing_verifiers_leftover_domain_does_not_summon_an_agent(self):
+        self.mixed(repair_domains=['art']); self.review_round(art=False)
+        self.only('fixer')
+
+    def test_repair_conflicting_with_a_plan_constraint_asks_a_human_instead_of_dispatching(self):
+        self.mixed(task=dict(MIXED, preserve=['sprite.png'])); self.review_round()
+        terminal = self.project()['terminal']
+        self.assertEqual(terminal['phase'], 'blocked')
+        self.assertIn('conflicts with an approved constraint', terminal['reason'])
+        self.assertFalse([r for r in self.board.ready() if r['profile'] in ('artist', 'fixer')])
+
+    def stalled_artist(self):
+        """The real incident: the artist refuses a repair that contradicts the plan and the controller stops for a human."""
+        self.mixed(); self.review_round()
+        artist = self.only('artist')
+        self.conn.execute("UPDATE tasks SET status='blocked' WHERE id=?", (artist['task_id'],)); self.conn.commit()
+        self.tick(); self.board.complete(self.only('factory-retro')); self.tick()
+        self.assertEqual(self.state.read_root(self.conn, self.root)['phase'], 'blocked')
+        return self.conn.execute('SELECT COUNT(*) FROM factory_workflow_stages').fetchone()[0]
+
+    DECISION = dict(waivers=[dict(ac='AC1', path='sprite.png', source='art-reviewer', reason='Runtime-tinted primitive, not a finished visual asset')],
+                    constraints=[dict(preserve=['sprite.png'], reason='The primitive must stay byte-identical')])
+
+    def test_resume_with_a_scoped_waiver_repairs_only_the_ui_finding_without_repeating_reviews(self):
+        before = self.stalled_artist()
+        self.controller.resume(self.conn, self.root, 'Waive AC1 for sprite.png: runtime-tinted primitive', self.DECISION)
+        self.only('fixer')
+        self.assertEqual(self.conn.execute('SELECT COUNT(*) FROM factory_workflow_stages').fetchone()[0], before + 1)  # no re-verify or re-review
+        stored = self.project()['waivers'][0]
+        self.assertEqual(stored['applied'][0]['finding'].split('|')[0], 'art-reviewer:F2')
+        self.assertIn('5% match', stored['applied'][0]['finding'])  # the original result stays in the audit trail
+        self.assertEqual(self.project()['constraints'][0]['preserve'], ['sprite.png'])
+        self.assertTrue(any('waived by human decision' in w for h in self.project()['history'] for w in h.get('waived', [])))
+
+    def test_after_the_waiver_the_milestone_is_accepted_only_once_the_ui_finding_is_repaired(self):
+        self.stalled_artist()
+        self.controller.resume(self.conn, self.root, 'Waive AC1 for sprite.png: runtime-tinted primitive', self.DECISION)
+        self.board.complete(self.only('fixer')); self.tick()
+        self.board.complete(self.only('verifier')); self.tick()
+        self.assertNotIn('mixed', [c['id'] for c in self.project()['completed']])
+        for row in self.board.ready():
+            self.complete_review(row)
+        self.tick()
+        self.assertIn('mixed', [c['id'] for c in self.project()['completed']])
+        self.assertTrue(self.project()['waivers'][0]['applied'])
+
+    def test_an_invalid_decision_changes_nothing(self):
+        self.stalled_artist()
+        before = json.dumps(self.project(), sort_keys=True)
+        bad = dict(waivers=[dict(ac='AC1', path='*', reason='Waive everything please')])
+        with self.assertRaises(ConfigurationError):
+            self.controller.resume(self.conn, self.root, 'Waive everything', bad)
+        self.assertEqual(json.dumps(self.project(), sort_keys=True), before)
+
+    def test_without_a_decision_resume_keeps_retrying_the_stalled_repair(self):
+        self.stalled_artist()
+        self.controller.resume(self.conn, self.root, 'Retry the artist')
+        self.assertEqual([r['profile'] for r in self.board.ready()], ['artist'])
 
     def test_visual_mismatch_calls_artist_then_verifier_not_developer(self):
         tasks=[dict(id='sprites',title='Make sprites',owner='artist',dependencies=[],acceptance={'AC1':'Sprite'},

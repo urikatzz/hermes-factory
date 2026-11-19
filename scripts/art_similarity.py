@@ -7,7 +7,7 @@ from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from factory_art.similarity import MODEL, THRESHOLD, openrouter_post, run_similarity
+from factory_art.similarity import KEY_VARS, MODEL, THRESHOLD, api_key, openrouter_post, run_similarity
 
 
 def main():
@@ -22,7 +22,9 @@ def main():
         lint = json.loads(Path(args.lint).read_text())
     except (OSError, ValueError) as error:
         parser.exit(2, f'art_similarity: {error}\n')
-    key = os.environ.get('OPENROUTER_API_KEY')
+    key = api_key(os.environ)
+    if not key:
+        print('art_similarity: no credential in ' + ' or '.join(KEY_VARS) + '; a profile can only forward the dedicated FACTORY_SIMILARITY_API_KEY through terminal.env_passthrough', file=sys.stderr)
     result = run_similarity(lint, args.out, openrouter_post(key, args.timeout) if key else None, args.threshold, args.model)
     below = [row['file'] for row in result['assets'] if row['status'] in ('fail', 'no_reference')]
     print(json.dumps({'gate': result['gate'], 'threshold': result['threshold'], 'assets': len(result['assets']),

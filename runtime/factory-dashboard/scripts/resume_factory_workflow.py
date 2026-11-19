@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Retry a blocked workflow stage after an explicit human recovery decision."""
 import argparse
+import json
 from contextlib import closing
 import importlib
 from pathlib import Path
@@ -15,6 +16,7 @@ def main():
     parser.add_argument('--new-project-root',type=Path,required=True)
     parser.add_argument('--root',required=True)
     parser.add_argument('--note',required=True)
+    parser.add_argument('--decision-file',type=Path,help='JSON human decision: {"waivers":[{"ac","path","source"?,"reason"}],"constraints":[{"preserve":[paths],"reason"}]}')
     args=parser.parse_args()
     sys.path.insert(0,str(args.hermes_source.resolve()))
     from hermes_cli import plugins,kanban_db,kanban_db_connect
@@ -28,7 +30,8 @@ def main():
     state_type=importlib.import_module(package+'workflow_state').WorkflowState
     controller=controller_type(kanban_db,state_type(),args.new_project_root)
     with closing(kanban_db_connect.connect(args.board_db,board=args.board)) as conn:
-        state=controller.resume(conn,args.root,args.note)
+        decisions=json.loads(args.decision_file.read_text()) if args.decision_file else None
+        state=controller.resume(conn,args.root,args.note,decisions)
     print(f"{args.root}: {state['phase']}")
 
 

@@ -24,7 +24,7 @@ It prints a one-line JSON summary. Full results are in `<workspace>/lint/lint.js
 
 `SIMILARITY <workspace>/lint/lint.json --out <workspace>/similarity.json`
 
-It sends each rendered asset and its reference images to the Jev model on OpenRouter (`OPENROUTER_API_KEY`) and prints a one-line JSON summary. `similarity.json` holds a 0-100 `score`, a `status` and the largest `differences` per asset. The scores are measured facts for this review: never raise, drop or dispute them.
+It sends each rendered asset and its reference images to the Jev model on OpenRouter (credential `FACTORY_SIMILARITY_API_KEY`, falling back to `OPENROUTER_API_KEY`; the profile forwards only the first through `terminal.env_passthrough`, since Hermes never forwards provider credential names) and prints a one-line JSON summary. `similarity.json` holds a 0-100 `score`, a `status` and the largest `differences` per asset. The scores are measured facts for this review: never raise, drop or dispute them.
 
 - `gate: "pass"`: every asset scored at least 80. Continue with section 3 to find what is still missing.
 - `gate: "fail"`: do not run section 3. For each asset with `status: "fail"` report a HIGH finding `[similarity] <score>% match, below 80%: <differences>`. For each `status: "no_reference"` report a BLOCKER finding `[similarity] no reference image for this asset class`, and in factory mode set metadata `plan_defect` to say which class lacks a reference. Verdict `CHANGES_REQUIRED`.

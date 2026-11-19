@@ -6,8 +6,9 @@ import time
 
 from .model_policy import ConfigurationError
 from .project_cards import ARCHITECT, COMPARISON, SIMILARITY, DIRECTOR, PLAN_DEFECT, PLAN_REVIEW, REPLAN, RETRO, SCOPE, TOOL_INCIDENTS, project_card
+from .project_decisions import constraints_of, normalize_decisions, preserved_conflict, record_applied
 from .project_evidence import plan_evidence, retained_json, validate_comparison, validate_similarity
-from .project_policy import (MAX_REPLANS, blocking_findings, finding_ac, planning_profiles, repair_profiles, rereview_profiles,
+from .project_policy import (MAX_REPLANS, blocking_findings, finding_ac, planning_profiles, route_findings, rereview_profiles,
                              review_profiles, scope_additions, validate_plan, validate_scope)
 
 REPAIR_LIMIT = 'Captured repair limit reached'
@@ -275,7 +276,10 @@ class ProjectController:
     def _work(self, conn, root, definition, context, project, task):
         work = project['work']
         cycle = work['cycle']
-        context = {**context, 'scope': [f.split('|', 1)[0] for f in work['blocking']] or list(task['acceptance']), 'blocking': work['blocking'],
+        # Each repair agent receives only the findings routed to it, never the other agents' findings.
+        mine = work.get('repair_findings', {}).get(work['repairs'][0]) if work['step'] == 'repairing' and work['repairs'] else None
+        blocking = mine or work['blocking']
+        context = {**context, 'scope': [f.split('|', 1)[0] for f in blocking] or list(task['acceptance']), 'blocking': blocking,
                    'baseline': work.get('manifest', 'none'), 'baseline_tgz': work.get('snapshot') or 'none',
                    'manifest': work.get('manifest', 'none')}
         prefix = self._prefix(project, task)
@@ -334,7 +338,7 @@ class ProjectController:
         blockers = tool_blockers(verifier.metadata)
         if any(v == 'unverified:environment' for v in verifier.metadata['ac_results'].values()) or blockers:
             raise ProjectBlocked('Verification requires unavailable environment or tools' + (': ' + '; '.join(blockers) if blockers else ''))
-        preliminary = evaluate_cycle(writer, [verifier], work.get('last_gate'), definition.max_repairs, cycle, {**context, 'unity_ci': False})
+        preliminary = evaluate_cycle(writer, [verifier], work.get('last_gate'), definition.max_repairs, cycle, {**context, 'unity_ci': False, 'waivers': project.get('waivers', [])})
         if preliminary.decision != 'pass':
             return self._decision(conn, root, project, task, writer, [verifier], preliminary, [verifier_row], definition, reviewed=False)
         if verifier.metadata['verdict'] != 'PASS':
@@ -367,7 +371,7 @@ class ProjectController:
             rows.append(row)
         if waiting:
             return False
-        decision = evaluate_cycle(writer, readers, work.get('last_gate'), definition.max_repairs, cycle, {**context, 'unity_ci': False})
+        decision = evaluate_cycle(writer, readers, work.get('last_gate'), definition.max_repairs, cycle, {**context, 'unity_ci': False, 'waivers': project.get('waivers', [])})
         return self._decision(conn, root, project, task, writer, readers, decision, rows, definition, reviewed=True)
 
     def _decision(self, conn, root, project, task, writer, readers, decision, rows, definition, reviewed):
@@ -375,6 +379,8 @@ class ProjectController:
         record = dict(task=task['id'], cycle=work['cycle'], **asdict(decision))
         self._state.event(conn, root['root_id'], 'project_gate', record)
         project['history'].append(record)
+        for audit in record_applied(project, decision.waived, task['id'], work['cycle']):
+            self._state.event(conn, root['root_id'], 'project_waiver_applied', audit)
         if decision.decision == 'pass':
             verifier = next(r for r in readers if r.kind == 'verify')
             project['completed'].append(dict(id=task['id'], evidence_task=next(r['task_id'] for r in rows if r['kind'] == 'verify'),
@@ -397,11 +403,21 @@ class ProjectController:
                 self._terminal(conn, root, project, 'human_review', decision.reason if exhausted else reason + ' (replan limit reached)')
             return True
         if decision.decision == 'repair':
-            domains = [d for reader in readers for d in reader.metadata.get('repair_domains', [])]
+            # Only readers that reported a failure ask for repair domains; a passing verifier's leftover domain must not summon an agent.
+            domains = [d for reader in readers if reader.metadata.get('verdict') not in ('PASS', 'NO_BLOCKING_FINDINGS')
+                       for d in reader.metadata.get('repair_domains', [])]
             integration = task['id'] == 'integration'
             # Integration failures belong to whoever produced the failing acceptance criterion, not to a default fixer.
             ac_owners = {ac: sorted({t['owner'] for t in project['tasks'] if ac in t['acceptance']}) for ac in project['ac_ids']} if integration else None
-            profiles = repair_profiles(decision.blocking, task['owner'], domains, ac_owners)
+            # A repair that would change a path the approved plan or the human froze is a decision, not a task to dispatch.
+            frozen = constraints_of(project)
+            for finding in decision.blocking:
+                constraint = preserved_conflict(finding, frozen)
+                if constraint:
+                    raise ProjectBlocked('Repair conflicts with an approved constraint (' + constraint['reason'] + '): ' + finding
+                                         + '. A human must waive this finding for that path or amend the plan.')
+            routes = route_findings(decision.blocking, task['owner'], domains, ac_owners)
+            profiles = list(routes)
             allowed = {'fixer', *(['artist'] if project['scope']['art'] else []), *(['sound-designer'] if project['scope']['audio'] else [])}
             if not set(profiles) <= allowed:
                 raise ConfigurationError('Repair expands the captured project scope')
@@ -421,7 +437,7 @@ class ProjectController:
             self._state.event(conn, root['root_id'], 'project_repair_routed', dict(task=task['id'], cycle=work['cycle'],
                               repairs=list(profiles), rereview=panel or 'all', attribution=attribution))
             work.update(panel=panel, attribution=attribution)
-            work.update(step='repairing', cycle=work['cycle']+1, blocking=list(decision.blocking), repairs=profiles,
+            work.update(step='repairing', cycle=work['cycle']+1, blocking=list(decision.blocking), repairs=profiles, repair_findings=routes,
                         writer_inputs=list(dict.fromkeys([*self._inputs(project), work['writer_task'], *[r['task_id'] for r in rows]])),
                         last_gate=asdict(decision))
             return True
@@ -475,10 +491,18 @@ class ProjectController:
         project.update(mode='finished', active_keys=[])
         return False
 
-    def resume(self, conn, root, note):
+    def _repair_done(self, conn, root, prefix, work):
+        rows = self._controller._rows(conn, root, prefix + '-repair-' + work['repairs'][0], work['cycle'])
+        return bool(rows) and rows[0]['accepted_run_id'] is not None
+
+    def resume(self, conn, root, note, decisions=None):
+        # Validate a human decision before anything changes; an invalid one leaves the project exactly as it was.
+        decided = normalize_decisions(decisions, note)
         row = conn.execute('SELECT document FROM factory_project_execution WHERE root_id=?', (root['root_id'],)).fetchone()
         project = json.loads(row[0]) if row else {}
         awaiting = project.get('awaiting')
+        if decisions and awaiting and not project.get('terminal'):
+            raise ConfigurationError('Waivers and constraints apply to a blocked stage, not to plan approval')
         if root['phase'] == 'blocked' and awaiting and not project.get('terminal'):
             # The note is the decision: 'REJECT: <feedback>' returns the plan to the director, anything else approves it.
             profile, text = awaiting['profile'], note.strip()
@@ -502,12 +526,28 @@ class ProjectController:
             raise ConfigurationError('Only an infrastructure-blocked project can resume; changed scope requires a new task')
         project.update(mode=project['resume_mode'], active_keys=[], recoveries=project.get('recoveries', 0)+1, recovery_note=note)
         project.pop('terminal', None);project.pop('retro', None)
+        known = {w['id'] for w in project.setdefault('waivers', [])}
+        project['waivers'].extend(w for w in decided['waivers'] if w['id'] not in known)
+        project.setdefault('constraints', []).extend(decided['constraints'])
+        if decisions:
+            self._state.event(conn, root['root_id'], 'human_decision', dict(note=note, waivers=[w['id'] for w in decided['waivers']],
+                              constraints=decided['constraints'], execution_version=2))
         gen = project.get('gen', 0)
         if 'work' in project:
             work = project['work']
             task = self._current(project)
             prefix = self._prefix(project, task)
-            if work['step'] in ('verifying', 'reviewing'):
+            if decisions and work['step'] == 'repairing' and work['repairs'] and work['cycle'] > 0 and not self._repair_done(conn, root, prefix, work):
+                # The repairs were dispatched against findings the decision may have changed: retire the stalled repair and
+                # judge the evidence that already exists again, instead of repeating verification or review work.
+                for stage in self._controller._rows(conn, root, prefix + '-repair-' + work['repairs'][0], work['cycle']):
+                    archive = getattr(self._board, 'archive_task', None)
+                    if archive:
+                        archive(conn, stage['task_id'])
+                work.update(step='reviewing', cycle=work['cycle'] - 1, repairs=[])
+                work.pop('repair_findings', None)
+                project['retry_keys'] = []
+            elif work['step'] in ('verifying', 'reviewing'):
                 work['step'] = 'verifying'
                 keys = [prefix + '-verify', *[prefix + '-' + p for p in self._panel([s['profile'] for s in root['definition']['reviewers']], task, work)]]
                 project['retry_keys'] = [f'{key}:{work["cycle"]}' for key in keys]

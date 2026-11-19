@@ -8,7 +8,7 @@ Art/audio mean creation, modification or integration of those assets. UI/UX mean
 Choose from evidence; do not infer false merely because the request omitted an existing integration.'''
 
 ARCHITECT = '''Read every inherited director plan before designing code. Retain PLAN.md and project-plan.json.
-Break the work into 1..40 small tasks in project-plan.json: {"tasks":[{"id":"lowercase-id","title":"...","owner":"developer|artist|sound-designer","dependencies":["task-id"],"acceptance":{"AC1":"observable criterion"},"needs":{"art":false,"audio":false,"ui":false,"ux":false},"risk":"normal|high"}]}.
+Break the work into 1..40 small tasks in project-plan.json: {"tasks":[{"id":"lowercase-id","title":"...","owner":"developer|artist|sound-designer","dependencies":["task-id"],"acceptance":{"AC1":"observable criterion"},"needs":{"art":false,"audio":false,"ui":false,"ux":false},"risk":"normal|high","preserve":["optional path or narrow glob this task must leave byte-identical"]}]}.
 The JSON document top level must be exactly {"tasks":[...]} with no other keys (no plan, root or metadata keys).
 Keep each task title under 120 characters; put detail in acceptance.
 risk is optional (default normal). Use high only for security-sensitive, concurrency, data-migration or cross-cutting changes: those tasks get the second selected code reviewer.
@@ -90,6 +90,11 @@ def project_card(definition, stage, cycle, context, inputs, project, task=None):
         details['repair_attribution'] = project['work']['attribution']
     if project.get('recovery_note'):
         details['human_recovery_note'] = project['recovery_note']
+    if project.get('waivers'):
+        # Reviewers keep reporting the true result; the gate applies the human's scoped waiver and keeps the original finding.
+        details['human_waivers'] = [{k: w[k] for k in ('id', 'ac', 'path', 'source', 'reason')} for w in project['waivers']]
+    if project.get('constraints'):
+        details['human_constraints'] = [{k: c[k] for k in ('preserve', 'reason')} for c in project['constraints']]
     text = '\nPROJECT_WORKFLOW_VERSION 2\nPROJECT_CONTEXT ' + json.dumps(details, sort_keys=True)
     if task:
         text += '\nOnly the TASK acceptance IDs apply to this cycle. Inherit the directors\' plans and architecture; do not substitute current defaults.'

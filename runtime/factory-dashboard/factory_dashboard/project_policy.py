@@ -1,6 +1,7 @@
 """Pure project planning, reviewer selection and specialist repair policy."""
 import re
 from .model_policy import ConfigurationError
+from .project_decisions import validate_preserve
 
 V2_PROFILES = (
     'factory-orchestrator', 'architect', 'developer', 'fixer',
@@ -82,8 +83,10 @@ def validate_plan(document, scope, project_ac_ids):
     by_id = {}
     covered = set()
     for task in tasks:
-        if not isinstance(task, dict) or set(task) - {'risk'} != {'id', 'title', 'owner', 'dependencies', 'acceptance', 'needs'}:
+        if not isinstance(task, dict) or set(task) - {'risk', 'preserve'} != {'id', 'title', 'owner', 'dependencies', 'acceptance', 'needs'}:
             raise ConfigurationError('Invalid task fields')
+        if 'preserve' in task:
+            task['preserve'] = validate_preserve(task['preserve'])
         if task.get('risk', 'normal') not in ('normal', 'high'):
             raise ConfigurationError('Task risk must be normal or high')
         key = task['id']
@@ -146,26 +149,54 @@ def validate_plan(document, scope, project_ac_ids):
     return ordered
 
 
-def repair_profiles(findings, owner, repair_domains=(), ac_owners=None):
-    """ac_owners (final integration) maps an acceptance ID to the owners of the tasks that produced it."""
+CODE_SUFFIXES = ('.cs', '.py', '.js', '.mjs', '.ts', '.tsx', '.jsx', '.go', '.rs', '.java', '.kt', '.swift', '.c', '.cc', '.cpp', '.h', '.hpp',
+                 '.gd', '.lua', '.shader', '.hlsl', '.asmdef', '.yaml', '.yml', '.sh')
+
+
+def _is_code_file(finding):
+    parts = finding.split('|', 4)
+    path = parts[3].strip().split(':', 1)[0].lower() if len(parts) == 5 else ''
+    return path.endswith(CODE_SUFFIXES)
+
+
+def route_findings(findings, owner, repair_domains=(), ac_owners=None):
+    """Map each repair profile to only the blocking findings it must fix, in repair order.
+
+    Routing follows who can act on the finding: an art-reviewer finding about an asset goes to the artist but one about a code file
+    goes to the code fixer; every other reviewer's finding goes to the fixer; verifier and gate findings go to the declared repair
+    domains, the owners of the failing acceptance criteria (integration) or the task owner. Only a repair domain that a reader
+    declared explicitly, with no finding of its own, falls back to seeing all findings.
+    ac_owners (final integration) maps an acceptance ID to the owners of the tasks that produced it."""
     fallback = REPAIR_OWNERS.get(owner, 'fixer')
-    profiles = []
+    routes, unattributed = {}, []
     for domain in repair_domains:
         if domain not in ('code', 'art', 'audio'):
             raise ConfigurationError('Unsupported repair domain')
-        profiles.append({'code': 'fixer', 'art': 'artist', 'audio': 'sound-designer'}[domain])
+        routes.setdefault({'code': 'fixer', 'art': 'artist', 'audio': 'sound-designer'}[domain], [])
     for finding in findings:
         source = finding.split(':', 1)[0]
         if source == 'art-reviewer':
-            profiles.append('artist')
-        elif re.match(r'[a-z]+-reviewer:F[0-9]+\|', finding):
-            profiles.append('fixer')
-        elif not repair_domains:
+            routes.setdefault('fixer' if _is_code_file(finding) else 'artist', []).append(finding)
+        elif re.match(r'[a-z]+(?:-[a-z]+)*-reviewer:F[0-9]+\|', finding):
+            routes.setdefault('fixer', []).append(finding)
+        elif repair_domains:
+            unattributed.append(finding)
+        else:
             owners = (ac_owners or {}).get(finding_ac(finding))
-            profiles.extend(REPAIR_OWNERS[o] for o in owners) if owners else profiles.append(fallback)
-    if not profiles:
-        profiles.append(fallback)
-    ordered = [p for p in ('artist', 'sound-designer', 'fixer') if p in profiles]
+            for profile in ([REPAIR_OWNERS[o] for o in owners] if owners else [fallback]):
+                routes.setdefault(profile, []).append(finding)
+    for domain in repair_domains:
+        routes[{'code': 'fixer', 'art': 'artist', 'audio': 'sound-designer'}[domain]].extend(unattributed)
+    if not routes:
+        routes[fallback] = []
+    routes = {p: f or list(findings) for p, f in routes.items()}  # an explicitly declared domain with no finding of its own sees them all
+    ordered = [p for p in ('artist', 'sound-designer', 'fixer') if p in routes]
     if len(ordered) > 1 and 'fixer' not in ordered:
         ordered.append('fixer')
-    return ordered
+        routes['fixer'] = list(findings)
+    return {p: list(dict.fromkeys(routes[p])) for p in ordered}
+
+
+def repair_profiles(findings, owner, repair_domains=(), ac_owners=None):
+    """Repair profiles in repair order (see route_findings)."""
+    return list(route_findings(findings, owner, repair_domains, ac_owners))
