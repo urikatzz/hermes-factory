@@ -323,7 +323,9 @@ class ProjectController:
         # Verification is a prerequisite, not a parallel member of the review panel.
         node = self._node(conn, root, definition, context, project, prefix + '-verify', 'verify', 'verifier',
                           'Verify only TASK acceptance IDs against the exact cumulative manifest. Run tests, integration checks, asset lint gates and release audit. '
-                          'Record repair_domains (code/art/audio) for failed asset or integration checks. Missing tools are environment gaps, never passes.\n' + PLAN_DEFECT,
+                          'Record repair_domains (code/art/audio) for failed asset or integration checks. Missing tools are environment gaps, never passes. '
+                          'Never use inline interpreter flags such as python -c or node -e (the safety guard blocks them): read files with the file tools or run a script file. '
+                          'A guard-refused command is not a missing tool; use an allowed way to get the same evidence and do not list it in blocked_tools.\n' + PLAN_DEFECT,
                           inputs, task=task, cycle=cycle)
         if not node:
             return False
