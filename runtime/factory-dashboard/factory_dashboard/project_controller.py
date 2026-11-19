@@ -7,7 +7,7 @@ import time
 from .model_policy import ConfigurationError
 from .project_cards import (ARCHITECT, COMPARISON, CONFLICT_CHECK, SIMILARITY, DIRECTOR, PLAN_DEFECT, PLAN_REVIEW, REPLAN, RETRO, SCOPE,
                             SPEC_CONSTRAINTS, TOOL_INCIDENTS, project_card)
-from .project_decisions import (constraints_of, normalize_decisions, preserved_conflict, record_applied, relevant_constraints,
+from .project_decisions import (constraint_view, constraints_of, normalize_decisions, preserved_conflict, record_applied, relevant_constraints,
                                 validate_plan_constraints, validate_spec_conflicts)
 from .project_evidence import plan_evidence, retained_json, validate_comparison, validate_similarity
 from .project_policy import (MAX_REPLANS, blocking_findings, finding_ac, planning_profiles, route_findings, rereview_profiles,
@@ -632,7 +632,8 @@ class ProjectController:
         project.pop('terminal', None);project.pop('retro', None)
         known = {w['id'] for w in project.setdefault('waivers', [])}
         project['waivers'].extend(w for w in decided['waivers'] if w['id'] not in known)
-        project.setdefault('constraints', []).extend(c for c in decided['constraints'] if c['id'] not in {k['id'] for k in project['constraints']})
+        stored = [constraint_view(c) for c in project.setdefault('constraints', [])]  # decisions recorded before ids existed get one now
+        project['constraints'] = stored + [c for c in decided['constraints'] if c['id'] not in {k['id'] for k in stored}]
         if decided['extra_repairs']:
             # Granted to the task in progress only: it lives in that task's work record and disappears with it.
             project['work']['extra_repairs'] = project['work'].get('extra_repairs', 0) + decided['extra_repairs']

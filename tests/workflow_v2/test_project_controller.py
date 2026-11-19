@@ -583,6 +583,17 @@ class ProjectControllerTests(unittest.TestCase):
         self.assertIn('mixed', [c['id'] for c in self.project()['completed']])
         self.assertTrue(self.project()['waivers'][0]['applied'])
 
+    def test_a_decision_after_one_recorded_before_constraint_ids_existed_keeps_the_old_constraint(self):
+        self.stalled_artist()
+        project = self.project()
+        project['constraints'] = [dict(preserve=['older.png'], reason='recorded by an earlier decision', source='human')]
+        self.conn.execute('UPDATE factory_project_execution SET document=?', (json.dumps(project),)); self.conn.commit()
+        self.controller.resume(self.conn, self.root, 'Add a palette rule', dict(self.DECISION, constraints=[
+            dict(kind='palette', colors=['#1C1C1F'], reason='Only the approved palette may be used')]))
+        kinds = sorted((c['kind'], bool(c['id'])) for c in self.project()['constraints'])
+        self.assertEqual(kinds, [('immutable', True), ('palette', True)])
+        self.assertEqual(self.project()['constraints'][0]['preserve'], ['older.png'])
+
     def test_an_invalid_decision_changes_nothing(self):
         self.stalled_artist()
         before = json.dumps(self.project(), sort_keys=True)
