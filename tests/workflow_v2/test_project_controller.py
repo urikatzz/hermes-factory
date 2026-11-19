@@ -559,6 +559,45 @@ class ProjectControllerTests(unittest.TestCase):
         self.controller.resume(self.conn, self.root, 'Retry the artist')
         self.assertEqual([r['profile'] for r in self.board.ready()], ['artist'])
 
+    def failed_then_repaired(self, repair_ids):
+        two = dict(CODE, acceptance={'AC1': 'Works', 'AC2': 'Also works'})
+        self.tick()
+        self.board.complete(self.only('factory-orchestrator'), project_scope=dict(art=False, audio=False, ui=False, ux=False)); self.tick()
+        later = dict(CODE, id='later', title='Later work', dependencies=['code'], acceptance={'AC3': 'Third'})
+        self.architect([two, later], ac_ids=['AC1', 'AC2', 'AC3'])
+        self.board.complete(self.only('claude-reviewer')); self.tick()
+        self.board.complete(self.only('developer'), ac_ids=['AC1', 'AC2']); self.tick()
+        self.board.complete(self.only('verifier'), verdict='FAIL', ac_results={'AC1': 'fail', 'AC2': 'pass'}); self.tick()
+        self.board.complete(self.only('fixer'), ac_ids=repair_ids); self.tick()
+
+    def test_repair_writer_naming_other_known_project_acs_is_accepted_and_judged_on_the_task_criteria(self):
+        self.failed_then_repaired(['AC1', 'AC2', 'AC3'])
+        self.assertNotIn('terminal', self.project())
+        self.board.complete(self.only('verifier'), ac_ids=['AC1', 'AC2'], ac_results={'AC1': 'pass', 'AC2': 'pass'}); self.tick()
+        self.assertEqual([r['profile'] for r in self.board.ready()], ['claude-reviewer', 'security-reviewer'])
+
+    def test_repair_writer_naming_an_unknown_ac_or_none_of_the_tasks_is_still_rejected(self):
+        self.failed_then_repaired(['AC1', 'AC9'])
+        self.assertEqual(self.project()['terminal']['phase'], 'human_review')
+        self.assertIn('Writer acceptance differs', self.project()['terminal']['reason'])
+
+    def test_reevaluate_rejudges_existing_evidence_without_repeating_any_stage(self):
+        self.plan(); self.board.complete(self.only('developer')); self.tick()
+        self.board.complete(self.only('verifier'), tool_incidents=[dict(command='x')]); self.tick()
+        verifier = self.conn.execute("SELECT task_id FROM factory_workflow_stages WHERE kind='verify'").fetchone()[0]
+        self.assertEqual(self.project()['terminal']['phase'], 'human_review')
+        self.board.complete(self.only('factory-retro')); self.tick()
+        with self.assertRaises(ConfigurationError):
+            self.controller.resume(self.conn, self.root, 'Plain resume must still refuse a human_review stop')
+        # The evidence is corrected (or the controller rule is fixed); re-judge it instead of running the verifier again.
+        run = self.conn.execute('SELECT id,metadata FROM task_runs WHERE task_id=?', (verifier,)).fetchone()
+        data = json.loads(run[1]); data.pop('tool_incidents'); self.conn.execute('UPDATE task_runs SET metadata=? WHERE id=?', (json.dumps(data), run[0])); self.conn.commit()
+        stages = self.conn.execute('SELECT COUNT(*) FROM factory_workflow_stages').fetchone()[0]
+        self.controller.resume(self.conn, self.root, 'Re-judge the verifier evidence', None, True)
+        self.assertEqual([r['profile'] for r in self.board.ready()], ['claude-reviewer', 'security-reviewer'])
+        self.assertEqual(self.conn.execute('SELECT COUNT(*) FROM factory_workflow_stages').fetchone()[0], stages + 2)
+        self.assertEqual(self.conn.execute("SELECT COUNT(*) FROM factory_workflow_stages WHERE kind='verify'").fetchone()[0], 1)
+
     def test_visual_mismatch_calls_artist_then_verifier_not_developer(self):
         tasks=[dict(id='sprites',title='Make sprites',owner='artist',dependencies=[],acceptance={'AC1':'Sprite'},
                     needs=dict(art=True,audio=False,ui=False,ux=False))]

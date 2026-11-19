@@ -1,5 +1,5 @@
 """Restart-safe two-level Factory execution over the existing guarded board API."""
-from dataclasses import asdict
+from dataclasses import asdict, replace
 import json
 from pathlib import Path
 import time
@@ -308,9 +308,10 @@ class ProjectController:
                     raise ConfigurationError('Plan defect reported after the replan limit: ' + defect)
                 return True
             reported, expected = set(result.metadata['ac_ids']), set(task['acceptance'])
-            # An implement writer reports every task AC; a repair writer may report only the ACs it repaired
-            # (the repair card scopes it to the failing findings). The verifier still re-checks all of them.
-            if (not reported or not reported <= expected) if repair else reported != expected:
+            # An implement writer reports every task AC. A repair writer may report fewer (the findings it repaired) or may also
+            # name other known project ACs (task text often says "ac_status covers AC1..ACn"); an unknown ID or no task AC at all
+            # is still rejected. The verifier re-checks every task AC either way.
+            if (not reported or not reported <= set(project['ac_ids']) or not reported & expected) if repair else reported != expected:
                 raise ConfigurationError('Writer acceptance differs from the captured small-task plan')
             work.update(writer_key=key, writer_task=row['task_id'], manifest=result.metadata['manifest_sha12'])
             if repair:
@@ -321,7 +322,7 @@ class ProjectController:
             work['step'] = 'verifying'
             return True
         writer_row = self._controller._rows(conn, root, work['writer_key'], cycle)[0]
-        writer = self._controller._result(conn, writer_row)
+        writer = self._scoped_writer(self._controller._result(conn, writer_row), task)
         if writer is None or not writer.valid or writer.metadata['manifest_sha12'] != work['manifest']:
             raise ConfigurationError('Captured writer evidence is no longer valid')
         inputs = list(dict.fromkeys([*self._inputs(project), *work['writer_inputs'], work['writer_task']]))
@@ -491,11 +492,22 @@ class ProjectController:
         project.update(mode='finished', active_keys=[])
         return False
 
+    @staticmethod
+    def _scoped_writer(writer, task):
+        """A repair writer's evidence covers the task's acceptance IDs, whatever extra or fewer IDs it listed; the gate then compares
+        it with the verifier's results for exactly the task's criteria. The IDs it reported are kept for the record."""
+        if writer is None or not writer.valid or writer.kind != 'repair':
+            return writer
+        expected = sorted(task['acceptance'])
+        if sorted(writer.metadata['ac_ids']) == expected:
+            return writer
+        return replace(writer, metadata={**writer.metadata, 'ac_ids': expected, 'ac_ids_reported': list(writer.metadata['ac_ids'])})
+
     def _repair_done(self, conn, root, prefix, work):
         rows = self._controller._rows(conn, root, prefix + '-repair-' + work['repairs'][0], work['cycle'])
         return bool(rows) and rows[0]['accepted_run_id'] is not None
 
-    def resume(self, conn, root, note, decisions=None):
+    def resume(self, conn, root, note, decisions=None, reevaluate=False):
         # Validate a human decision before anything changes; an invalid one leaves the project exactly as it was.
         decided = normalize_decisions(decisions, note)
         row = conn.execute('SELECT document FROM factory_project_execution WHERE root_id=?', (root['root_id'],)).fetchone()
@@ -522,7 +534,8 @@ class ProjectController:
             self._state.event(conn, root['root_id'], 'human_plan_decision', decision)
             self._board._append_event(conn, root['root_id'], 'workflow_resumed', dict(note=note))
             return
-        if root['phase'] != 'blocked' or project.get('terminal', {}).get('phase') != 'blocked':
+        stopped = ('blocked', 'human_review') if reevaluate else ('blocked',)
+        if root['phase'] not in stopped or project.get('terminal', {}).get('phase') not in stopped:
             raise ConfigurationError('Only an infrastructure-blocked project can resume; changed scope requires a new task')
         project.update(mode=project['resume_mode'], active_keys=[], recoveries=project.get('recoveries', 0)+1, recovery_note=note)
         project.pop('terminal', None);project.pop('retro', None)
@@ -537,7 +550,10 @@ class ProjectController:
             work = project['work']
             task = self._current(project)
             prefix = self._prefix(project, task)
-            if decisions and work['step'] == 'repairing' and work['repairs'] and work['cycle'] > 0 and not self._repair_done(conn, root, prefix, work):
+            if reevaluate and not decisions:
+                # Judge the evidence that already exists again under the current rules: no stage is retried or repeated.
+                project['retry_keys'] = []
+            elif decisions and work['step'] == 'repairing' and work['repairs'] and work['cycle'] > 0 and not self._repair_done(conn, root, prefix, work):
                 # The repairs were dispatched against findings the decision may have changed: retire the stalled repair and
                 # judge the evidence that already exists again, instead of repeating verification or review work. The stalled card is left
                 # on the board (blocked, harmless): archiving needs its own transaction, which this one already holds.
