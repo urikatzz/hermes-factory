@@ -594,6 +594,20 @@ class ProjectControllerTests(unittest.TestCase):
         self.assertEqual(kinds, [('immutable', True), ('palette', True)])
         self.assertEqual(self.project()['constraints'][0]['preserve'], ['older.png'])
 
+    def test_a_decision_with_reevaluate_rejudges_the_existing_review_evidence_without_new_cards(self):
+        cid = self.with_palette()
+        self.mixed(); self.review_round(art=False, ui_extra=self.spec_conflict(cid))
+        self.board.complete(self.only('factory-retro')); self.tick()
+        self.assertEqual(self.state.read_root(self.conn, self.root)['phase'], 'blocked')
+        count = lambda: self.conn.execute("SELECT COUNT(*) FROM factory_workflow_stages WHERE kind IN ('verify','review')").fetchone()[0]
+        before = count()
+        waive = dict(waivers=[dict(ac='AC1', path='Assets/Scripts/Builder.cs', source='ui-reviewer',
+                                   reason='The plan fixes the palette; this contrast concern is waived for the builder')])
+        self.controller.resume(self.conn, self.root, 'Waive the contrast concern', waive, True)
+        self.assertEqual(count(), before)  # nothing was verified or reviewed again
+        self.assertIn('mixed', [t['id'] for t in self.project()['completed']])
+        self.assertEqual([r['profile'] for r in self.board.ready()], ['developer'])  # on to final integration
+
     def test_an_invalid_decision_changes_nothing(self):
         self.stalled_artist()
         before = json.dumps(self.project(), sort_keys=True)
