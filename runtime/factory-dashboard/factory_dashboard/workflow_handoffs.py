@@ -45,7 +45,7 @@ def normalize_handoff(task, run, expected_stage):
     header = f"VERDICT={verdict} STAGE={metadata.get('stage')} CYCLE={metadata['cycle']} MANIFEST={metadata.get('manifest_sha12')}"
     first = summary.split('\n',1)[0]
     # The header must lead the summary exactly; a worker may append a short note after it on the same line.
-    if first != header and not first.startswith(header + ' '):
+    if first != header and not (first.startswith(header) and not first[len(header)].isalnum()):
         return invalid('Summary contradicts handoff metadata')
     if verdict == 'BLOCKED':
         return StageResult(True, '', kind, run['id'], metadata)
