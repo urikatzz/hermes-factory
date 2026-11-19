@@ -19,6 +19,8 @@ Constraints
 
 Extra repairs
     ``extra_repairs`` grants a bounded number of additional repair cycles to the task in progress, for that decision only.
+    ``extra_replans`` (0 or 1 per decision) grants one additional architect replan to the current project. The grant, its reason, its
+    consumption and every use are recorded under ``replan_grants``.
     ``on_exhaustion: human_review`` makes that task stop for a human, instead of replanning, when the budget runs out again.
 """
 import fnmatch
@@ -35,6 +37,7 @@ CATCH_ALL = {'*', '**', '**/*', '*/*', '/', '.', './', '/*'}
 KINDS = ('immutable', 'palette', 'layout', 'architecture', 'behavior', 'acceptance')
 MAX_EXTRA_REPAIRS = 2
 EXHAUSTION = ('replan', 'human_review')
+MAX_EXTRA_REPLANS = 1
 AUDIT_LIMIT = 50
 
 
@@ -108,11 +111,11 @@ def validate_plan_constraints(value):
 
 def normalize_decisions(decisions, note, now=None):
     """Validate a human decision document; return it ready to store."""
-    empty = dict(waivers=[], constraints=[], extra_repairs=0, on_exhaustion=None)
+    empty = dict(waivers=[], constraints=[], extra_repairs=0, extra_replans=0, on_exhaustion=None)
     if decisions in (None, {}):
         return empty
-    if not isinstance(decisions, dict) or set(decisions) - {'waivers', 'constraints', 'extra_repairs', 'on_exhaustion'}:
-        raise ConfigurationError('A decision may only contain waivers, constraints, extra_repairs and on_exhaustion')
+    if not isinstance(decisions, dict) or set(decisions) - {'waivers', 'constraints', 'extra_repairs', 'extra_replans', 'on_exhaustion'}:
+        raise ConfigurationError('A decision may only contain waivers, constraints, extra_repairs, extra_replans and on_exhaustion')
     stamp = int(time.time() if now is None else now)
     waivers = []
     for item in decisions.get('waivers') or []:
@@ -136,9 +139,12 @@ def normalize_decisions(decisions, note, now=None):
     on_exhaustion = decisions.get('on_exhaustion')
     if on_exhaustion is not None and on_exhaustion not in EXHAUSTION:
         raise ConfigurationError('on_exhaustion must be one of: ' + ', '.join(EXHAUSTION))
-    if (extra or on_exhaustion) and not note.strip():
+    extra_replans = decisions.get('extra_replans', 0)
+    if type(extra_replans) is not int or not 0 <= extra_replans <= MAX_EXTRA_REPLANS:
+        raise ConfigurationError(f'extra_replans must be an integer from 0 to {MAX_EXTRA_REPLANS} per decision')
+    if (extra or extra_replans or on_exhaustion) and not note.strip():
         raise ConfigurationError('Granting repairs or changing exhaustion handling requires a recorded note')
-    return dict(waivers=waivers, constraints=constraints, extra_repairs=extra, on_exhaustion=on_exhaustion)
+    return dict(waivers=waivers, constraints=constraints, extra_repairs=extra, extra_replans=extra_replans, on_exhaustion=on_exhaustion)
 
 
 def finding_file(finding):

@@ -44,7 +44,7 @@ class ProjectControllerTests(unittest.TestCase):
 
     def architect(self, tasks=None, **overrides):
         stage = self.only('architect')
-        plan = Path(self.temp.name) / f'project-plan-{stage["cycle"]}' / 'project-plan.json'
+        plan = Path(self.temp.name) / f'project-plan-{stage["cycle"]}-{stage["evidence_retry"]}' / 'project-plan.json'
         plan.parent.mkdir()
         plan.write_text(json.dumps(dict(tasks=tasks or [CODE], **getattr(self, 'plan_extra', {}))))
         self.board.complete(stage, **overrides)
@@ -230,15 +230,91 @@ class ProjectControllerTests(unittest.TestCase):
         self.tick()
         self.only('developer')
 
-    def test_invalid_architect_plan_returns_to_architect_instead_of_ending_the_run(self):
+    BAD_PLAN = [{**CODE, 'owner': 'nobody'}]
+
+    def start_planning(self):
         self.tick()
-        self.board.complete(self.only('factory-orchestrator'),project_scope=NEEDS);self.tick()
-        self.architect(tasks=[{**CODE, 'owner': 'nobody'}])
-        stage=self.only('architect')
-        self.assertEqual(stage['cycle'],1)
-        self.assertIn('Invalid task owner',self.board.cards[stage['task_id']]['body'])
+        self.board.complete(self.only('factory-orchestrator'), project_scope=NEEDS); self.tick()
+
+    def test_an_invalid_architect_plan_is_corrected_with_the_exact_errors_without_spending_a_replan(self):
+        self.start_planning()
+        self.architect(tasks=self.BAD_PLAN)
+        stage = self.only('architect')
+        self.assertEqual((stage['cycle'], stage['evidence_retry']), (0, 1))  # the same generation: no replan
+        body = self.board.cards[stage['task_id']]['body']
+        rejection = json.JSONDecoder().raw_decode(body.rsplit('\nPROJECT_CONTEXT ', 1)[1])[0]['previous_handoff_rejected']
+        self.assertIn('Invalid task owner', rejection['reason'])
+        self.assertIn('numbered acceptance criteria', rejection['required_schema'])
+        self.assertEqual((rejection['attempt'], rejection['max_attempts']), (1, 2))
+        self.assertEqual(self.project().get('replans', 0), 0)
         self.architect()
         self.only('claude-reviewer')
+
+    def test_every_structural_error_of_a_plan_is_reported_at_once(self):
+        self.start_planning()
+        self.architect(tasks=[{**CODE, 'owner': 'nobody'}, {**CODE, 'id': 'second', 'title': '', 'acceptance': {}}])
+        body = self.board.cards[self.only('architect')['task_id']]['body']
+        reason = json.JSONDecoder().raw_decode(body.rsplit('\nPROJECT_CONTEXT ', 1)[1])[0]['previous_handoff_rejected']['reason']
+        self.assertIn('code: Invalid task owner', reason)
+        self.assertIn('second: ', reason)
+
+    def test_structural_correction_is_bounded_then_stops_for_a_human_and_never_replans(self):
+        self.start_planning()
+        for _ in range(3):  # the original plan and its two corrections are all invalid
+            self.architect(tasks=self.BAD_PLAN)
+        self.assertEqual(self.project()['terminal']['phase'], 'human_review')
+        self.assertIn('still failed validation after 2 corrections', self.project()['terminal']['reason'])
+        self.assertEqual(self.project().get('replans', 0), 0)
+        self.assertEqual([e['kind'] for e in self.project()['orchestration_log']], ['plan_validation_retry', 'plan_validation_retry'])
+
+    def test_structural_corrections_leave_the_whole_architectural_replan_budget_intact(self):
+        self.start_planning()
+        for _ in range(2):
+            self.architect(tasks=self.BAD_PLAN)
+        for _ in range(3):  # then valid plans that the plan review rejects: both architectural replans are still available
+            self.architect()
+            self.board.complete(self.only('claude-reviewer'), findings=['F1|BLOCKER|-|code|Request requirement is missing']); self.tick()
+        self.assertEqual(self.project()['replans'], 2)
+        self.assertEqual(self.project()['terminal']['phase'], 'human_review')
+
+    def exhausted_plan_review(self):
+        self.start_planning()
+        for _ in range(3):
+            self.architect()
+            self.board.complete(self.only('claude-reviewer'), findings=['F1|BLOCKER|-|code|Request requirement is missing']); self.tick()
+        self.board.complete(self.only('factory-retro')); self.tick()
+        self.assertEqual(self.state.read_root(self.conn, self.root)['phase'], 'human_review')
+
+    def test_a_human_granted_extra_replan_is_recorded_used_once_and_audited(self):
+        self.exhausted_plan_review()
+        self.controller.resume(self.conn, self.root, 'One more architect pass against the reviewer findings', dict(extra_replans=1), True)
+        stage = self.only('architect')
+        self.assertEqual(stage['cycle'], 3)
+        grants = self.project()['replan_grants']
+        self.assertEqual((grants['granted'], grants['consumed']), (1, 1))
+        self.assertEqual([e['kind'] for e in grants['log']], ['granted', 'consumed'])
+        self.assertIn('One more architect pass', grants['log'][0]['reason'])
+        self.architect()
+        self.board.complete(self.only('claude-reviewer'), findings=['F1|BLOCKER|-|code|Still missing']); self.tick()
+        self.assertEqual(self.project()['terminal']['phase'], 'human_review')  # the single grant is spent: a human decides again
+        self.assertEqual(self.project()['replans'], 3)
+
+    def test_without_a_grant_the_replan_limit_still_stops_and_a_grant_is_one_per_decision(self):
+        self.exhausted_plan_review()
+        self.assertEqual(self.project().get('replan_grants'), None)
+        with self.assertRaises(ConfigurationError):
+            self.controller.resume(self.conn, self.root, 'Two extra replans', dict(extra_replans=2), True)
+        self.assertEqual(self.state.read_root(self.conn, self.root)['phase'], 'human_review')
+
+    def test_reevaluate_never_retries_a_planning_stage(self):
+        self.start_planning()
+        for _ in range(3):
+            self.architect(tasks=self.BAD_PLAN)
+        self.board.complete(self.only('factory-retro')); self.tick()
+        architects = lambda: self.conn.execute("SELECT COUNT(*) FROM factory_workflow_stages WHERE profile='architect'").fetchone()[0]
+        before = architects()
+        self.controller.resume(self.conn, self.root, 'Re-judge the existing architect evidence', None, True)
+        self.assertEqual(architects(), before)
 
     def test_plan_review_that_never_passes_stops_for_a_human(self):
         self.tick()

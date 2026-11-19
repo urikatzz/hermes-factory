@@ -15,6 +15,13 @@ from .project_policy import (MAX_ORCHESTRATION_RECOVERIES, MAX_REPLANS, blocking
 
 REPAIR_LIMIT = 'Captured repair limit reached'
 MAX_HANDOFF_RETRIES = 2
+# A plan that fails structural validation (missing fields, no numbered criteria, bad graph) is corrected by the architect with the exact
+# errors; this never spends an architectural replan. Past the bound a human decides.
+MAX_PLAN_VALIDATION_RETRIES = 2
+PLAN_SCHEMA = ('project-plan.json: {"tasks":[{"id":"lowercase-id","title":"...","owner":"developer|artist|sound-designer","dependencies":["task-id"],'
+               '"acceptance":{"AC1":"observable criterion"},"needs":{"art":false,"audio":false,"ui":false,"ux":false},"risk":"normal|high",'
+               '"preserve":["optional path"]}],"constraints":[optional structured constraints]}; every task needs numbered acceptance criteria '
+               '(AC1, AC2, ...); together the tasks cover every project AC; completed tasks stay byte-for-byte unchanged.')
 # Worker-side formatting slips are retried; a missing or foreign run is about who completed the stage, never the worker's formatting.
 NOT_RETRYABLE = ('Missing or stale completed worker run', 'Worker ownership evidence is missing')
 from .tool_incidents import tool_blockers
@@ -191,8 +198,14 @@ class ProjectController:
 
     def _replan(self, conn, root, project, task, reason, findings, inputs):
         """Return the project to the architect. Bounded; completed tasks stay frozen."""
-        if project.get('replans', 0) >= MAX_REPLANS:
+        grants = project.get('replan_grants', {})
+        if project.get('replans', 0) >= MAX_REPLANS + grants.get('granted', 0):
             return False
+        if project.get('replans', 0) >= MAX_REPLANS:
+            # This replan runs on a human grant: record the consumption.
+            grants['consumed'] = grants.get('consumed', 0) + 1
+            grants.setdefault('log', []).append(dict(kind='consumed', replan=project.get('replans', 0) + 1, reason=reason[:300], at=int(time.time())))
+            self._state.event(conn, root['root_id'], 'project_replan_grant_consumed', dict(consumed=grants['consumed'], granted=grants['granted']))
         project.update(replans=project.get('replans', 0) + 1, gen=project.get('gen', 0) + 1, mode='planning',
                        replan=dict(reason=reason, task=task['id'] if task else None, findings=list(findings)[:15],
                                    inputs=list(dict.fromkeys(inputs))))
@@ -264,9 +277,19 @@ class ProjectController:
                 tasks = validate_plan(plan_document, project['scope'], result.metadata['ac_ids'])
                 plan_constraints = validate_plan_constraints(plan_document.get('constraints'))
             except ConfigurationError as exc:
-                # A malformed plan goes back to the architect (bounded by MAX_REPLANS) instead of ending the run.
-                if not self._replan(conn, root, project, None, 'Plan failed validation: ' + str(exc), ['architect:F1|HIGH|-|' + str(exc).replace('|', '/') + '|Return a plan that passes validation'], [row['task_id']]):
-                    raise
+                # Structural failure, not an architectural one: the architect corrects it with the exact errors, off the replan budget.
+                tries = project.setdefault('plan_validation_retries', {}).get(str(gen), 0)
+                if tries >= MAX_PLAN_VALIDATION_RETRIES:
+                    raise ConfigurationError(f'Plan still failed validation after {tries} corrections: {exc}')
+                project['plan_validation_retries'][str(gen)] = tries + 1
+                project.setdefault('handoff_rejections', {})['project-architect'] = dict(
+                    attempt=tries + 1, max_attempts=MAX_PLAN_VALIDATION_RETRIES, rejected_task=row['task_id'],
+                    reason='Plan failed structural validation: ' + str(exc), required_schema=PLAN_SCHEMA,
+                    instruction='Correct only what the validation errors name, keep every valid part of the plan, and resubmit project-plan.json. '
+                                'Your previous attachments are readable from the rejected task.')
+                project.setdefault('retry_keys', []).append(f'project-architect:{gen}')
+                project.setdefault('orchestration_log', []).append(dict(kind='plan_validation_retry', generation=gen, attempt=tries + 1, reason=str(exc)[:400], at=int(time.time())))
+                self._state.event(conn, root['root_id'], 'plan_validation_rejected', dict(generation=gen, attempt=tries + 1, reason=str(exc)[:1000]))
                 return True
             previous = {t['id']: t for t in project['tasks']}
             if any(done['id'] != 'integration' and previous.get(done['id']) not in tasks for done in project['completed']):
@@ -673,6 +696,10 @@ class ProjectController:
         project['waivers'].extend(w for w in decided['waivers'] if w['id'] not in known)
         stored = [constraint_view(c) for c in project.setdefault('constraints', [])]  # decisions recorded before ids existed get one now
         project['constraints'] = stored + [c for c in decided['constraints'] if c['id'] not in {k['id'] for k in stored}]
+        if decided['extra_replans']:
+            grants = project.setdefault('replan_grants', dict(granted=0, consumed=0, log=[]))
+            grants['granted'] += decided['extra_replans']
+            grants['log'].append(dict(kind='granted', amount=decided['extra_replans'], reason=note.strip()[:500], at=int(time.time())))
         if decided['on_exhaustion'] and 'work' in project:
             project['work']['on_exhaustion'] = decided['on_exhaustion']
         if decided['extra_repairs']:
@@ -681,7 +708,7 @@ class ProjectController:
         if decisions:
             self._state.event(conn, root['root_id'], 'human_decision', dict(note=note, waivers=[w['id'] for w in decided['waivers']],
                               constraints=decided['constraints'], extra_repairs=decided['extra_repairs'],
-                              on_exhaustion=decided['on_exhaustion'], execution_version=2))
+                              extra_replans=decided['extra_replans'], on_exhaustion=decided['on_exhaustion'], execution_version=2))
         gen = project.get('gen', 0)
         if 'work' in project:
             work = project['work']
@@ -717,6 +744,8 @@ class ProjectController:
             project['retry_keys'] = [f"project-{p}:{project.get('director_gen', {}).get(p, 0)}" for p in missing] or [f'project-architect:{gen}']
         else:
             project['retry_keys'] = []
+        if reevaluate:
+            project['retry_keys'] = []  # whatever the stopped mode, judge the existing evidence instead of retrying a stage
         project.setdefault('orchestration_log', []).append(dict(kind='human_resume', reevaluate=bool(reevaluate), retry_keys=list(project.get('retry_keys', [])), at=int(time.time())))
         self._save(conn, root, project)
         conn.execute("UPDATE factory_workflow_roots SET phase='project',reason='' WHERE root_id=?", (root['root_id'],))

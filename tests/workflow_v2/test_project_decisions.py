@@ -176,6 +176,15 @@ class StructuredConstraintTests(unittest.TestCase):
         with self.assertRaises(ConfigurationError):
             normalize_decisions(dict(extra_repairs=1), '  ')
 
+    def test_extra_replans_are_one_per_decision_and_need_a_note(self):
+        self.assertEqual(normalize_decisions(dict(extra_replans=1), 'n')['extra_replans'], 1)
+        self.assertEqual(normalize_decisions(dict(), 'n')['extra_replans'], 0)
+        for bad in (-1, 2, '1', 0.5, True):
+            with self.subTest(bad=bad), self.assertRaises(ConfigurationError):
+                normalize_decisions(dict(extra_replans=bad), 'n')
+        with self.assertRaises(ConfigurationError):
+            normalize_decisions(dict(extra_replans=1), ' ')
+
     def test_extra_repairs_are_bounded(self):
         self.assertEqual(normalize_decisions(dict(extra_repairs=1), 'n')['extra_repairs'], 1)
         for bad in (-1, 3, '1', 1.5, True):

@@ -82,39 +82,46 @@ def validate_plan(document, scope, project_ac_ids):
         raise ConfigurationError('Project plan requires 1 to 40 small tasks')
     by_id = {}
     covered = set()
+    errors = []
     for task in tasks:
-        if not isinstance(task, dict) or set(task) - {'risk', 'preserve'} != {'id', 'title', 'owner', 'dependencies', 'acceptance', 'needs'}:
-            raise ConfigurationError('Invalid task fields')
-        if 'preserve' in task:
-            task['preserve'] = validate_preserve(task['preserve'])
-        if task.get('risk', 'normal') not in ('normal', 'high'):
-            raise ConfigurationError('Task risk must be normal or high')
-        key = task['id']
-        if not isinstance(key, str) or not re.fullmatch('[a-z][a-z0-9-]{0,23}', key) or key == 'integration' or key in by_id:
-            raise ConfigurationError('Invalid or duplicate task ID')
-        if isinstance(task['title'], str) and len(task['title']) > 200:
-            task['title'] = task['title'][:197].rstrip() + '...'  # over-long titles are trimmed, not fatal
-        if not isinstance(task['title'], str) or not task['title'].strip() or len(task['title']) > 200:
-            raise ConfigurationError('Invalid task title')
-        if task['owner'] not in ('developer', 'artist', 'sound-designer'):
-            raise ConfigurationError('Invalid task owner')
-        needs = validate_scope(task['needs'])
-        if any(needs[d] and not scope[d] for d in DOMAINS):
-            raise ConfigurationError('Task expands the captured project scope')
-        for owner, domain in [('artist', 'art'), ('sound-designer', 'audio')]:
-            if task['owner'] == owner and not needs[domain]:
-                raise ConfigurationError('Asset task must declare its specialist domain')
-        ac = task['acceptance']
-        if not isinstance(ac, dict) or not ac or any(not isinstance(k, str) or not re.fullmatch(r'AC(?:[0-9]+|-GATE)', k)
-                or not isinstance(v, str) or not v.strip() or len(v) > 1000 for k, v in ac.items()):
-            raise ConfigurationError('Task requires numbered acceptance criteria')
-        if not set(ac) <= set(project_ac_ids):
-            raise ConfigurationError('Task acceptance is outside the architecture plan')
-        covered.update(ac)
-        deps = task['dependencies']
-        if not isinstance(deps, list) or any(not isinstance(d, str) for d in deps) or len(deps) != len(set(deps)):
-            raise ConfigurationError('Invalid task dependencies')
-        by_id[key] = task
+        try:
+            if not isinstance(task, dict) or set(task) - {'risk', 'preserve'} != {'id', 'title', 'owner', 'dependencies', 'acceptance', 'needs'}:
+                raise ConfigurationError('Invalid task fields')
+            if 'preserve' in task:
+                task['preserve'] = validate_preserve(task['preserve'])
+            if task.get('risk', 'normal') not in ('normal', 'high'):
+                raise ConfigurationError('Task risk must be normal or high')
+            key = task['id']
+            if not isinstance(key, str) or not re.fullmatch('[a-z][a-z0-9-]{0,23}', key) or key == 'integration' or key in by_id:
+                raise ConfigurationError('Invalid or duplicate task ID')
+            if isinstance(task['title'], str) and len(task['title']) > 200:
+                task['title'] = task['title'][:197].rstrip() + '...'  # over-long titles are trimmed, not fatal
+            if not isinstance(task['title'], str) or not task['title'].strip() or len(task['title']) > 200:
+                raise ConfigurationError('Invalid task title')
+            if task['owner'] not in ('developer', 'artist', 'sound-designer'):
+                raise ConfigurationError('Invalid task owner')
+            needs = validate_scope(task['needs'])
+            if any(needs[d] and not scope[d] for d in DOMAINS):
+                raise ConfigurationError('Task expands the captured project scope')
+            for owner, domain in [('artist', 'art'), ('sound-designer', 'audio')]:
+                if task['owner'] == owner and not needs[domain]:
+                    raise ConfigurationError('Asset task must declare its specialist domain')
+            ac = task['acceptance']
+            if not isinstance(ac, dict) or not ac or any(not isinstance(k, str) or not re.fullmatch(r'AC(?:[0-9]+|-GATE)', k)
+                    or not isinstance(v, str) or not v.strip() or len(v) > 1000 for k, v in ac.items()):
+                raise ConfigurationError('Task requires numbered acceptance criteria')
+            if not set(ac) <= set(project_ac_ids):
+                raise ConfigurationError('Task acceptance is outside the architecture plan')
+            covered.update(ac)
+            deps = task['dependencies']
+            if not isinstance(deps, list) or any(not isinstance(d, str) for d in deps) or len(deps) != len(set(deps)):
+                raise ConfigurationError('Invalid task dependencies')
+            by_id[key] = task
+        except ConfigurationError as error:
+            label = task.get('id') if isinstance(task, dict) and isinstance(task.get('id'), str) else 'task #' + str(tasks.index(task) + 1)
+            errors.append(f'{label}: {error}')
+    if errors:
+        raise ConfigurationError('; '.join(errors))
     if covered != set(project_ac_ids):
         raise ConfigurationError('Task graph does not cover every project acceptance criterion')
     ordered, visiting, ancestors = [], set(), {}
