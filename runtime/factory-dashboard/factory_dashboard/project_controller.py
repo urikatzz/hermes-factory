@@ -543,7 +543,8 @@ class ProjectController:
                 for stage in self._controller._rows(conn, root, prefix + '-repair-' + work['repairs'][0], work['cycle']):
                     archive = getattr(self._board, 'archive_task', None)
                     if archive:
-                        archive(conn, stage['task_id'])
+                        with controller_scope(conn, root['root_id']):
+                            archive(conn, stage['task_id'])
                 work.update(step='reviewing', cycle=work['cycle'] - 1, repairs=[])
                 work.pop('repair_findings', None)
                 project['retry_keys'] = []
