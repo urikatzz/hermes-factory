@@ -2,7 +2,9 @@
 import unittest
 
 from factory_dashboard.model_policy import ConfigurationError
-from factory_dashboard.project_decisions import (constraints_of, finding_file, normalize_decisions, preserved_conflict, waiver_for)
+from factory_dashboard.project_decisions import (constraint_view, constraints_of, finding_file, normalize_constraint, normalize_decisions,
+                                                 preserved_conflict, relevant_constraints, validate_plan_constraints, validate_spec_conflicts,
+                                                 waiver_for)
 from factory_dashboard.project_policy import route_findings, validate_plan
 from factory_dashboard.workflow_gate import evaluate_cycle
 from factory_dashboard.workflow_handoffs import StageResult
@@ -105,6 +107,71 @@ class GateWaiverTests(unittest.TestCase):
         decision = self.gate([ART, UI.replace('ui-reviewer', 'art-reviewer')], stored)
         self.assertEqual(decision.decision, 'repair')
         self.assertEqual(len(decision.blocking), 1)
+
+
+class StructuredConstraintTests(unittest.TestCase):
+    def test_every_kind_has_a_validated_stored_form_with_a_stable_id(self):
+        samples = [dict(kind='immutable', preserve=['Assets/a.png'], reason='Approved asset must stay as is'),
+                   dict(kind='palette', colors=['#1c1c1f', '#F2A020'], reason='Only the approved palette may be used', paths=['Assets/Scripts/*']),
+                   dict(kind='layout', rules=['Health bar anchored top-left at 32,32'], reason='Approved HUD layout'),
+                   dict(kind='architecture', rules=['Gameplay code never references editor assemblies'], reason='Approved architecture'),
+                   dict(kind='behavior', rules=['Dodge roll has a one second cooldown'], reason='Approved behaviour'),
+                   dict(kind='acceptance', acs=['AC8'], reason='AC8 must stay satisfied after any repair')]
+        for sample in samples:
+            with self.subTest(kind=sample['kind']):
+                stored = normalize_constraint(sample)
+                self.assertEqual(stored['kind'], sample['kind'])
+                self.assertRegex(stored['id'], r'^c_[0-9a-f]{8}$')
+                self.assertEqual(stored['id'], normalize_constraint(dict(reversed(list(sample.items()))))['id'])
+        self.assertEqual(normalize_constraint(samples[1])['colors'], ['#1C1C1F', '#F2A020'])
+
+    def test_invalid_constraints_are_rejected(self):
+        for bad in (dict(kind='palette', colors=['red'], reason='long enough reason'), dict(kind='palette', reason='long enough reason'),
+                    dict(kind='layout', reason='long enough reason'), dict(kind='layout', rules=['x'], reason='long enough reason'),
+                    dict(kind='acceptance', acs=['nope'], reason='long enough reason'), dict(kind='immutable', reason='long enough reason'),
+                    dict(kind='immutable', preserve=['*'], reason='long enough reason'), dict(kind='unknown', reason='long enough reason'),
+                    dict(kind='behavior', rules=['valid rule text'], reason='short'), dict(kind='behavior', rules=['valid rule text'], reason='long enough reason', paths='x'),
+                    dict(kind='behavior', rules=['valid rule text'], reason='long enough reason', extra=1)):
+            with self.subTest(bad=bad), self.assertRaises(ConfigurationError):
+                normalize_constraint(bad)
+        with self.assertRaises(ConfigurationError):
+            validate_plan_constraints('nope')
+
+    def test_legacy_stored_constraints_get_a_kind_and_an_id(self):
+        view = constraint_view(dict(preserve=['sprite.png'], reason='old record', source='human'))
+        self.assertEqual((view['kind'], view['preserve']), ('immutable', ['sprite.png']))
+        self.assertRegex(view['id'], r'^c_[0-9a-f]{8}$')
+
+    def test_constraints_in_force_merge_task_plan_and_human_sources_without_duplicates(self):
+        plan = normalize_constraint(dict(kind='palette', colors=['#1C1C1F'], reason='Approved palette for the whole project'), 'plan')
+        project = dict(tasks=[dict(id='t', preserve=['a.png'])], plan_constraints=[plan], constraints=[plan, dict(preserve=['b.png'], reason='human freeze')])
+        self.assertEqual(sorted(c['kind'] for c in constraints_of(project)), ['immutable', 'immutable', 'palette'])
+
+    def test_only_non_mechanical_constraints_in_scope_are_relevant_to_a_finding(self):
+        finding = 'ui-reviewer:F1|MEDIUM|AC8|Assets/Scripts/Hud.cs:Bar|Low contrast'
+        unscoped = normalize_constraint(dict(kind='palette', colors=['#1C1C1F'], reason='Approved palette for the project'))
+        scoped = normalize_constraint(dict(kind='layout', rules=['Bar stays top-left'], reason='Approved layout', paths=['Assets/Scripts/Hud.cs']))
+        elsewhere = normalize_constraint(dict(kind='layout', rules=['Menu stays centred'], reason='Approved menu layout', paths=['Assets/Menu/*']))
+        acceptance = normalize_constraint(dict(kind='acceptance', acs=['AC8'], reason='AC8 must stay satisfied'))
+        other_ac = normalize_constraint(dict(kind='acceptance', acs=['AC2'], reason='AC2 must stay satisfied'))
+        immutable = normalize_constraint(dict(kind='immutable', preserve=['x.png'], reason='Approved file stays as is'))
+        found = {c['id'] for c in relevant_constraints(finding, [unscoped, scoped, elsewhere, acceptance, other_ac, immutable])}
+        self.assertEqual(found, {unscoped['id'], scoped['id'], acceptance['id']})
+
+    def test_spec_conflict_reports_are_validated(self):
+        ok = dict(spec_conflicts=[dict(constraint='c_0123abcd', reason='The fix needs an off-palette colour', finding='F1')])
+        self.assertEqual(validate_spec_conflicts(ok)[0]['constraint'], 'c_0123abcd')
+        self.assertEqual(validate_spec_conflicts({}), [])
+        for bad in (dict(spec_conflicts='x'), dict(spec_conflicts=[dict(constraint='palette', reason='long enough reason')]),
+                    dict(spec_conflicts=[dict(constraint='c_0123abcd', reason='short')]), dict(spec_conflicts=[dict(constraint='c_0123abcd', reason='long enough reason', extra=1)])):
+            with self.subTest(bad=bad), self.assertRaises(ConfigurationError):
+                validate_spec_conflicts(bad)
+
+    def test_extra_repairs_are_bounded(self):
+        self.assertEqual(normalize_decisions(dict(extra_repairs=1), 'n')['extra_repairs'], 1)
+        for bad in (-1, 3, '1', 1.5, True):
+            with self.subTest(bad=bad), self.assertRaises(ConfigurationError):
+                normalize_decisions(dict(extra_repairs=bad), 'n')
 
 
 if __name__ == '__main__':

@@ -5,16 +5,22 @@ from pathlib import Path
 import time
 
 from .model_policy import ConfigurationError
-from .project_cards import ARCHITECT, COMPARISON, SIMILARITY, DIRECTOR, PLAN_DEFECT, PLAN_REVIEW, REPLAN, RETRO, SCOPE, TOOL_INCIDENTS, project_card
-from .project_decisions import constraints_of, normalize_decisions, preserved_conflict, record_applied
+from .project_cards import (ARCHITECT, COMPARISON, CONFLICT_CHECK, SIMILARITY, DIRECTOR, PLAN_DEFECT, PLAN_REVIEW, REPLAN, RETRO, SCOPE,
+                            SPEC_CONSTRAINTS, TOOL_INCIDENTS, project_card)
+from .project_decisions import (constraints_of, normalize_decisions, preserved_conflict, record_applied, relevant_constraints,
+                                validate_plan_constraints, validate_spec_conflicts)
 from .project_evidence import plan_evidence, retained_json, validate_comparison, validate_similarity
 from .project_policy import (MAX_REPLANS, blocking_findings, finding_ac, planning_profiles, route_findings, rereview_profiles,
                              review_profiles, scope_additions, validate_plan, validate_scope)
 
 REPAIR_LIMIT = 'Captured repair limit reached'
+MAX_HANDOFF_RETRIES = 2
+# Worker-side formatting slips are retried; a missing or foreign run is about who completed the stage, never the worker's formatting.
+NOT_RETRYABLE = ('Missing or stale completed worker run', 'Worker ownership evidence is missing')
 from .tool_incidents import tool_blockers
 from .workflow_gate import evaluate_cycle
 from .workflow_guards import controller_scope
+from .workflow_handoffs import VERDICTS
 from .workflow_types import StageSpec
 
 
@@ -63,6 +69,7 @@ class ProjectController:
 
     def _node(self, conn, root, definition, context, project, key, kind, profile, instructions, inputs, *, task=None, cycle=0):
         from .workflow_templates import GAME_ART, GAME_AUDIO
+        original = instructions
         for owner, notes in [('artist', GAME_ART), ('sound-designer', GAME_AUDIO)]:
             if profile == owner:
                 instructions += '\n' + notes['repair' if kind == 'repair' else 'implement']
@@ -103,13 +110,24 @@ class ProjectController:
                 raise ProjectBlocked('Project stage requires intervention: ' + key)
             return None
         if not result.valid:
-            raise ConfigurationError(result.reason + ': ' + key)
+            tries = project.setdefault('handoff_retries', {}).get(token, 0)
+            if result.reason in NOT_RETRYABLE or tries >= MAX_HANDOFF_RETRIES:
+                raise ConfigurationError(result.reason + ': ' + key)
+            # A malformed handoff is a worker slip, not a failed milestone: retry only this stage, telling the worker exactly what to fix.
+            project['handoff_retries'][token] = tries + 1
+            project.setdefault('handoff_rejections', {})[key] = self._rejection(conn, row, result, kind, key, cycle, root, tries + 1)
+            project.setdefault('retry_keys', []).append(token)
+            self._state.event(conn, root['root_id'], 'handoff_rejected', dict(key=key, task_id=row['task_id'], reason=result.reason, attempt=tries + 1))
+            return self._node(conn, root, definition, context, project, key, kind, profile, original, [*inputs, row['task_id']], task=task, cycle=cycle)
         if result.metadata['verdict'] == 'BLOCKED':
             blocked = dict(key=key, profile=profile, task_id=row['task_id'], run_id=result.run_id, cycle=cycle,
                            verdict='BLOCKED', artifacts=result.metadata.get('artifacts', []), reason=result.metadata.get('blocked_reason', key))
             if not any(h.get('task_id') == row['task_id'] and h.get('run_id') == result.run_id for h in project['history']):
                 project['history'].append(blocked)
                 self._state.event(conn, root['root_id'], 'project_stage_blocked', blocked)
+            if result.metadata.get('spec_conflicts'):
+                raise ProjectBlocked('Specification conflict reported by ' + profile + ': ' + result.metadata.get('blocked_reason', key)
+                                     + ' [' + ', '.join(c['constraint'] for c in result.metadata['spec_conflicts']) + ']. A human must decide.')
             raise ProjectBlocked('Stage blocked: ' + result.metadata.get('blocked_reason', key))
         self._controller._accept(conn, row, result)
         project['active_keys'].remove(token)
@@ -121,6 +139,23 @@ class ProjectController:
             project['history'].append(history)
             self._state.event(conn, root['root_id'], 'project_stage_accepted', history)
         return row, result
+
+    def _rejection(self, conn, row, result, kind, key, cycle, root, attempt):
+        """What a retried worker is told: the exact reason, the required identity/schema, and the valid part of what it sent."""
+        kept = {}
+        try:
+            run = self._board.get_run(conn, row.get('active_run_id'))
+            sent = getattr(run, 'metadata', None) or {}
+            kept = {k: v for k, v in sent.items() if k not in ('artifacts', 'worker_session_id')} if isinstance(sent, dict) else {}
+            if len(json.dumps(kept, default=str)) > 4000:
+                kept = {k: v for k, v in kept.items() if k in ('contract', 'workflow_contract', 'root', 'stage_key', 'cycle', 'stage', 'verdict', 'manifest_sha12', 'ac_ids', 'ac_results')}
+        except Exception:
+            kept = {}
+        required = dict(contract='factory-worker/v2', workflow_contract='factory-workflow/v1', root=root['root_id'], stage_key=key,
+                        cycle=cycle + 1, verdict='one of ' + ' | '.join(VERDICTS[kind]))
+        return dict(attempt=attempt, max_attempts=MAX_HANDOFF_RETRIES, rejected_task=row['task_id'], reason=result.reason, required_identity=required,
+                    instruction='Resubmit the handoff with the missing or wrong fields corrected. Keep what was valid; redo work only if the reason requires it. '
+                                'Prior attachments are readable from the rejected task.', previous_valid_metadata=kept)
 
     @staticmethod
     def _inputs(project):
@@ -223,7 +258,9 @@ class ProjectController:
                     return True
             evidence = plan_evidence('architect', row['task_id'], result.metadata)
             try:
-                tasks = validate_plan(retained_json(result.metadata['artifacts'], 'project-plan.json'), project['scope'], result.metadata['ac_ids'])
+                plan_document = retained_json(result.metadata['artifacts'], 'project-plan.json')
+                tasks = validate_plan(plan_document, project['scope'], result.metadata['ac_ids'])
+                plan_constraints = validate_plan_constraints(plan_document.get('constraints'))
             except ConfigurationError as exc:
                 # A malformed plan goes back to the architect (bounded by MAX_REPLANS) instead of ending the run.
                 if not self._replan(conn, root, project, None, 'Plan failed validation: ' + str(exc), ['architect:F1|HIGH|-|' + str(exc).replace('|', '/') + '|Return a plan that passes validation'], [row['task_id']]):
@@ -233,7 +270,7 @@ class ProjectController:
             if any(done['id'] != 'integration' and previous.get(done['id']) not in tasks for done in project['completed']):
                 raise ConfigurationError('Replan changed a task that already passed')
             project['plans'] = [p for p in project['plans'] if p['profile'] != 'architect'] + [evidence]
-            project.update(ac_ids=result.metadata['ac_ids'], tasks=tasks, mode='plan_review')
+            project.update(ac_ids=result.metadata['ac_ids'], tasks=tasks, plan_constraints=plan_constraints, mode='plan_review')
             self._state.event(conn, root['root_id'], 'project_plan_captured', dict(tasks=tasks, plans=project['plans'], generation=gen))
             return True
         if mode == 'plan_review':
@@ -296,7 +333,7 @@ class ProjectController:
                              'VERDICT=BLOCKED; use BLOCKED only for a missing tool or capability you cannot provide. '
                              'The approved plan paths named in your card are your plan: read them there, and if you need the plan under '
                              'PROJECT_DIR/.factory copy it yourself. A plan attachment that looks missing is never a reason for BLOCKED.')
-            instructions += '\n' + PLAN_DEFECT
+            instructions += '\n' + SPEC_CONSTRAINTS + '\n' + PLAN_DEFECT
             node = self._node(conn, root, definition, context, project, key, 'repair' if repair else 'implement', profile,
                               instructions, work['writer_inputs'], task=task, cycle=cycle)
             if not node:
@@ -331,7 +368,7 @@ class ProjectController:
                           'Verify only TASK acceptance IDs against the exact cumulative manifest. Run tests, integration checks, asset lint gates and release audit. '
                           'Record repair_domains (code/art/audio) for failed asset or integration checks. Missing tools are environment gaps, never passes. '
                           'Never use inline interpreter flags such as python -c or node -e (the safety guard blocks them): read files with the file tools or run a script file. '
-                          + TOOL_INCIDENTS + '\n' + PLAN_DEFECT,
+                          + TOOL_INCIDENTS + '\n' + SPEC_CONSTRAINTS + '\n' + PLAN_DEFECT,
                           inputs, task=task, cycle=cycle)
         if not node:
             return False
@@ -339,7 +376,10 @@ class ProjectController:
         blockers = tool_blockers(verifier.metadata)
         if any(v == 'unverified:environment' for v in verifier.metadata['ac_results'].values()) or blockers:
             raise ProjectBlocked('Verification requires unavailable environment or tools' + (': ' + '; '.join(blockers) if blockers else ''))
-        preliminary = evaluate_cycle(writer, [verifier], work.get('last_gate'), definition.max_repairs, cycle, {**context, 'unity_ci': False, 'waivers': project.get('waivers', [])})
+        preliminary = evaluate_cycle(writer, [verifier], work.get('last_gate'), definition.max_repairs + work.get('extra_repairs', 0), cycle, {**context, 'unity_ci': False, 'waivers': project.get('waivers', [])})
+        if preliminary.decision == 'repair' and not self._spec_check(conn, root, definition, context, project, task, work, cycle, prefix,
+                                                                      [verifier], preliminary, [*inputs, verifier_row['task_id']]):
+            return False
         if preliminary.decision != 'pass':
             return self._decision(conn, root, project, task, writer, [verifier], preliminary, [verifier_row], definition, reviewed=False)
         if verifier.metadata['verdict'] != 'PASS':
@@ -348,7 +388,7 @@ class ProjectController:
         profiles = self._panel([s.profile for s in definition.reviewers], task, work)
         readers, rows, waiting = [verifier], [verifier_row], False
         for profile in profiles:
-            instructions = 'Review only your discipline against TASK acceptance and the inherited plans; report actionable findings.\n' + TOOL_INCIDENTS + '\n' + PLAN_DEFECT
+            instructions = 'Review only your discipline against TASK acceptance and the inherited plans; report actionable findings.\n' + TOOL_INCIDENTS + '\n' + SPEC_CONSTRAINTS + '\n' + PLAN_DEFECT
             if profile == 'art-reviewer':
                 instructions += '\n' + COMPARISON
             if profile == 'art-reviewer' and task['id'] != 'integration':
@@ -372,8 +412,57 @@ class ProjectController:
             rows.append(row)
         if waiting:
             return False
-        decision = evaluate_cycle(writer, readers, work.get('last_gate'), definition.max_repairs, cycle, {**context, 'unity_ci': False, 'waivers': project.get('waivers', [])})
+        decision = evaluate_cycle(writer, readers, work.get('last_gate'), definition.max_repairs + work.get('extra_repairs', 0), cycle, {**context, 'unity_ci': False, 'waivers': project.get('waivers', [])})
+        if decision.decision == 'repair' and not self._spec_check(conn, root, definition, context, project, task, work, cycle, prefix,
+                                                                   readers, decision, [*inputs, verifier_row['task_id']]):
+            return False
         return self._decision(conn, root, project, task, writer, readers, decision, rows, definition, reviewed=True)
+
+    def _spec_check(self, conn, root, definition, context, project, task, work, cycle, prefix, readers, decision, inputs):
+        """Before a repair is authorized: a finding that can only be fixed by breaking an approved requirement is a specification
+        conflict for a human, never an implementation defect that spends repair budget. Returns False while the assessment is pending."""
+        constraints = constraints_of(project)
+        if not constraints:
+            return True
+        known = {c['id']: c for c in constraints}
+
+        def conflict(reported, who):
+            names = '; '.join(f"{c['constraint']} ({known[c['constraint']]['kind']}: {known[c['constraint']]['reason']}): {c['reason']}" for c in reported)
+            record = dict(task=task['id'], cycle=cycle, by=who, conflicts=reported, blocking=list(decision.blocking))
+            project['history'].append(dict(key=prefix + '-spec-conflict', verdict='SPEC_CONFLICT', **record))
+            self._state.event(conn, root['root_id'], 'project_spec_conflict', record)
+            raise ProjectBlocked('Specification conflict (' + who + '): ' + names + '. A human must decide: waive the finding, amend the requirement or change the plan.')
+
+        for finding in decision.blocking:
+            frozen = preserved_conflict(finding, constraints)
+            if frozen:
+                conflict([dict(constraint=frozen['id'], reason='the finding targets a path the plan fixed as unchanged: ' + finding, finding=finding)], 'controller')
+        for reader in readers:
+            reported = validate_spec_conflicts(reader.metadata)
+            unknown = [c['constraint'] for c in reported if c['constraint'] not in known]
+            if unknown:
+                raise ConfigurationError('Reported conflict names an unknown constraint: ' + ', '.join(unknown))
+            if reported:
+                conflict(reported, reader.metadata.get('source_profile', 'reviewer'))
+        relevant = {f: relevant_constraints(f, constraints) for f in decision.blocking}
+        if not any(relevant.values()):
+            return True
+        assessor = next(s.profile for s in definition.reviewers if s.profile in ('claude-reviewer', 'codex-reviewer'))
+        shown = {c['id']: c for found in relevant.values() for c in found}
+        text = (CONFLICT_CHECK + '\nFINDINGS ' + json.dumps(list(decision.blocking), sort_keys=True)
+                + '\nCONSTRAINTS ' + json.dumps([{k: v for k, v in c.items() if k in ('id', 'kind', 'reason', 'preserve', 'paths', 'colors', 'rules', 'acs') and v}
+                                                  for c in shown.values()], sort_keys=True))
+        node = self._node(conn, root, definition, context, project, prefix + '-conflict-check', 'review', assessor, text, inputs, task=task, cycle=cycle)
+        if node is None:
+            return False
+        _, result = node
+        reported = validate_spec_conflicts(result.metadata)
+        unknown = [c['constraint'] for c in reported if c['constraint'] not in shown]
+        if unknown:
+            raise ConfigurationError('Conflict assessment names a constraint outside the question: ' + ', '.join(unknown))
+        if reported:
+            conflict(reported, 'conflict-check:' + assessor)
+        return True
 
     def _decision(self, conn, root, project, task, writer, readers, decision, rows, definition, reviewed):
         work = project['work']
@@ -512,6 +601,8 @@ class ProjectController:
         decided = normalize_decisions(decisions, note)
         row = conn.execute('SELECT document FROM factory_project_execution WHERE root_id=?', (root['root_id'],)).fetchone()
         project = json.loads(row[0]) if row else {}
+        if decided['extra_repairs'] and 'work' not in project:
+            raise ConfigurationError('extra_repairs applies to a task in progress; none is')
         awaiting = project.get('awaiting')
         if decisions and awaiting and not project.get('terminal'):
             raise ConfigurationError('Waivers and constraints apply to a blocked stage, not to plan approval')
@@ -541,10 +632,13 @@ class ProjectController:
         project.pop('terminal', None);project.pop('retro', None)
         known = {w['id'] for w in project.setdefault('waivers', [])}
         project['waivers'].extend(w for w in decided['waivers'] if w['id'] not in known)
-        project.setdefault('constraints', []).extend(decided['constraints'])
+        project.setdefault('constraints', []).extend(c for c in decided['constraints'] if c['id'] not in {k['id'] for k in project['constraints']})
+        if decided['extra_repairs']:
+            # Granted to the task in progress only: it lives in that task's work record and disappears with it.
+            project['work']['extra_repairs'] = project['work'].get('extra_repairs', 0) + decided['extra_repairs']
         if decisions:
             self._state.event(conn, root['root_id'], 'human_decision', dict(note=note, waivers=[w['id'] for w in decided['waivers']],
-                              constraints=decided['constraints'], execution_version=2))
+                              constraints=decided['constraints'], extra_repairs=decided['extra_repairs'], execution_version=2))
         gen = project.get('gen', 0)
         if 'work' in project:
             work = project['work']

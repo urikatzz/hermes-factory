@@ -6,6 +6,7 @@ import unittest
 
 from board_fixture import Board
 from factory_dashboard.model_policy import ConfigurationError
+from factory_dashboard.project_decisions import normalize_constraint
 from factory_dashboard.workflow_controller import WorkflowController
 from factory_dashboard.workflow_state import WorkflowState
 from factory_dashboard.workflow_templates import _preset
@@ -44,7 +45,7 @@ class ProjectControllerTests(unittest.TestCase):
         stage = self.only('architect')
         plan = Path(self.temp.name) / f'project-plan-{stage["cycle"]}' / 'project-plan.json'
         plan.parent.mkdir()
-        plan.write_text(json.dumps(dict(tasks=tasks or [CODE])))
+        plan.write_text(json.dumps(dict(tasks=tasks or [CODE], **getattr(self, 'plan_extra', {}))))
         self.board.complete(stage, **overrides)
         self.conn.execute('INSERT INTO attachments VALUES(?,?)', (stage['task_id'], str(plan)))
         run = self.conn.execute('SELECT metadata FROM task_runs WHERE task_id=?', (stage['task_id'],)).fetchone()
@@ -163,8 +164,9 @@ class ProjectControllerTests(unittest.TestCase):
 
     def test_stale_verifier_manifest_never_launches_review(self):
         self.plan();self.board.complete(self.only('developer'));self.tick()
-        self.board.complete(self.only('verifier'),manifest_sha12='111111111111')
-        self.tick()
+        for _ in range(3):  # the original handoff and its two bounded retries all carry the stale manifest
+            self.board.complete(self.only('verifier'),manifest_sha12='111111111111')
+            self.tick()
         self.only('factory-retro')
         self.assertFalse(self.conn.execute("SELECT 1 FROM factory_workflow_stages WHERE kind='review'").fetchone())
 
@@ -457,12 +459,47 @@ class ProjectControllerTests(unittest.TestCase):
         self.verify_with(blocked_tools=[dict(cmd='rm -rf scratch',block='dangerous',needed_for='none',attempts=1)])
         self.only('factory-retro')
 
-    def test_malformed_incident_evidence_stops_for_human_review_and_never_launches_reviews(self):
-        self.verify_with(tool_incidents=[dict(command='x')])
-        terminal=self.project()['terminal']
-        self.assertEqual(terminal['phase'],'human_review')
-        self.assertIn('tool incident',terminal['reason'])
+    BAD_INCIDENT = dict(tool_incidents=[dict(command='x')])
+
+    def malformed_until_stopped(self):
+        self.plan();self.board.complete(self.only('developer'));self.tick()
+        for _ in range(3):
+            self.board.complete(self.only('verifier'),**self.BAD_INCIDENT);self.tick()
+        return self.project()
+
+    def test_malformed_incident_evidence_is_retried_twice_then_stops_for_human_review(self):
+        project=self.malformed_until_stopped()
+        self.assertEqual(project['terminal']['phase'],'human_review')
+        self.assertIn('tool incident',project['terminal']['reason'])
         self.assertFalse([r for r in self.board.ready() if r['kind']=='review'])
+        self.assertEqual(project['handoff_retries'],{'task-code-verify:0':2})
+
+    def test_a_malformed_handoff_retries_only_that_stage_with_exact_errors_and_valid_parts(self):
+        self.plan();self.board.complete(self.only('developer'));self.tick()
+        stages=lambda:self.conn.execute('SELECT COUNT(*) FROM factory_workflow_stages').fetchone()[0]
+        before=stages()
+        self.board.complete(self.only('verifier'),**self.BAD_INCIDENT);self.tick()
+        retry=self.only('verifier')
+        self.assertEqual(stages(),before+1)  # one card; the writer and the milestone are not restarted
+        self.assertEqual(retry['evidence_retry'],1)
+        body=self.board.cards[retry['task_id']]['body']
+        rejection=json.JSONDecoder().raw_decode(body.split('PROJECT_CONTEXT ',1)[1])[0]['previous_handoff_rejected']
+        self.assertIn('tool incident',rejection['reason'].lower())
+        self.assertEqual(rejection['required_identity']['workflow_contract'],'factory-workflow/v1')
+        self.assertEqual(rejection['required_identity']['stage_key'],retry['stage_key'])
+        self.assertEqual(rejection['previous_valid_metadata']['manifest_sha12'],'abcdef123456')  # the valid part of the original result
+        self.assertEqual((rejection['attempt'],rejection['max_attempts']),(1,2))
+        self.board.complete(retry);self.tick()  # a corrected handoff continues the same milestone
+        self.assertEqual([r['profile'] for r in self.board.ready()],['claude-reviewer','security-reviewer'])
+
+    def test_an_ownership_failure_is_not_retried_as_a_formatting_slip(self):
+        self.plan();self.board.complete(self.only('developer'));self.tick()
+        verifier=self.only('verifier')
+        self.board.complete(verifier)
+        self.conn.execute('UPDATE factory_workflow_stages SET active_run_id=999 WHERE task_id=?',(verifier['task_id'],));self.conn.commit()
+        self.tick()
+        self.assertEqual(self.project()['terminal']['phase'],'human_review')
+        self.assertNotIn('task-code-verify:0',self.project().get('handoff_retries',{}))
 
     # --- human decisions: scoped waivers, constraint conflicts and per-agent repair (the milestone-1 incident) ---
     def mixed(self, task=MIXED, **verify):
@@ -475,7 +512,7 @@ class ProjectControllerTests(unittest.TestCase):
         self.board.complete(self.only('developer')); self.tick()
         self.board.complete(self.only('verifier'), **verify); self.tick()
 
-    def review_round(self, art=True, ui=True):
+    def review_round(self, art=True, ui=True, ui_extra=None):
         folder = Path(self.temp.name) / f'gate-{len(list(Path(self.temp.name).iterdir()))}'
         folder.mkdir()
         for row in self.board.ready():
@@ -483,7 +520,7 @@ class ProjectControllerTests(unittest.TestCase):
                 self.board.complete(row, verdict='CHANGES_REQUIRED', artifacts=[self.similarity(folder, 5)],
                                     findings=['F2|HIGH|AC1|sprite.png|[similarity] 5% match to the reference, below 80%'])
             elif row['profile'] == 'ui-reviewer' and ui:
-                self.board.complete(row, verdict='CHANGES_REQUIRED', findings=['F1|MEDIUM|AC1|Assets/Scripts/Builder.cs:HealthBar|Bar inside the ceiling band'])
+                self.board.complete(row, verdict='CHANGES_REQUIRED', findings=['F1|MEDIUM|AC1|Assets/Scripts/Builder.cs:HealthBar|Bar inside the ceiling band'], **(ui_extra or {}))
             else:
                 self.complete_review(row)
         self.tick()
@@ -508,7 +545,7 @@ class ProjectControllerTests(unittest.TestCase):
         self.mixed(task=dict(MIXED, preserve=['sprite.png'])); self.review_round()
         terminal = self.project()['terminal']
         self.assertEqual(terminal['phase'], 'blocked')
-        self.assertIn('conflicts with an approved constraint', terminal['reason'])
+        self.assertIn('Specification conflict', terminal['reason'])
         self.assertFalse([r for r in self.board.ready() if r['profile'] in ('artist', 'fixer')])
 
     def stalled_artist(self):
@@ -582,9 +619,8 @@ class ProjectControllerTests(unittest.TestCase):
         self.assertIn('Writer acceptance differs', self.project()['terminal']['reason'])
 
     def test_reevaluate_rejudges_existing_evidence_without_repeating_any_stage(self):
-        self.plan(); self.board.complete(self.only('developer')); self.tick()
-        self.board.complete(self.only('verifier'), tool_incidents=[dict(command='x')]); self.tick()
-        verifier = self.conn.execute("SELECT task_id FROM factory_workflow_stages WHERE kind='verify'").fetchone()[0]
+        self.malformed_until_stopped()
+        verifier = self.conn.execute("SELECT task_id FROM factory_workflow_stages WHERE kind='verify' ORDER BY evidence_retry DESC").fetchone()[0]
         self.assertEqual(self.project()['terminal']['phase'], 'human_review')
         self.board.complete(self.only('factory-retro')); self.tick()
         with self.assertRaises(ConfigurationError):
@@ -596,7 +632,89 @@ class ProjectControllerTests(unittest.TestCase):
         self.controller.resume(self.conn, self.root, 'Re-judge the verifier evidence', None, True)
         self.assertEqual([r['profile'] for r in self.board.ready()], ['claude-reviewer', 'security-reviewer'])
         self.assertEqual(self.conn.execute('SELECT COUNT(*) FROM factory_workflow_stages').fetchone()[0], stages + 2)
-        self.assertEqual(self.conn.execute("SELECT COUNT(*) FROM factory_workflow_stages WHERE kind='verify'").fetchone()[0], 1)
+        self.assertEqual(self.conn.execute("SELECT COUNT(*) FROM factory_workflow_stages WHERE kind='verify'").fetchone()[0], 3)  # no new verifier
+
+    # --- structured constraints, specification conflicts and extra repairs ---
+    PALETTE = dict(kind='palette', reason='Only the approved palette may be used by the HUD', colors=['#1C1C1F', '#4A3A1E', '#F2A020'])
+
+    def with_palette(self):
+        self.plan_extra = dict(constraints=[self.PALETTE])
+        return normalize_constraint(self.PALETTE)['id']
+
+    def test_plan_constraints_are_captured_and_shown_to_every_task_stage(self):
+        cid = self.with_palette()
+        self.mixed()
+        self.assertEqual([c['id'] for c in self.project()['plan_constraints']], [cid])
+        verifier = self.conn.execute("SELECT task_id FROM factory_workflow_stages WHERE kind='verify'").fetchone()[0]
+        for stage_id in (verifier,):
+            self.assertIn(cid, self.board.cards[stage_id]['body'])
+        self.assertIn(cid, self.board.cards[next(r['task_id'] for r in self.board.ready() if r['profile'] == 'ui-reviewer')]['body'])
+
+    def spec_conflict(self, cid, **extra):
+        return dict(spec_conflicts=[dict(constraint=cid, reason='Every fix for this finding needs a colour outside the palette', finding='ui-reviewer:F1')], **extra)
+
+    def test_a_reviewer_reported_specification_conflict_stops_for_a_human_without_spending_repair_budget(self):
+        cid = self.with_palette()
+        self.mixed(); self.review_round(art=False, ui_extra=self.spec_conflict(cid))
+        terminal = self.project()['terminal']
+        self.assertEqual(terminal['phase'], 'blocked')
+        self.assertIn('Specification conflict', terminal['reason'])
+        self.assertIn(cid, terminal['reason'])
+        self.assertFalse([r for r in self.board.ready() if r['profile'] in ('fixer', 'artist')])
+        self.assertEqual(self.project()['work']['cycle'], 0)  # no repair cycle was consumed
+        self.assertTrue(any(h.get('verdict') == 'SPEC_CONFLICT' for h in self.project()['history']))
+
+    def test_a_conflict_naming_an_unknown_constraint_is_rejected_not_trusted(self):
+        self.with_palette()
+        self.mixed(); self.review_round(art=False, ui_extra=self.spec_conflict('c_00000000'))
+        self.assertEqual(self.project()['terminal']['phase'], 'human_review')
+        self.assertIn('unknown constraint', self.project()['terminal']['reason'])
+
+    def conflict_check(self):
+        return next(r for r in self.board.ready() if r['stage_key'].endswith('conflict-check'))
+
+    def test_a_relevant_constraint_triggers_a_targeted_assessment_before_the_repair_is_authorized(self):
+        cid = self.with_palette()
+        self.mixed(); self.review_round(art=False)
+        check = self.conflict_check()
+        self.assertEqual(check['profile'], 'claude-reviewer')
+        body = self.board.cards[check['task_id']]['body']
+        self.assertIn('ui-reviewer:F1', body)
+        self.assertIn(cid, body)
+        self.assertFalse([r for r in self.board.ready() if r['profile'] == 'fixer'])
+        self.board.complete(check); self.tick()  # no genuine contradiction: the repair proceeds
+        self.only('fixer')
+
+    def test_an_assessed_contradiction_is_a_specification_conflict_not_a_repair(self):
+        cid = self.with_palette()
+        self.mixed(); self.review_round(art=False)
+        self.board.complete(self.conflict_check(), **self.spec_conflict(cid)); self.tick()
+        self.assertEqual(self.project()['terminal']['phase'], 'blocked')
+        self.assertIn('conflict-check', self.project()['terminal']['reason'])
+        self.assertFalse([r for r in self.board.ready() if r['profile'] == 'fixer'])
+        self.assertEqual(self.project()['work']['cycle'], 0)
+
+    def test_without_constraints_there_is_no_assessment_overhead(self):
+        self.mixed(); self.review_round(art=False)
+        self.only('fixer')
+
+    def test_extra_repairs_are_granted_to_the_task_in_progress_and_extend_its_budget(self):
+        self.definition['max_repairs'] = 0
+        self.conn.execute('UPDATE factory_workflow_roots SET definition=?', (json.dumps(self.definition),))
+        self.plan()
+        project = self.project(); project['work'] = project.get('work') or {}
+        self.board.complete(self.only('developer')); self.tick()
+        project = self.project(); project['work']['extra_repairs'] = 1
+        self.conn.execute('UPDATE factory_project_execution SET document=?', (json.dumps(project),)); self.conn.commit()
+        self.board.complete(self.only('verifier'), verdict='FAIL', ac_results={'AC1': 'fail'}); self.tick()
+        self.only('fixer')  # without the grant a zero budget would have gone back to the architect
+
+    def test_a_decision_can_grant_extra_repairs_only_while_a_task_is_in_progress_and_within_the_cap(self):
+        self.stalled_artist()
+        self.controller.resume(self.conn, self.root, 'One more repair for this decision', dict(self.DECISION, extra_repairs=1))
+        self.assertEqual(self.project()['work']['extra_repairs'], 1)
+        with self.assertRaises(ConfigurationError):
+            normalize_constraint(dict(kind='palette', reason='long enough reason', colors=['red']))
 
     def test_visual_mismatch_calls_artist_then_verifier_not_developer(self):
         tasks=[dict(id='sprites',title='Make sprites',owner='artist',dependencies=[],acceptance={'AC1':'Sprite'},

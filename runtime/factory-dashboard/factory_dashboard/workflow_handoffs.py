@@ -4,6 +4,8 @@ import json
 import re
 from pathlib import PurePath
 
+from .model_policy import ConfigurationError
+from .project_decisions import validate_spec_conflicts
 from .tool_incidents import validate_tool_incidents
 
 
@@ -94,6 +96,11 @@ def normalize_handoff(task, run, expected_stage):
     incident_problem = validate_tool_incidents(metadata, known_acs)
     if incident_problem:
         return invalid(incident_problem)
+    try:
+        if 'spec_conflicts' in metadata:
+            metadata['spec_conflicts'] = validate_spec_conflicts(metadata)
+    except ConfigurationError as error:
+        return invalid(str(error))
     if kind == 'verify':
         archive_pattern = r'src-' + re.escape(metadata['manifest_sha12']) + r'(?:_[0-9]+)?\.tgz'
         archives = [path for path in metadata['artifacts'] if re.fullmatch(archive_pattern,PurePath(path).name)]

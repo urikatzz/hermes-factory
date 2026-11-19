@@ -1,22 +1,38 @@
-"""Human decisions the controller must honour: scoped finding waivers and preserved-path constraints.
+"""Human decisions and structured constraints the controller must honour.
 
-A waiver lets one named acceptance criterion pass for one named path (or narrow glob), optionally for one reviewer. It never
-edits or hides the reviewer's finding: the original text stays in the gate decision and in the waiver's audit trail. There is
-no global waiver; a missing criterion, a missing path or a catch-all pattern is rejected.
+Waivers
+    A waiver lets one named acceptance criterion pass for one named path (or narrow glob), optionally for one reviewer. It never
+    edits or hides the reviewer's finding: the original text stays in the gate decision and in the waiver's audit trail. There is no
+    global waiver; a missing criterion, a missing path or a catch-all pattern is rejected.
 
-A constraint names paths that approved plans or the human require to stay unchanged. A repair that would have to change one is
-a conflict the controller hands back to a human instead of dispatching an impossible task. Tasks may declare the same thing
-with an optional ``preserve`` list in the architect's plan.
+Constraints
+    Machine-readable requirements that approved plans or a human fixed, of six kinds:
+      immutable     paths that must stay unchanged            (preserve: [paths])
+      palette       the only colours a scope may use          (colors: ['#RRGGBB'], optional paths scope)
+      layout        required geometry or arrangement          (rules: [text], optional paths scope)
+      architecture  structural decisions to respect           (rules: [text], optional paths scope)
+      behavior      required runtime behaviour                (rules: [text], optional paths scope)
+      acceptance    criteria that must stay satisfied         (acs: ['AC8'], optional rules)
+    Reviewers and fixers receive them in their cards. Only immutable paths can be checked mechanically; for the rest a reviewer or the
+    conflict assessment reports ``spec_conflicts`` (a finding or repair that contradicts a constraint), which the controller treats
+    as a specification conflict for a human, not as an implementation defect to spend repair budget on.
+
+Extra repairs
+    ``extra_repairs`` grants a bounded number of additional repair cycles to the task in progress, for that decision only.
 """
 import fnmatch
 import hashlib
+import json
 import re
 import time
 
 from .model_policy import ConfigurationError
 
 AC_ID = re.compile(r'AC(?:[0-9]+|-GATE)')
+HEX_COLOR = re.compile(r'#[0-9A-Fa-f]{6}')
 CATCH_ALL = {'*', '**', '**/*', '*/*', '/', '.', './', '/*'}
+KINDS = ('immutable', 'palette', 'layout', 'architecture', 'behavior', 'acceptance')
+MAX_EXTRA_REPAIRS = 2
 AUDIT_LIMIT = 50
 
 
@@ -38,14 +54,65 @@ def validate_preserve(value):
     return [_pattern(v, 'preserved path') for v in value]
 
 
+def _text_list(value, what):
+    if not isinstance(value, list) or not value or len(value) > 20 or any(not isinstance(v, str) or not 5 <= len(v.strip()) <= 500 for v in value):
+        raise ConfigurationError(f'{what} must be a list of 1 to 20 statements of 5 to 500 characters')
+    return [v.strip() for v in value]
+
+
+def normalize_constraint(item, source='human', note='', stamp=0):
+    """Validate one constraint document and return it in stored form (with a stable id)."""
+    if not isinstance(item, dict) or set(item) - {'kind', 'reason', 'preserve', 'paths', 'colors', 'rules', 'acs'}:
+        raise ConfigurationError('Invalid constraint fields')
+    kind = item.get('kind', 'immutable' if 'preserve' in item else None)
+    if kind not in KINDS:
+        raise ConfigurationError('A constraint kind must be one of: ' + ', '.join(KINDS))
+    reason = item.get('reason')
+    if not isinstance(reason, str) or len(reason.strip()) < 10:
+        raise ConfigurationError('A constraint requires a reason of at least 10 characters')
+    if item.get('paths') is not None and not isinstance(item['paths'], list):
+        raise ConfigurationError('Constraint paths must be a list')
+    paths = [_pattern(p, 'constraint scope') for p in item['paths']] if item.get('paths') else []
+    stored = dict(kind=kind, reason=reason.strip(), preserve=[], paths=paths, colors=[], rules=[], acs=[])
+    if kind == 'immutable':
+        stored['preserve'] = validate_preserve(item.get('preserve'))
+        if not stored['preserve']:
+            raise ConfigurationError('An immutable constraint requires preserve paths')
+    elif kind == 'palette':
+        colors = item.get('colors')
+        if not isinstance(colors, list) or not colors or any(not isinstance(c, str) or not HEX_COLOR.fullmatch(c) for c in colors):
+            raise ConfigurationError('A palette constraint requires a list of #RRGGBB colors')
+        stored['colors'] = sorted({c.upper() for c in colors})
+    elif kind == 'acceptance':
+        acs = item.get('acs')
+        if not isinstance(acs, list) or not acs or any(not isinstance(a, str) or not AC_ID.fullmatch(a) for a in acs):
+            raise ConfigurationError('An acceptance constraint requires acceptance IDs')
+        stored['acs'] = sorted(set(acs))
+        stored['rules'] = _text_list(item['rules'], 'rules') if item.get('rules') else []
+    else:
+        stored['rules'] = _text_list(item.get('rules'), 'rules')
+    digest = hashlib.sha256(json.dumps(stored, sort_keys=True).encode()).hexdigest()[:8]
+    return dict(id='c_' + digest, source=source, note=note.strip()[:500], recorded_at=stamp, **stored)
+
+
+def validate_plan_constraints(value):
+    """Optional top-level ``constraints`` list in the architect's plan."""
+    if value is None:
+        return []
+    if not isinstance(value, list) or len(value) > 40:
+        raise ConfigurationError('Plan constraints must be a list of at most 40 entries')
+    return [normalize_constraint(item, source='plan') for item in value]
+
+
 def normalize_decisions(decisions, note, now=None):
-    """Validate a human decision document; return {'waivers': [...], 'constraints': [...]} ready to store."""
+    """Validate a human decision document; return it ready to store."""
+    empty = dict(waivers=[], constraints=[], extra_repairs=0)
     if decisions in (None, {}):
-        return {'waivers': [], 'constraints': []}
-    if not isinstance(decisions, dict) or set(decisions) - {'waivers', 'constraints'}:
-        raise ConfigurationError('A decision may only contain waivers and constraints')
+        return empty
+    if not isinstance(decisions, dict) or set(decisions) - {'waivers', 'constraints', 'extra_repairs'}:
+        raise ConfigurationError('A decision may only contain waivers, constraints and extra_repairs')
     stamp = int(time.time() if now is None else now)
-    waivers, constraints = [], []
+    waivers = []
     for item in decisions.get('waivers') or []:
         if not isinstance(item, dict) or set(item) - {'ac', 'path', 'source', 'reason'}:
             raise ConfigurationError('Invalid waiver fields')
@@ -60,15 +127,11 @@ def normalize_decisions(decisions, note, now=None):
         wid = 'w_' + hashlib.sha256(f'{ac}|{path}|{source}|{reason}'.encode()).hexdigest()[:8]
         waivers.append(dict(id=wid, ac=ac, path=path, source=source, reason=reason.strip(), note=note.strip()[:500],
                             recorded_at=stamp, applied=[]))
-    for item in decisions.get('constraints') or []:
-        if not isinstance(item, dict) or set(item) - {'preserve', 'reason'}:
-            raise ConfigurationError('Invalid constraint fields')
-        reason = item.get('reason')
-        if not isinstance(reason, str) or len(reason.strip()) < 10:
-            raise ConfigurationError('A constraint requires a reason of at least 10 characters')
-        constraints.append(dict(preserve=validate_preserve(item.get('preserve')), reason=reason.strip(), source='human',
-                                note=note.strip()[:500], recorded_at=stamp))
-    return dict(waivers=waivers, constraints=constraints)
+    constraints = [normalize_constraint(item, 'human', note, stamp) for item in decisions.get('constraints') or []]
+    extra = decisions.get('extra_repairs', 0)
+    if type(extra) is not int or not 0 <= extra <= MAX_EXTRA_REPAIRS:
+        raise ConfigurationError(f'extra_repairs must be an integer from 0 to {MAX_EXTRA_REPAIRS}')
+    return dict(waivers=waivers, constraints=constraints, extra_repairs=extra)
 
 
 def finding_file(finding):
@@ -97,22 +160,77 @@ def waiver_for(finding, waivers):
     return None
 
 
+def constraint_view(constraint):
+    """A stored constraint in the current shape (older decisions stored only preserve + reason)."""
+    if 'kind' in constraint and 'id' in constraint:
+        return constraint
+    legacy = dict(kind='immutable', reason=constraint.get('reason', 'preserved path'), preserve=list(constraint.get('preserve', [])),
+                  paths=[], colors=[], rules=[], acs=[])
+    digest = hashlib.sha256(json.dumps(legacy, sort_keys=True).encode()).hexdigest()[:8]
+    return {**constraint, **legacy, 'id': 'c_' + digest}
+
+
 def constraints_of(project):
-    """Preserved-path constraints from the approved task plan plus recorded human constraints."""
-    found = [dict(preserve=t['preserve'], reason=f"task {t['id']} must leave these paths unchanged", source='plan')
-             for t in project.get('tasks', []) if t.get('preserve')]
-    return found + list(project.get('constraints', []))
+    """Every constraint in force: task ``preserve`` lists, the plan's structured constraints and recorded human constraints."""
+    found = []
+    for task in project.get('tasks', []):
+        if task.get('preserve'):
+            found.append(constraint_view(dict(preserve=task['preserve'], reason=f"task {task['id']} must leave these paths unchanged", source='plan')))
+    found += [constraint_view(c) for c in project.get('plan_constraints', [])]
+    found += [constraint_view(c) for c in project.get('constraints', [])]
+    return list({c['id']: c for c in found}.values())
 
 
 def preserved_conflict(finding, constraints):
-    """The constraint a repair of this finding would violate (the finding cites a preserved path), else None."""
+    """The immutable constraint a repair of this finding would violate (the finding cites a preserved path), else None."""
     path = finding_file(finding)
     if not path:
         return None
     for constraint in constraints:
-        if any(_matches(path, pattern) for pattern in constraint['preserve']):
+        if constraint.get('kind', 'immutable') == 'immutable' and any(_matches(path, p) for p in constraint.get('preserve', [])):
             return constraint
     return None
+
+
+def relevant_constraints(finding, constraints):
+    """Non-mechanical constraints a repair of this finding could plausibly contradict: same scope path, same criterion or unscoped."""
+    path, parts = finding_file(finding), finding.split('|', 4)
+    ac = parts[2] if len(parts) == 5 else None
+    result = []
+    for constraint in constraints:
+        kind = constraint.get('kind', 'immutable')
+        if kind == 'immutable':
+            continue
+        scoped = constraint.get('paths') or []
+        if kind == 'acceptance' and ac in constraint.get('acs', []):
+            result.append(constraint)
+        elif scoped and path and any(_matches(path, p) for p in scoped):
+            result.append(constraint)
+        elif not scoped and kind != 'acceptance':
+            result.append(constraint)
+    return result
+
+
+def validate_spec_conflicts(metadata):
+    """Shape of the optional ``spec_conflicts`` a worker reports: [{constraint, reason, finding?}]. Returns the normalized list."""
+    value = metadata.get('spec_conflicts')
+    if value is None:
+        return []
+    if not isinstance(value, list) or len(value) > 20:
+        raise ConfigurationError('Invalid spec_conflicts')
+    result = []
+    for item in value:
+        if not isinstance(item, dict) or set(item) - {'constraint', 'reason', 'finding'}:
+            raise ConfigurationError('Invalid spec_conflicts entry')
+        constraint, reason, finding = item.get('constraint'), item.get('reason'), item.get('finding')
+        if not isinstance(constraint, str) or not re.fullmatch(r'c_[0-9a-f]{8}', constraint):
+            raise ConfigurationError('spec_conflicts must name a constraint ID')
+        if not isinstance(reason, str) or len(reason.strip()) < 10:
+            raise ConfigurationError('spec_conflicts needs a reason')
+        if finding is not None and not isinstance(finding, str):
+            raise ConfigurationError('Invalid spec_conflicts finding')
+        result.append(dict(constraint=constraint, reason=reason.strip(), finding=finding))
+    return result
 
 
 def record_applied(project, entries, task_id, cycle):

@@ -51,6 +51,18 @@ evidence (file tools, a script file, a narrower command). Record every refusal, 
 alternative produced the evidence), alternative (what worked, else ""), affected_criteria ([AC ids])}]. Only an unresolved required tool
 is blocked work: also list it in blocked_tools and mark the affected criteria unverified:environment. A resolved or optional incident never is.'''
 
+SPEC_CONSTRAINTS = '''Approved constraints: PROJECT_CONTEXT.constraints lists the requirements the plan and the human fixed, each with an id and a kind
+(immutable paths, palette, layout, architecture, behavior, acceptance). Respect all of them. Before you implement a repair, check that it
+does not violate any constraint. If satisfying a finding would, do not implement it: finish VERDICT=BLOCKED with blocked_reason naming the
+constraint and metadata spec_conflicts [{"constraint":"c_xxxxxxxx","reason":"...","finding":"profile:F1"}]. If a finding you raise can only be
+fixed by violating a constraint, still report it, and add the same spec_conflicts entry so a human decides instead of the repair budget being spent.'''
+
+CONFLICT_CHECK = '''Specification conflict check (read-only; no code, no project changes). The findings below block this task. For each finding decide whether
+every way of fixing it would violate one of the listed approved constraints. Report only genuine contradictions: a finding that can be fixed
+within the constraints is NOT a conflict. Retain a short report.md. Complete with verdict NO_BLOCKING_FINDINGS and no findings. Put each genuine
+contradiction in metadata spec_conflicts [{"constraint":"<id from the list>","reason":"why the fix must violate it","finding":"<finding text start>"}],
+or an empty list. Use only constraint ids from the list.'''
+
 COMPARISON = '''Compare the actual result against the inherited director plan, in addition to lint and normal review.
 For art tasks retain rendered asset images; for final integration retain actual in-engine screenshots.
 If perception is unavailable, record it as an unresolved required tool incident (blocked_tools and unverified:environment) in the retained report; do not approve.
@@ -90,6 +102,13 @@ def project_card(definition, stage, cycle, context, inputs, project, task=None):
         details['repair_attribution'] = project['work']['attribution']
     if project.get('recovery_note'):
         details['human_recovery_note'] = project['recovery_note']
+    if task:
+        from .project_decisions import constraints_of
+        shown = constraints_of(project)
+        if shown:
+            details['constraints'] = [{k: c[k] for k in ('id', 'kind', 'reason', 'preserve', 'paths', 'colors', 'rules', 'acs') if c.get(k)} for c in shown]
+    if project.get('handoff_rejections', {}).get(stage.key):
+        details['previous_handoff_rejected'] = project['handoff_rejections'][stage.key]
     if project.get('waivers'):
         # Reviewers keep reporting the true result; the gate applies the human's scoped waiver and keeps the original finding.
         details['human_waivers'] = [{k: w[k] for k in ('id', 'ac', 'path', 'source', 'reason')} for w in project['waivers']]

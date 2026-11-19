@@ -28,7 +28,7 @@ It sends each rendered asset and its reference images to the Jev model on OpenRo
 
 - `gate: "pass"`: every asset scored at least 80. Continue with section 3 to find what is still missing.
 - `gate: "fail"`: do not run section 3. For each asset with `status: "fail"` report a HIGH finding `[similarity] <score>% match, below 80%: <differences>`. For each `status: "no_reference"` report a BLOCKER finding `[similarity] no reference image for this asset class`, and in factory mode set metadata `plan_defect` to say which class lacks a reference. Verdict `CHANGES_REQUIRED`.
-- `gate: "blocked"`: the model or its key is unavailable. Report `blocked_tools: ["jev-similarity"]`; do not approve and do not substitute your own estimate.
+- `gate: "blocked"`: the model or its key is unavailable. Never load a `.env` or look for the key yourself. Record it as an unresolved required tool incident (`blocked_tools: ["jev-similarity"]` and `tool_incidents`) and say the human should run `factory_secrets.py doctor`; do not approve and do not substitute your own estimate.
 
 ## 3. Judge
 

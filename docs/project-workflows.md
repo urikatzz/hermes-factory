@@ -92,6 +92,16 @@ Restart long-running gateway/dashboard consumers after installation so their imp
 
 A refused command is an incident, not automatically a blocked task. Workers record each one in `tool_incidents` (`command`, `reason`, `required`, `resolved`, `alternative`, `affected_criteria`). The controller blocks only on an unresolved required tool, or an unresolved incident that names an affected criterion; resolved and optional incidents continue and stay in the retained evidence. Malformed incident evidence stops the project for human review instead of being ignored. Results without `tool_incidents` keep the legacy rule: any non-empty `blocked_tools` blocks. The logic is `factory_dashboard/tool_incidents.py`, used by the handoff validator, the gate and the project controller.
 
+## Human decisions, constraints and recovery
+
+- **Waivers.** `resume_factory_workflow.py --decision-file` accepts `waivers` (one acceptance criterion, one path or narrow glob, optionally one reviewer, plus a reason). The finding keeps its original text in the gate record and on the waiver's audit trail; global waivers are rejected.
+- **Structured constraints.** Plans may list top-level `constraints` and per-task `preserve`; a decision may add more. Kinds: `immutable` (paths), `palette` (`colors`), `layout`, `architecture`, `behavior` (`rules`) and `acceptance` (`acs`), each with an optional `paths` scope. Every task card carries them with their ids.
+- **Specification conflicts.** A finding that can only be fixed by breaking a constraint is a specification conflict, not a defect. Mechanically: a finding on an immutable path. Reviewers and fixers report `spec_conflicts` (`constraint`, `reason`, `finding`). When relevant constraints exist, a read-only conflict check by a code reviewer runs before any repair is dispatched. A conflict stops the project for a human and spends no repair budget.
+- **`extra_repairs`** (0 to 2, in a decision) grants that many additional repair cycles to the task in progress only.
+- **Handoff recovery.** A malformed worker handoff retries only that stage, at most twice, with the exact reason, the required identity and the valid part of the previous result; retries exhausted escalates to human review. A missing or foreign run is never retried.
+- **`--reevaluate`** re-judges existing stage evidence under the current rules without re-running stages, and also resumes a `human_review` stop.
+- **Scoped secrets.** Workers never load a `.env`. A key a worker needs uses a dedicated, non-provider name (for the similarity gate, `FACTORY_SIMILARITY_API_KEY`) listed in that profile's `terminal.env_passthrough`; Hermes then supplies it from the profile's own `.env` to that profile's commands only (provider credential names such as `OPENROUTER_API_KEY` are refused by design). `scripts/factory_secrets.py doctor` checks this by name; `set` reads the value from a hidden prompt. Error text and artifacts redact the value.
+
 ## Verification
 
 ```sh

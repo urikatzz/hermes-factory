@@ -15,6 +15,15 @@ URL = 'https://openrouter.ai/api/v1/chat/completions'
 KEY_VARS = ('FACTORY_SIMILARITY_API_KEY', 'OPENROUTER_API_KEY')
 
 
+def redact(text, *secrets):
+    """text with every non-trivial secret value replaced, for anything that reaches a log, handoff or artifact."""
+    text = str(text)
+    for secret in secrets:
+        if secret and len(secret) >= 6:
+            text = text.replace(secret, '[redacted]')
+    return text
+
+
 def api_key(environ):
     """The first non-empty similarity credential in environ, or None."""
     for name in KEY_VARS:
@@ -53,7 +62,7 @@ def openrouter_post(api_key, timeout=120):
             with urllib.request.urlopen(request, timeout=timeout) as response:
                 return json.load(response)
         except (urllib.error.URLError, TimeoutError, ValueError) as error:
-            raise SimilarityUnavailable(str(error)) from error
+            raise SimilarityUnavailable(redact(error, api_key)) from error
     return post
 
 
