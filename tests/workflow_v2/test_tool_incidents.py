@@ -49,6 +49,13 @@ class ToolBlockerTests(unittest.TestCase):
         self.assertIsNone(validate_tool_incidents(data, {'AC1'}))
         self.assertEqual(tool_blockers(data), [])
 
+    def test_a_paraphrased_command_still_matches_its_incident(self):
+        data = dict(blocked_tools=[dict(cmd='python3 art_similarity.py lint/lint.json --out similarity.json', needed_for='AC1')],
+                    tool_incidents=[incident(command='art_similarity.py lint/lint.json --out similarity.json', required=True, resolved=False,
+                                             alternative='', affected_criteria=['AC1'])])
+        self.assertIsNone(validate_tool_incidents(data, {'AC1'}))
+        self.assertEqual(len(tool_blockers(data)), 1)
+
     def test_blocked_tool_missing_from_incidents_is_malformed_not_ignored(self):
         data = dict(blocked_tools=[dict(cmd='unity', block='missing', needed_for='AC2', attempts=1)], tool_incidents=[incident()])
         self.assertIn('not accounted', validate_tool_incidents(data, {'AC1'}))

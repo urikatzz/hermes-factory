@@ -27,6 +27,12 @@ def _command(entry):
     return None
 
 
+def _same_command(a, b):
+    """Workers paraphrase a command (a prefix such as `python3`, a shortened argument list); containment either way is the same command."""
+    a, b = ' '.join(a.split()), ' '.join(b.split())
+    return bool(a) and bool(b) and (a in b or b in a)
+
+
 def validate_tool_incidents(metadata, ac_ids=None):
     """Return a reason when incident evidence is malformed, else None. ``ac_ids`` limits affected_criteria when known."""
     if 'tool_incidents' not in metadata:
@@ -58,7 +64,7 @@ def validate_tool_incidents(metadata, ac_ids=None):
         commands.add(command.strip())
     for entry in legacy:
         command = _command(entry)
-        if command is None or command.strip() not in commands:
+        if command is None or not any(_same_command(command, known) for known in commands):
             return 'Blocked tool is not accounted for in tool_incidents'
     return None
 
