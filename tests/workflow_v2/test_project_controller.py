@@ -860,6 +860,36 @@ class ProjectControllerTests(unittest.TestCase):
         self.controller.resume(self.conn, self.root, 'One more repair, then a human', dict(self.DECISION, extra_repairs=1, on_exhaustion='human_review'))
         self.assertEqual((self.project()['work']['extra_repairs'], self.project()['work']['on_exhaustion']), (1, 'human_review'))
 
+    def test_a_blocked_writer_that_declares_a_plan_defect_goes_to_the_architect_not_to_a_human(self):
+        self.plan()
+        self.board.complete(self.only('developer'), verdict='BLOCKED', blocked_reason='Task acceptance conflict',
+                            plan_defect='The acceptance criteria contradict each other; the architect must clarify them')
+        self.tick()
+        stage = self.only('architect')
+        self.assertIn('contradict each other', self.board.cards[stage['task_id']]['body'])
+        self.assertNotIn('terminal', self.project())
+
+    def test_a_blocked_writer_without_a_plan_defect_still_stops_for_a_human(self):
+        self.plan()
+        self.board.complete(self.only('developer'), verdict='BLOCKED', blocked_reason='The Unity editor is not installed')
+        self.tick()
+        self.assertEqual(self.project()['terminal']['phase'], 'blocked')
+        self.assertIn('Stage blocked', self.project()['terminal']['reason'])
+
+    def test_reevaluating_a_stop_caused_by_a_blocked_plan_defect_replans_without_rerunning_the_writer(self):
+        self.plan()
+        self.board.complete(self.only('developer'), verdict='BLOCKED', blocked_reason='Task acceptance conflict', plan_defect='Contradictory criteria need clarification')
+        # Reproduce the stop an older controller produced: the writer's BLOCKED result was never accepted and the project stopped for a human.
+        project = self.project(); project['terminal'] = dict(phase='blocked', reason='Stage blocked: Task acceptance conflict'); project['resume_mode'] = 'tasks'
+        project['mode'] = 'finished'; project['active_keys'] = []
+        self.conn.execute('UPDATE factory_project_execution SET document=?', (json.dumps(project),))
+        self.conn.execute("UPDATE factory_workflow_roots SET phase='blocked'"); self.conn.commit()
+        developers = lambda: self.conn.execute("SELECT COUNT(*) FROM factory_workflow_stages WHERE profile='developer'").fetchone()[0]
+        before = developers()
+        self.controller.resume(self.conn, self.root, 'Re-judge under the corrected controller', None, True)
+        self.only('architect')
+        self.assertEqual(developers(), before)
+
     def test_visual_mismatch_calls_artist_then_verifier_not_developer(self):
         tasks=[dict(id='sprites',title='Make sprites',owner='artist',dependencies=[],acceptance={'AC1':'Sprite'},
                     needs=dict(art=True,audio=False,ui=False,ux=False))]

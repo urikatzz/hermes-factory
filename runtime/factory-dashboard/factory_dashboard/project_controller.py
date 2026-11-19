@@ -120,7 +120,8 @@ class ProjectController:
             project.setdefault('retry_keys', []).append(token)
             self._state.event(conn, root['root_id'], 'handoff_rejected', dict(key=key, task_id=row['task_id'], reason=result.reason, attempt=tries + 1))
             return self._node(conn, root, definition, context, project, key, kind, profile, original, [*inputs, row['task_id']], task=task, cycle=cycle)
-        if result.metadata['verdict'] == 'BLOCKED':
+        if result.metadata['verdict'] == 'BLOCKED' and not self._defect([result]):
+            # A BLOCKED stage that declares a plan defect is not blocked work: it goes on to the architect (bounded replans).
             blocked = dict(key=key, profile=profile, task_id=row['task_id'], run_id=result.run_id, cycle=cycle,
                            verdict='BLOCKED', artifacts=result.metadata.get('artifacts', []), reason=result.metadata.get('blocked_reason', key))
             if not any(h.get('task_id') == row['task_id'] and h.get('run_id') == result.run_id for h in project['history']):
