@@ -539,12 +539,8 @@ class ProjectController:
             prefix = self._prefix(project, task)
             if decisions and work['step'] == 'repairing' and work['repairs'] and work['cycle'] > 0 and not self._repair_done(conn, root, prefix, work):
                 # The repairs were dispatched against findings the decision may have changed: retire the stalled repair and
-                # judge the evidence that already exists again, instead of repeating verification or review work.
-                for stage in self._controller._rows(conn, root, prefix + '-repair-' + work['repairs'][0], work['cycle']):
-                    archive = getattr(self._board, 'archive_task', None)
-                    if archive:
-                        with controller_scope(conn, root['root_id']):
-                            archive(conn, stage['task_id'])
+                # judge the evidence that already exists again, instead of repeating verification or review work. The stalled card is left
+                # on the board (blocked, harmless): archiving needs its own transaction, which this one already holds.
                 work.update(step='reviewing', cycle=work['cycle'] - 1, repairs=[])
                 work.pop('repair_findings', None)
                 project['retry_keys'] = []
