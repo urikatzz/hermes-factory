@@ -5,12 +5,13 @@ from pathlib import Path
 import time
 
 from .model_policy import ConfigurationError
-from .project_cards import ARCHITECT, COMPARISON, SIMILARITY, DIRECTOR, PLAN_DEFECT, PLAN_REVIEW, REPLAN, RETRO, SCOPE, project_card
+from .project_cards import ARCHITECT, COMPARISON, SIMILARITY, DIRECTOR, PLAN_DEFECT, PLAN_REVIEW, REPLAN, RETRO, SCOPE, TOOL_INCIDENTS, project_card
 from .project_evidence import plan_evidence, retained_json, validate_comparison, validate_similarity
 from .project_policy import (MAX_REPLANS, blocking_findings, finding_ac, planning_profiles, repair_profiles, rereview_profiles,
                              review_profiles, scope_additions, validate_plan, validate_scope)
 
 REPAIR_LIMIT = 'Captured repair limit reached'
+from .tool_incidents import tool_blockers
 from .workflow_gate import evaluate_cycle
 from .workflow_guards import controller_scope
 from .workflow_types import StageSpec
@@ -325,13 +326,14 @@ class ProjectController:
                           'Verify only TASK acceptance IDs against the exact cumulative manifest. Run tests, integration checks, asset lint gates and release audit. '
                           'Record repair_domains (code/art/audio) for failed asset or integration checks. Missing tools are environment gaps, never passes. '
                           'Never use inline interpreter flags such as python -c or node -e (the safety guard blocks them): read files with the file tools or run a script file. '
-                          'A guard-refused command is not a missing tool; use an allowed way to get the same evidence and do not list it in blocked_tools.\n' + PLAN_DEFECT,
+                          + TOOL_INCIDENTS + '\n' + PLAN_DEFECT,
                           inputs, task=task, cycle=cycle)
         if not node:
             return False
         verifier_row, verifier = node
-        if any(v == 'unverified:environment' for v in verifier.metadata['ac_results'].values()) or verifier.metadata.get('blocked_tools'):
-            raise ProjectBlocked('Verification requires unavailable environment or tools')
+        blockers = tool_blockers(verifier.metadata)
+        if any(v == 'unverified:environment' for v in verifier.metadata['ac_results'].values()) or blockers:
+            raise ProjectBlocked('Verification requires unavailable environment or tools' + (': ' + '; '.join(blockers) if blockers else ''))
         preliminary = evaluate_cycle(writer, [verifier], work.get('last_gate'), definition.max_repairs, cycle, {**context, 'unity_ci': False})
         if preliminary.decision != 'pass':
             return self._decision(conn, root, project, task, writer, [verifier], preliminary, [verifier_row], definition, reviewed=False)
@@ -341,7 +343,7 @@ class ProjectController:
         profiles = self._panel([s.profile for s in definition.reviewers], task, work)
         readers, rows, waiting = [verifier], [verifier_row], False
         for profile in profiles:
-            instructions = 'Review only your discipline against TASK acceptance and the inherited plans; report actionable findings.\n' + PLAN_DEFECT
+            instructions = 'Review only your discipline against TASK acceptance and the inherited plans; report actionable findings.\n' + TOOL_INCIDENTS + '\n' + PLAN_DEFECT
             if profile == 'art-reviewer':
                 instructions += '\n' + COMPARISON
             if profile == 'art-reviewer' and task['id'] != 'integration':
@@ -354,8 +356,9 @@ class ProjectController:
                 waiting = True
                 continue
             row, result = node
-            if result.metadata.get('blocked_tools'):
-                raise ProjectBlocked('Review requires unavailable tools: ' + profile)
+            review_blockers = tool_blockers(result.metadata)
+            if review_blockers:
+                raise ProjectBlocked('Review requires unavailable tools: ' + profile + ': ' + '; '.join(review_blockers))
             # Below 80% the reviewer stops at the score, so there is no detailed comparison to validate.
             close_enough = profile != 'art-reviewer' or task['id'] == 'integration' or validate_similarity(result)
             if profile == 'art-reviewer' and close_enough:

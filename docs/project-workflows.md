@@ -88,6 +88,10 @@ The preview contains hashes and affected paths, not credentials. Apply checks it
 
 Restart long-running gateway/dashboard consumers after installation so their imported policy code matches the installed source. Do not remove the v2 runtime while captured v2 projects exist. To return future submissions to v1, save new template revisions with `execution_version: 1`; do not restore an old database over current snapshots. Consistent board/settings backups are required for disaster recovery.
 
+## Tool incidents versus blocked work
+
+A refused command is an incident, not automatically a blocked task. Workers record each one in `tool_incidents` (`command`, `reason`, `required`, `resolved`, `alternative`, `affected_criteria`). The controller blocks only on an unresolved required tool, or an unresolved incident that names an affected criterion; resolved and optional incidents continue and stay in the retained evidence. Malformed incident evidence stops the project for human review instead of being ignored. Results without `tool_incidents` keep the legacy rule: any non-empty `blocked_tools` blocks. The logic is `factory_dashboard/tool_incidents.py`, used by the handoff validator, the gate and the project controller.
+
 ## Verification
 
 ```sh

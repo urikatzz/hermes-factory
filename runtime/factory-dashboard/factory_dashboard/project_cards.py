@@ -45,9 +45,15 @@ Do not approve the assets or implement them in this planning stage.
 A human must approve the art director's plan before architecture starts. If PROJECT_CONTEXT.human_feedback is present,
 a human rejected the previous plan: revise it to address that feedback.'''
 
+TOOL_INCIDENTS = '''Tool incidents: when the safety guard refuses a command or a tool is missing, first use an approved alternative that gives the same
+evidence (file tools, a script file, a narrower command). Record every refusal, resolved or not, in metadata tool_incidents:
+[{command, reason (safety_guard|missing|timeout|other), required (true if an acceptance criterion needs it), resolved (true only if the
+alternative produced the evidence), alternative (what worked, else ""), affected_criteria ([AC ids])}]. Only an unresolved required tool
+is blocked work: also list it in blocked_tools and mark the affected criteria unverified:environment. A resolved or optional incident never is.'''
+
 COMPARISON = '''Compare the actual result against the inherited director plan, in addition to lint and normal review.
 For art tasks retain rendered asset images; for final integration retain actual in-engine screenshots.
-If perception is unavailable, report blocked_tools and unverified:environment in the retained report; do not approve.
+If perception is unavailable, record it as an unresolved required tool incident (blocked_tools and unverified:environment) in the retained report; do not approve.
 Retain comparison.json with exactly: schema="factory-comparison/v1", plan_sha256=<director PLAN hash>,
 manifest_sha12=<reviewed manifest>, mode="rendered_asset" (art task) or "rendered_in_engine" (final art),
 source="tool"|"human", outcome="pass"|"fail", criteria=[{rule,expected,observed,outcome:"pass"|"fail"}],
@@ -58,7 +64,7 @@ An unclear or contradictory director plan requires human review; never silently 
 SIMILARITY = '''Before any detailed judgement run the art-review similarity gate: the Jev model scores each rendered asset against its
 reference images. Retain similarity.json as a completion artifact. If any asset scores below 80% or has no reference image, stop there:
 report those scores as blocking findings with CHANGES_REQUIRED and skip comparison.json. Only when every asset reaches 80% do the
-detailed comparison to find what is still missing. If the model is unavailable report blocked_tools; never estimate the score yourself.'''
+detailed comparison to find what is still missing. If the model is unavailable record an unresolved required tool incident (blocked_tools); never estimate the score yourself.'''
 
 RETRO = '''Analyze the retained project/task history: verification failures, review findings, repair cycles, missing tools,
 stage outcomes and final integration. Retain RETRO.md with evidence references, root causes, and prioritized Factory improvements.

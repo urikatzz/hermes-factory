@@ -4,6 +4,8 @@ import json
 import re
 from pathlib import PurePath
 
+from .tool_incidents import validate_tool_incidents
+
 
 @dataclass(frozen=True)
 class StageResult:
@@ -88,6 +90,10 @@ def normalize_handoff(task, run, expected_stage):
     if type(failed_count) is not int or failed_count<0:
         return invalid('Invalid failed check count')
     metadata['checks_failed']=failed_count
+    known_acs = set(metadata['ac_results']) if kind == 'verify' and isinstance(metadata.get('ac_results'), dict) else None
+    incident_problem = validate_tool_incidents(metadata, known_acs)
+    if incident_problem:
+        return invalid(incident_problem)
     if kind == 'verify':
         archive_pattern = r'src-' + re.escape(metadata['manifest_sha12']) + r'(?:_[0-9]+)?\.tgz'
         archives = [path for path in metadata['artifacts'] if re.fullmatch(archive_pattern,PurePath(path).name)]

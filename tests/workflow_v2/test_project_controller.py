@@ -428,6 +428,40 @@ class ProjectControllerTests(unittest.TestCase):
         self.assertEqual(stage['evidence_retry'],1)
         self.assertIn('Required test environment is now available',self.board.cards[stage['task_id']]['body'])
 
+    def verify_with(self, **evidence):
+        self.plan();self.board.complete(self.only('developer'));self.tick()
+        self.board.complete(self.only('verifier'),**evidence)
+        return self.tick()
+
+    GUARD = dict(command='rm -rf scratch', reason='safety_guard', required=False, resolved=True, alternative='fw.py clean', affected_criteria=[])
+
+    def test_guard_refused_cleanup_with_a_working_alternative_does_not_block_the_project(self):
+        legacy=[dict(cmd='rm -rf scratch',block='dangerous',needed_for='none',attempts=1)]
+        self.verify_with(blocked_tools=legacy,tool_incidents=[self.GUARD])
+        self.assertEqual([r['profile'] for r in self.board.ready()],['claude-reviewer','security-reviewer'])
+        self.assertNotEqual(self.state.read_root(self.conn,self.root)['phase'],'blocked')
+
+    def test_unresolved_required_tool_still_blocks_the_project(self):
+        needed=dict(self.GUARD,command='unity',required=True,resolved=False,alternative='',affected_criteria=['AC1'])
+        self.verify_with(blocked_tools=[dict(cmd='unity',block='missing',needed_for='AC1',attempts=1)],tool_incidents=[needed],ac_results={'AC1':'unverified:environment'})
+        self.only('factory-retro');self.assertFalse(self.board.cards and [r for r in self.board.ready() if r['kind']=='review'])
+
+    def test_unresolved_required_tool_blocks_even_when_the_verifier_claims_pass(self):
+        needed=dict(self.GUARD,command='unity',required=True,resolved=False,alternative='',affected_criteria=['AC1'])
+        self.verify_with(tool_incidents=[needed])
+        self.only('factory-retro')
+
+    def test_legacy_blocked_tools_without_incidents_still_block(self):
+        self.verify_with(blocked_tools=[dict(cmd='rm -rf scratch',block='dangerous',needed_for='none',attempts=1)])
+        self.only('factory-retro')
+
+    def test_malformed_incident_evidence_stops_for_human_review_and_never_launches_reviews(self):
+        self.verify_with(tool_incidents=[dict(command='x')])
+        terminal=self.project()['terminal']
+        self.assertEqual(terminal['phase'],'human_review')
+        self.assertIn('tool incident',terminal['reason'])
+        self.assertFalse([r for r in self.board.ready() if r['kind']=='review'])
+
     def test_visual_mismatch_calls_artist_then_verifier_not_developer(self):
         tasks=[dict(id='sprites',title='Make sprites',owner='artist',dependencies=[],acceptance={'AC1':'Sprite'},
                     needs=dict(art=True,audio=False,ui=False,ux=False))]

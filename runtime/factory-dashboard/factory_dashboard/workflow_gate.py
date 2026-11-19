@@ -1,6 +1,8 @@
 """Pure policy for same-manifest review, bounded repairs and human escalation."""
 from dataclasses import dataclass
 
+from .tool_incidents import tool_blockers
+
 
 @dataclass(frozen=True)
 class GateDecision:
@@ -25,8 +27,9 @@ def evaluate_cycle(writer, readers, previous_cycle, max_repairs, repairs_used, c
         reader_start=len(blocking)
         if data['manifest_sha12'] != writer.metadata['manifest_sha12']:
             return GateDecision('human_review','Review manifest does not match the writer')
-        if data.get('blocked_tools'):
-            return GateDecision('human_review','Required tools or security checks could not run')
+        blockers=tool_blockers(data)
+        if blockers:
+            return GateDecision('human_review','Required tools or security checks could not run: '+'; '.join(blockers))
         if reader.kind=='verify':
             results = data['ac_results']
             if set(results) != set(writer.metadata['ac_ids']):
