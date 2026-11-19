@@ -286,6 +286,9 @@ class ProjectController:
                             'Do not change the approved plan to make a mismatch pass. ' if repair else '')
             instructions += 'Read every inherited plan and TASK acceptance criteria. Use the relevant production skill for assets. '
             instructions += 'Integrate required art and audio outputs; run applicable checks and rebuild the cumulative project manifest.'
+            instructions += ('\nIf a test, build or gate fails, including tests you just wrote, diagnose it and fix the test or the code, '
+                             'then re-run, repeating until every gate you can run passes. A failure you can fix is never a reason for '
+                             'VERDICT=BLOCKED; use BLOCKED only for a missing tool or capability you cannot provide.')
             instructions += '\n' + PLAN_DEFECT
             node = self._node(conn, root, definition, context, project, key, 'repair' if repair else 'implement', profile,
                               instructions, work['writer_inputs'], task=task, cycle=cycle)
