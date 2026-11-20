@@ -328,7 +328,7 @@ class ProjectController:
                 kept = {k: v for k, v in kept.items() if k in ('contract', 'workflow_contract', 'root', 'stage_key', 'cycle', 'stage', 'verdict', 'manifest_sha12', 'ac_ids', 'ac_results')}
         except Exception:
             kept = {}
-        required = dict(contract='factory-worker/v2', workflow_contract='factory-workflow/v1', root=root['root_id'], stage_key=key,
+        required = dict(contract='factory-worker/v2', workflow_contract='factory-workflow/v1', root=root['root_id'], stage_key=key, stage=key,
                         cycle=cycle + 1, verdict='one of ' + ' | '.join(VERDICTS[kind]))
         return dict(attempt=attempt, max_attempts=limit, rejected_task=row['task_id'], reason=reason or result.reason, required_identity=required,
                     instruction='Resubmit the handoff with the missing or wrong fields corrected. Keep what was valid; redo work only if the reason requires it. '

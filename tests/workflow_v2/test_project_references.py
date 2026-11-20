@@ -155,6 +155,7 @@ class ReferenceModuleTests(unittest.TestCase):
                 'The current palette.txt has no steel grey and no hazard stripe colour, so the bible must be amended before V1 hazard stripes can be checked.',
                 'T1 amends STYLE.md to remove the superseded greybox-only rules and add painted classes that carry V1 hazard stripes and V2 slanted segments.',
                 'Room01PresentationTests assert V1 hazard stripes and V2 slanted segments through the L-rules and the presence of spark effects instead of greybox assertions that every sprite is WhiteSquare.',
+                'style.json gains painted classes for V1 hazard stripes and V2 slanted segments. The existing WhiteSquare blockout class keeps its current file pattern.',
                 'SUPERSEDED (rewrite, do not preserve): AC10 grey-box assertions for V1 hazard stripes; greybox-only assertions replaced by V2 slanted segment checks.'):
             self.assertEqual(refs.find_contradictions(faithful, {'PLAN.md': sentence}), [], sentence)
 
@@ -175,6 +176,10 @@ class ReferenceModuleTests(unittest.TestCase):
     def test_instead_of_a_simplification_is_accepted_but_the_simplification_itself_is_not(self):
         self.assertEqual(refs.find_contradictions(self.records, {'PLAN.md': 'V1 hazard stripes are painted instead of greybox rectangles.'}), [])
         found = refs.find_contradictions(self.records, {'PLAN.md': 'V1 hazard stripes are delivered as greybox rectangles instead of painted trim.'})
+        self.assertEqual({c['kind'] for c in found}, {'implicit_deferral'})
+
+    def test_keeping_an_existing_class_is_not_a_deferral_but_delivering_the_requirement_as_one_is(self):
+        found = refs.find_contradictions(self.records, {'PLAN.md': 'V1 hazard stripes are delivered as blockout rectangles and the look stays that way.'})
         self.assertEqual({c['kind'] for c in found}, {'implicit_deferral'})
 
     def test_a_removal_word_far_from_the_simplification_does_not_excuse_it(self):

@@ -334,7 +334,7 @@ _SIMPLIFY = re.compile(r"\b(grey-?box\w*|gray-?box\w*|placeholder\w*|blockout\w*
 # Deferrals of the entire visual style need no requirement keyword: a bible or plan that declares the style itself postponed contradicts any approved visual reference.
 _GLOBAL_DEFERRAL = re.compile(r"\b(grey-?box only|only grey-?box|gray-?box only|deferred look|look is deferred|no (?:new )?textures|no painted art|"
                               r"placeholder (?:art|look|visuals?|assets?)|flat (?:untextured )?(?:squares|rectangles) only)\b", re.I)
-_PRESERVING = re.compile(r"\b(byte-identical|unchanged|preserv\w*|remains?|retained|not modified)\b", re.I)
+_PRESERVING = re.compile(r"\b(byte-identical|unchanged|preserv\w*|remains?|retained|not modified)\b|\b(?:existing|current)\b[^.;]{0,60}\b(?:keeps?|kept|stays?|retains?)\b", re.I)
 _TARGETING = re.compile(r"\b(similar\w*|compar\w*|match\w*|target\w*|baseline|against|reference\w*|expected|scor\w*|threshold)\b", re.I)
 
 
