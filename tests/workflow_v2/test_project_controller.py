@@ -1124,6 +1124,37 @@ class ProjectControllerTests(unittest.TestCase):
         fresh = self.only('security-reviewer')  # only the stalled reviewer: no second verification, no repeat of the accepted claude review
         self.assertEqual(fresh['evidence_retry'], reviewer['evidence_retry'] + 1)
 
+    def style_task_reviewers(self, changed_files):
+        self.tick()
+        self.board.complete(self.only('factory-orchestrator'), project_scope=dict(art=True, audio=False, ui=True, ux=False)); self.tick()
+        self.board.complete(self.only('art-director')); self.tick()
+        self.approve()
+        self.architect([MIXED])
+        self.board.complete(self.only('claude-reviewer')); self.tick()
+        extra = dict(changed_files=changed_files) if changed_files is not None else {}
+        self.board.complete(self.only('developer'), **extra); self.tick()
+        self.board.complete(self.only('verifier')); self.tick()
+        return {r['profile'] for r in self.board.ready()}
+
+    def test_a_task_that_changed_only_the_style_bible_is_reviewed_without_the_art_reviewer(self):
+        panel = self.style_task_reviewers(['art/style/STYLE.md', 'art/style/style.json', 'art/style/reference/look-D.png'])
+        self.assertNotIn('art-reviewer', panel)
+        self.assertIn('ui-reviewer', panel)  # every other reviewer the task needs still reviews it
+        self.assertTrue(self.project()['work']['style_only'])
+
+    def test_a_task_with_real_art_or_no_file_list_keeps_the_art_reviewer(self):
+        self.assertIn('art-reviewer', self.style_task_reviewers(['art/style/STYLE.md', 'Assets/Art/Room01/wall.png']))
+        self.assertFalse(self.project()['work']['style_only'])
+
+    def test_without_a_changed_file_list_the_art_reviewer_stays(self):
+        self.assertIn('art-reviewer', self.style_task_reviewers(None))
+
+    def test_the_panel_never_drops_the_art_reviewer_from_the_final_integration(self):
+        from factory_dashboard.project_controller import ProjectController
+        task = dict(id='integration', needs=dict(art=True, audio=False, ui=True, ux=False), risk='normal')
+        panel = ProjectController._panel(['claude-reviewer', 'art-reviewer', 'ui-reviewer'], task, dict(style_only=True))
+        self.assertIn('art-reviewer', panel)
+
     # --- the independent plan review is off by default ---
     def review_off(self):
         from unittest import mock

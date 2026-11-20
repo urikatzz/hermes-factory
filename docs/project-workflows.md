@@ -101,6 +101,10 @@ Integration failures have an owner. A failing acceptance criterion is attributed
 
 `factory-retro` runs after a successful or unsuccessful project outcome. It writes retained `RETRO.md` with evidence, root causes, prioritized improvements, tradeoffs and validation steps. It has a scratch workspace and cannot apply improvements, modify Factory configuration, change outcomes, or publish. A missing retro report cannot silently become success.
 
+## Review panel for style-only tasks
+
+The art-reviewer compares rendered output with the approved image. A task whose writer changed only files under `art/style/` (the style bible: `STYLE.md`, `style.json`, reference images) has nothing to render, so the panel leaves the art-reviewer out for that task (`work.style_only`); the other reviewers it needs still review it, and bible fidelity is still checked by the verifier's criteria and the deterministic contradiction scan. A task with real art, or a writer that reports no changed-file list, keeps the art-reviewer, and the final integration always gets the complete panel with in-engine screenshots.
+
 ## Hermes patches and updates
 
 The Factory depends on local patches to the Hermes source (`runtime/hermes-patches`: version-controlled git patches, a manifest, and `hermes_patches.py status|apply|export`). A Hermes update resets the source tree and removes them, so the plugin checks for them when it loads (`hermes_compat.py`) and withholds its run-board support claim if they are missing. The `factory_patch_check.py` cron job records `state/factory/hermes-patches.json`, alerts once per change, pauses new intake while patches are missing, and reapplies clean patches by default (`--check-only` disables that) (never during an update, never over a conflict, never restarting the gateway). See `runtime/hermes-patches/README.md`.

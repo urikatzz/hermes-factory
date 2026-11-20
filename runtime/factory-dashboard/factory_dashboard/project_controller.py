@@ -373,6 +373,9 @@ class ProjectController:
         """Reviewers for this cycle. Final integration always gets the complete panel on the delivered manifest."""
         integration = task['id'] == 'integration'
         profiles = review_profiles(task['needs'], selected, integration or task.get('risk') == 'high')
+        if work.get('style_only') and not integration:
+            # The art-reviewer compares rendered output with the approved image; a task that changed only the style bible has none.
+            profiles = [p for p in profiles if p != 'art-reviewer']
         scoped = None if integration else work.get('panel')
         return [p for p in profiles if p in scoped] if scoped else profiles
 
@@ -731,6 +734,8 @@ class ProjectController:
         if verifier.metadata['verdict'] != 'PASS':
             raise ConfigurationError('Review requires an explicit successful verifier')
         work.update(step='reviewing', snapshot=verifier.metadata.get('snapshot'))
+        changed = writer.metadata.get('changed_files')
+        work['style_only'] = bool(changed) and isinstance(changed, list) and all(isinstance(p, str) and p.startswith('art/style/') for p in changed)
         profiles = self._panel([s.profile for s in definition.reviewers], task, work)
         readers, rows, waiting = [verifier], [verifier_row], False
         for profile in profiles:
