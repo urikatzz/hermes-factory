@@ -114,7 +114,7 @@ class ProjectController:
         if not rows or retry_requested:
             if approved and refs.must_inspect(profile, key):
                 # A stage that must look at the reference cannot be created for a profile that cannot open images.
-                problem = refs.vision_problem(profile, os.environ.get('FACTORY_HERMES_HOME') or os.environ.get('HERMES_HOME') or Path.home() / '.hermes')
+                problem = refs.vision_problem(profile, self._hermes_home())
                 if problem:
                     raise ProjectBlocked('Visual capability missing: ' + problem)
             retry = rows[0]['evidence_retry'] + 1 if rows else 0
@@ -173,7 +173,7 @@ class ProjectController:
 
     @staticmethod
     def _hermes_home():
-        return Path(os.environ.get('FACTORY_HERMES_HOME') or os.environ.get('HERMES_HOME') or Path.home() / '.hermes')
+        return refs.hermes_root(os.environ, Path.home() / '.hermes')
 
     @staticmethod
     def _describe(findings):

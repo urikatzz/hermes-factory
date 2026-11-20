@@ -162,6 +162,12 @@ def must_inspect(profile, key):
     return profile in INSPECTING_PROFILES or key == PLAN_REVIEW_KEY
 
 
+def hermes_root(environ, default):
+    """The Hermes home that holds profiles/<name>. A controller running inside a profile sees HERMES_HOME as <root>/profiles/<profile>; the root is two levels up."""
+    home = Path(environ.get('FACTORY_HERMES_HOME') or environ.get('HERMES_HOME') or default)
+    return home.parent.parent if home.parent.name == 'profiles' else home
+
+
 def vision_problem(profile, home):
     """None when the profile can open images, else why not. Reads the profile's own toolset list."""
     config = Path(home) / 'profiles' / profile / 'config.yaml'

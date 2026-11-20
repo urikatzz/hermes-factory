@@ -107,6 +107,18 @@ class ReferenceModuleTests(unittest.TestCase):
         with self.assertRaisesRegex(ConfigurationError, 'unreadable'):
             refs.vision_proof('nobody', 'sessionAAAA', home, wanted)
 
+    def test_a_controller_running_inside_a_profile_still_finds_the_hermes_root(self):
+        root = Path(self.temp.name) / 'hermes'
+        inside = root / 'profiles' / 'factory-orchestrator'
+        self.assertEqual(refs.hermes_root({'HERMES_HOME': str(inside)}, '/nowhere'), root)
+        self.assertEqual(refs.hermes_root({'HERMES_HOME': str(root)}, '/nowhere'), root)
+        self.assertEqual(refs.hermes_root({}, root), root)
+        self.assertEqual(refs.hermes_root({'FACTORY_HERMES_HOME': str(root), 'HERMES_HOME': str(inside)}, '/nowhere'), root)
+        for profile in ('art-director', 'architect'):
+            (root / 'profiles' / profile).mkdir(parents=True, exist_ok=True)
+            (root / 'profiles' / profile / 'config.yaml').write_text('platform_toolsets:\n  cli:\n  - kanban\n  - vision\n')
+        self.assertIsNone(refs.vision_problem('art-director', refs.hermes_root({'HERMES_HOME': str(inside)}, '/nowhere')))
+
     def test_the_plain_contradiction_that_started_this_is_found_in_the_bible_and_in_plans(self):
         rule = 'S9 (blocking) Deferred look: no hazard stripes, crosshair corner marks or painted art (GDD milestone 6).'
         found = refs.find_contradictions(self.records, {'art/style/STYLE.md': 'S1 Palette is charcoal.\n' + rule})
