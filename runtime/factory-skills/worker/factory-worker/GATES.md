@@ -14,6 +14,8 @@ A root header may carry lines `GATE: <path prefix> => <command>`, run from the r
 ## WRITER_GATE lines (checks that need the full checkout)
 Some checks cannot run on the verifier's manifest copy (for example Unity compile and tests need the whole project). The header lists them as `WRITER_GATE: <path prefix> => <command>`. The developer runs each matching command in PROJECT_DIR before completing and reports its one-line result in `checks_run`; the publisher then re-runs them independently on the host before any PR is opened, so a failure there blocks publishing. Unity: always `sh $HOME/.hermes/scripts/unity_gate.sh . EditMode` (official Unity CLI, one editor at a time, cloned Library cache); never call the Unity editor binary directly.
 
+A check that cannot run on the frozen copy for lack of what it needs is not applicable and never a failed check: a Unity gate on a manifest that is not a Unity project, `npm audit` with no `package.json` or lockfile (ENOLOCK), a tool that is not installed. Record it in `residual_risk`.
+
 A command that needs the whole checkout is a writer gate wherever it was named (a GATE header, a card, a ticket note). The verifier runs it on the frozen copy only when that copy is a complete project; otherwise it does not run it, never records it in `failed_checks`, confirms the writer's `checks_run` result, and says in `residual_risk` that it was not run on the manifest. A failed check the verifier does record that is preexisting or has no fix stops the project for a human.
 
 ## Rules by PROJECT_MODE

@@ -1123,9 +1123,10 @@ class ProjectControllerTests(unittest.TestCase):
     def test_the_verifier_card_says_gates_needing_the_whole_checkout_are_writer_gates(self):
         self.plan(); self.board.complete(self.only('developer')); self.tick()
         card = self.board.cards[self.only('verifier')['task_id']]['body']
-        self.assertIn('are writer gates, not verifier checks', card)
-        self.assertIn('never record it in failed_checks', card)
+        self.assertIn('These are writer or publisher gates', card)
+        self.assertIn('never in failed_checks', card)
         self.assertIn('Not a Unity project', card)
+        self.assertIn('npm audit', card); self.assertIn('ENOLOCK', card); self.assertIn('residual_risk and never in failed_checks', card)
 
     # --- uncovered project ACs are surfaced, reviewed and made explicit integration work ---
     def test_an_uncovered_project_ac_is_recorded_shown_to_the_plan_reviewer_and_is_not_an_error(self):
