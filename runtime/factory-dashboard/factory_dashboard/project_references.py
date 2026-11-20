@@ -587,7 +587,7 @@ def validate_role_findings(record, references, kind, tasks=(), screenshots=(), f
             if entry['verdict'] in ('weakened', 'missing', 'differs'):
                 blocking = [f for f in findings if identifier in f and f.split('|', 4)[1] in ('BLOCKER', 'HIGH')]
                 if not blocking or (kind == 'render_check' and verdict != 'CHANGES_REQUIRED'):
-                    raise ConfigurationError('A ' + entry['verdict'] + ' ' + identifier + ' needs a BLOCKER/HIGH finding naming it' + (' and the verdict CHANGES_REQUIRED' if kind == 'render_check' else ''))
+                    raise ConfigurationError('A ' + entry['verdict'] + ' ' + identifier + ' needs a BLOCKER/HIGH finding whose text contains the id "' + identifier + '" (write it in the finding itself, e.g. "AC3|scene|' + identifier + ': ...")' + (' and the verdict CHANGES_REQUIRED' if kind == 'render_check' else ''))
         seen[identifier] = entry
     missing = sorted(set(required) - set(seen))
     if missing:
