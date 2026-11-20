@@ -1038,18 +1038,32 @@ class ProjectControllerTests(unittest.TestCase):
         self.assertEqual(self.only('architect')['cycle'], 1)
         self.assertNotIn('correction', self.project())
 
-    def test_a_correction_that_changes_an_acceptance_criterion_escalates_and_spends_no_budget(self):
+    def test_a_correction_that_changes_an_acceptance_criterion_becomes_an_architectural_replan(self):
         self.reviewed_plan(self.LOCAL, {'F1': 'correction'}, self.BASELINE)
         self.correct(tasks=[dict(CODE, acceptance={'AC1': 'A weaker criterion'})])
-        self.assertEqual(self.project()['terminal']['phase'], 'human_review')
-        self.assertIn('changed architecture or acceptance criteria', self.project()['terminal']['reason'])
-        self.assertEqual(self.project().get('replans', 0), 0)
-        self.assertEqual(self.project()['plan_corrections'], {})
+        project = self.project()
+        self.assertNotIn('terminal', project)
+        self.assertNotIn('correction', project)
+        self.assertEqual(project['replans'], 1)  # a full replan, so the full plan review follows
+        self.assertEqual(project['plan_corrections'], {})
+        self.assertIn('plan_correction_escalated', [e['kind'] for e in project['orchestration_log']])
+        self.assertEqual(self.only('architect')['cycle'], 1)
 
-    def test_a_correction_that_adds_a_task_or_changes_an_owner_also_escalates(self):
+    def test_a_correction_that_adds_a_task_or_changes_an_owner_also_becomes_a_replan(self):
         self.reviewed_plan(self.LOCAL, {'F1': 'correction'}, self.BASELINE)
         self.correct(tasks=[CODE, dict(CODE, id='extra', title='Extra', dependencies=['code'])])
-        self.assertIn('extra', self.project()['terminal']['reason'])
+        self.assertEqual(self.project()['replans'], 1)
+        self.assertNotIn('terminal', self.project())
+
+    def test_an_escalating_correction_stops_for_a_human_only_when_the_replan_budget_is_spent(self):
+        self.reviewed_plan(self.LOCAL, {'F1': 'correction'}, self.BASELINE)
+        spent = self.project()
+        spent['replans'] = 2
+        self.conn.execute('UPDATE factory_project_execution SET document=?', (json.dumps(spent, sort_keys=True),))
+        self.correct(tasks=[dict(CODE, acceptance={'AC1': 'A weaker criterion'})])
+        self.assertEqual(self.project()['terminal']['phase'], 'human_review')
+        self.assertIn('replan budget is exhausted', self.project()['terminal']['reason'])
+        self.assertEqual(self.project()['replans'], 2)
 
     def test_a_correction_may_not_drop_the_original_integrity_baselines_and_may_retry_once(self):
         self.reviewed_plan(self.LOCAL, {'F1': 'correction'}, self.BASELINE)

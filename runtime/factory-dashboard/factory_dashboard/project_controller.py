@@ -398,7 +398,13 @@ class ProjectController:
             return self._correction_failed(conn, root, project, correction, key, 'Corrected plan failed structural validation: ' + str(exc))
         if sorted(result.metadata['ac_ids']) != sorted(project['ac_ids']) or plan_architecture_diff(project['tasks'], tasks):
             changed = plan_architecture_diff(project['tasks'], tasks) or ['project acceptance IDs']
-            raise ConfigurationError('Plan correction changed architecture or acceptance criteria (' + ', '.join(changed) + '): that needs an architectural replan or a human decision')
+            reason = 'Plan correction changed architecture or acceptance criteria (' + ', '.join(changed) + ')'
+            # A correction that outgrew its remit becomes a full architectural replan (full plan review, normal replan budget); only an exhausted budget stops for a human.
+            if self._replan(conn, root, project, None, reason, correction['findings'], [correction['review_task'], row['task_id']]):
+                project.pop('correction', None)
+                project.setdefault('orchestration_log', []).append(dict(kind='plan_correction_escalated', generation=gen, reason=reason[:300], at=int(time.time())))
+                return True
+            raise ConfigurationError(reason + ': that needs an architectural replan, and the replan budget is exhausted; grant extra_replans and resume')
         evidence = plan_evidence('architect', row['task_id'], result.metadata)
         previous = next(p for p in project['plans'] if p['profile'] == 'architect')
         try:
