@@ -1042,6 +1042,24 @@ class ProjectControllerTests(unittest.TestCase):
         self.assertEqual(self.project()['terminal']['phase'], 'human_review')
         self.assertNotIn('model_overrides', self.project())
 
+    def test_a_repair_card_the_worker_blocked_is_redispatched_as_a_new_attempt_after_a_decision(self):
+        self.plan(); self.board.complete(self.only('developer')); self.tick()
+        findings = ['F1|HIGH|AC1|code.py|Real defect to repair', 'F2|MEDIUM|AC1|notes.md|Wording a human must confirm']
+        self.board.complete(self.only('verifier'), verdict='FAIL', ac_results={'AC1': 'fail'}, findings=findings, repair_domains=['code']); self.tick()
+        stalled = self.only('fixer')
+        self.conn.execute("UPDATE tasks SET status='blocked' WHERE id=?", (stalled['task_id'],)); self.conn.commit()  # the worker called kanban_block
+        self.tick(); self.board.complete(self.only('factory-retro')); self.tick()
+        self.assertEqual(self.state.read_root(self.conn, self.root)['phase'], 'blocked')
+        waiver = dict(waivers=[dict(ac='AC1', path='notes.md', source='verifier', reason='Human confirmed this wording is authoritative')])
+        self.controller.resume(self.conn, self.root, 'Waive F2 only; F1 still needs repair', waiver)
+        self.tick()
+        fresh = self.only('fixer')  # the same profile again: a new attempt, not the blocked card and not another stop
+        self.assertNotEqual(fresh['task_id'], stalled['task_id'])
+        self.assertEqual((fresh['stage_key'], fresh['evidence_retry']), (stalled['stage_key'], stalled['evidence_retry'] + 1))
+        self.assertNotIn('terminal', self.project())
+        card = self.board.cards[fresh['task_id']]['body']
+        self.assertIn('F1|HIGH|AC1|code.py', card); self.assertNotIn('F2|MEDIUM', card)
+
     # --- the independent plan review is off by default ---
     def review_off(self):
         from unittest import mock

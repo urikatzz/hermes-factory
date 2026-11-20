@@ -1123,11 +1123,14 @@ class ProjectController:
                 # The repairs were dispatched against findings the decision may have changed: retire the stalled repair and
                 # judge the evidence that already exists again, instead of repeating verification or review work. The stalled card is left
                 # on the board (blocked, harmless): archiving needs its own transaction, which this one already holds.
+                stalled = [f'{prefix}-repair-{profile}:{work["cycle"]}' for profile in work['repairs']]
                 work.update(step='reviewing', cycle=work['cycle'] - 1, repairs=[])
                 if work.get('charges'):
                     work['charges'].pop()  # the repair that never ran was never spent
                 work.pop('repair_findings', None)
-                project['retry_keys'] = []
+                # A repair that is still needed for the same profile reuses the stage key of the card that stalled (possibly one the worker
+                # blocked itself); it must start as a new attempt, not stop on that card again.
+                project['retry_keys'] = stalled
             elif reevaluate:
                 # Judge the evidence that already exists again under the current rules: no stage is retried or repeated.
                 project['retry_keys'] = []
