@@ -152,5 +152,58 @@ class InfrastructureFaultTests(AdjudicationFlow):
         self.assertEqual(self.document().get('handoff_retries', {}), {})  # nothing charged to the worker
 
 
+class HandoffGrantTests(AdjudicationFlow):
+    def exhausted_architect(self):
+        self.explained_director()
+        self.approve()
+        for _ in range(3):
+            self.finish(self.only('architect'), 'V1 V2 carried.', inspected=False)
+        self.assertEqual(self.terminal()['phase'], 'human_review')
+        while self.board.ready():
+            self.board.complete(self.board.ready()[0])
+            self.tick()
+        self.assertEqual(self.state.read_root(self.conn, self.root)['phase'], 'human_review')
+
+    def test_the_retry_message_gives_the_exact_summary_header_and_artifact_rules(self):
+        self.explained_director()
+        self.approve()
+        self.finish(self.only('architect'), 'V1 V2 carried.', inspected=False)
+        instruction = self.rejection('architect')[1]['previous_handoff_rejected']['instruction']
+        self.assertIn('VERDICT=<verdict> STAGE=<the same value as metadata.stage>', instruction)
+        self.assertIn('never list paths from the rejected task or from any cache or scratch folder', instruction)
+
+    def test_exhausted_retries_stop_for_human_review_and_plain_recovery_cannot_continue(self):
+        self.exhausted_architect()
+        with self.assertRaisesRegex(Exception, 'Only an infrastructure-blocked project can resume'):
+            self.controller.resume(self.conn, self.root, 'Retry please')
+
+    def test_a_bounded_audited_human_grant_continues_the_approved_run_without_new_approval(self):
+        self.exhausted_architect()
+        approved = self.document()['approvals']['art-director']['sha256']
+        self.controller.resume(self.conn, self.root, 'The architect kept slipping on the completion contract; the controller now explains it.', dict(extra_handoff_retries=1))
+        self.assertEqual(self.state.read_root(self.conn, self.root)['phase'], 'project')
+        stage = self.only('architect')
+        self.assertIn('human_approvals', self.board.cards[stage['task_id']]['body'])
+        document = self.document()
+        self.assertEqual(document['approvals']['art-director']['sha256'], approved)  # nothing is re-approved or re-asked
+        grant = [e for e in document['orchestration_log'] if e['kind'] == 'human_handoff_grant']
+        self.assertEqual((len(grant), grant[0]['amount'], grant[0]['budgets']), (1, 1, ['project-architect:0']))
+        self.finish(stage, 'V1 V2 carried.', inspected=False)  # a grant of 1 restores exactly one retry: the first slip is retried ...
+        self.assertIsNone(self.document().get('terminal'))
+        self.finish(self.only('architect'), 'V1 V2 carried.', inspected=False)  # ... and the next one stops again
+        self.assertEqual(self.terminal()['phase'], 'human_review')
+
+    def test_a_grant_is_refused_without_an_exhausted_budget_a_note_or_within_bounds(self):
+        self.explained_director()
+        self.approve()
+        self.finish(self.only('architect'), 'V1 V2 carried.', inspected=False)  # one retry spent, none exhausted
+        with self.assertRaisesRegex(Exception, 'none is'):
+            self.controller.resume(self.conn, self.root, 'grant', dict(extra_handoff_retries=1))
+        with self.assertRaisesRegex(Exception, 'from 0 to 3'):
+            self.controller.resume(self.conn, self.root, 'grant', dict(extra_handoff_retries=4))
+        with self.assertRaisesRegex(Exception, 'recovery decision is required'):
+            self.controller.resume(self.conn, self.root, '', dict(extra_handoff_retries=1))
+
+
 if __name__ == '__main__':
     unittest.main()

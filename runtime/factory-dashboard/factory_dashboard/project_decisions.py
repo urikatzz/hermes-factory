@@ -40,6 +40,7 @@ KINDS = ('immutable', 'palette', 'layout', 'architecture', 'behavior', 'acceptan
 MAX_EXTRA_REPAIRS = 2
 EXHAUSTION = ('replan', 'human_review')
 MAX_EXTRA_REPLANS = 1
+MAX_EXTRA_HANDOFF_RETRIES = 3
 AUDIT_LIMIT = 50
 
 
@@ -113,11 +114,11 @@ def validate_plan_constraints(value):
 
 def normalize_decisions(decisions, note, now=None):
     """Validate a human decision document; return it ready to store."""
-    empty = dict(waivers=[], constraints=[], extra_repairs=0, extra_replans=0, on_exhaustion=None, plan_correction=[])
+    empty = dict(waivers=[], constraints=[], extra_repairs=0, extra_replans=0, extra_handoff_retries=0, on_exhaustion=None, plan_correction=[])
     if decisions in (None, {}):
         return empty
-    if not isinstance(decisions, dict) or set(decisions) - {'waivers', 'constraints', 'extra_repairs', 'extra_replans', 'on_exhaustion', 'plan_correction'}:
-        raise ConfigurationError('A decision may only contain waivers, constraints, extra_repairs, extra_replans, on_exhaustion and plan_correction')
+    if not isinstance(decisions, dict) or set(decisions) - {'waivers', 'constraints', 'extra_repairs', 'extra_replans', 'extra_handoff_retries', 'on_exhaustion', 'plan_correction'}:
+        raise ConfigurationError('A decision may only contain waivers, constraints, extra_repairs, extra_replans, extra_handoff_retries, on_exhaustion and plan_correction')
     stamp = int(time.time() if now is None else now)
     waivers = []
     for item in decisions.get('waivers') or []:
@@ -144,12 +145,15 @@ def normalize_decisions(decisions, note, now=None):
     extra_replans = decisions.get('extra_replans', 0)
     if type(extra_replans) is not int or not 0 <= extra_replans <= MAX_EXTRA_REPLANS:
         raise ConfigurationError(f'extra_replans must be an integer from 0 to {MAX_EXTRA_REPLANS} per decision')
+    extra_handoff = decisions.get('extra_handoff_retries', 0)
+    if type(extra_handoff) is not int or not 0 <= extra_handoff <= MAX_EXTRA_HANDOFF_RETRIES:
+        raise ConfigurationError(f'extra_handoff_retries must be an integer from 0 to {MAX_EXTRA_HANDOFF_RETRIES}')
     correction = decisions.get('plan_correction') or []
     if not isinstance(correction, list) or len(correction) > 20 or any(not isinstance(i, str) or not re.fullmatch(r'F[0-9]{1,3}', i) for i in correction):
         raise ConfigurationError('plan_correction must list plan-review finding ids such as F1')
-    if (extra or extra_replans or on_exhaustion or correction) and not note.strip():
+    if (extra or extra_replans or extra_handoff or on_exhaustion or correction) and not note.strip():
         raise ConfigurationError('Granting repairs or changing exhaustion handling requires a recorded note')
-    return dict(waivers=waivers, constraints=constraints, extra_repairs=extra, extra_replans=extra_replans, on_exhaustion=on_exhaustion, plan_correction=sorted(set(correction)))
+    return dict(waivers=waivers, constraints=constraints, extra_repairs=extra, extra_replans=extra_replans, extra_handoff_retries=extra_handoff, on_exhaustion=on_exhaustion, plan_correction=sorted(set(correction)))
 
 
 def finding_file(finding):

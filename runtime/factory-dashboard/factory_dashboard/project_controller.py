@@ -313,7 +313,10 @@ class ProjectController:
                         cycle=cycle + 1, verdict='one of ' + ' | '.join(VERDICTS[kind]))
         return dict(attempt=attempt, max_attempts=limit, rejected_task=row['task_id'], reason=reason or result.reason, required_identity=required,
                     instruction='Resubmit the handoff with the missing or wrong fields corrected. Keep what was valid; redo work only if the reason requires it. '
-                                'Prior attachments are readable from the rejected task.', previous_valid_metadata=kept)
+                                'Prior attachments are readable from the rejected task: read them there, write your files again under $HERMES_KANBAN_WORKSPACE in THIS run and list those new absolute paths in '
+                                'kanban_complete(artifacts=[...]); never list paths from the rejected task or from any cache or scratch folder. '
+                                'The first line of the summary must be exactly VERDICT=<verdict> STAGE=<the same value as metadata.stage> CYCLE=<metadata.cycle> MANIFEST=<metadata.manifest_sha12>.',
+                    previous_valid_metadata=kept)
 
     @staticmethod
     def _inputs(project):
@@ -958,10 +961,23 @@ class ProjectController:
             self._state.event(conn, root['root_id'], 'human_plan_decision', decision)
             self._board._append_event(conn, root['root_id'], 'workflow_resumed', dict(note=note))
             return
-        stopped = ('blocked', 'human_review') if reevaluate else ('blocked',)
+        exhausted = {k: v for k, v in project.get('handoff_retries', {}).items() if v >= (MAX_SCAN_RETRIES if k.endswith(':scan') else MAX_HANDOFF_RETRIES)}
+        exhausted_plan = {k: v for k, v in project.get('plan_validation_retries', {}).items() if v >= MAX_PLAN_VALIDATION_RETRIES}
+        if decided['extra_handoff_retries'] and not (exhausted or exhausted_plan):
+            raise ConfigurationError('extra_handoff_retries applies to a stage whose handoff or plan-correction retries are exhausted; none is')
+        stopped = ('blocked', 'human_review') if reevaluate or decided['extra_handoff_retries'] else ('blocked',)
         if root['phase'] not in stopped or project.get('terminal', {}).get('phase') not in stopped:
             raise ConfigurationError('Only an infrastructure-blocked project can resume; changed scope requires a new task')
         project.update(mode=project['resume_mode'], active_keys=[], recoveries=project.get('recoveries', 0)+1, recovery_note=note)
+        if decided['extra_handoff_retries']:
+            # A bounded, audited human grant: the exhausted budgets get this many attempts back. Approvals, the approved plan and every other state stay as they are.
+            grant = decided['extra_handoff_retries']
+            for key, value in exhausted.items():
+                project['handoff_retries'][key] = max(0, (MAX_SCAN_RETRIES if key.endswith(':scan') else MAX_HANDOFF_RETRIES) - grant)
+            for key in exhausted_plan:
+                project['plan_validation_retries'][key] = max(0, MAX_PLAN_VALIDATION_RETRIES - grant)
+            project.setdefault('orchestration_log', []).append(dict(kind='human_handoff_grant', amount=grant, budgets=sorted([*exhausted, *('plan:' + k for k in exhausted_plan)]),
+                                                                   reason=note.strip()[:500], at=int(time.time())))
         project.setdefault('scan_resolved', []).extend(i for i in re.findall(r'SCAN-BENIGN ([0-9a-f]{8})', note) if i not in project.get('scan_resolved', []))
         if project.get('references_digest'):
             task = self._board.get_task(conn, root['root_id'])
@@ -991,7 +1007,7 @@ class ProjectController:
         if decisions:
             self._state.event(conn, root['root_id'], 'human_decision', dict(note=note, waivers=[w['id'] for w in decided['waivers']],
                               constraints=decided['constraints'], extra_repairs=decided['extra_repairs'],
-                              extra_replans=decided['extra_replans'], on_exhaustion=decided['on_exhaustion'], plan_correction=decided['plan_correction'],
+                              extra_replans=decided['extra_replans'], extra_handoff_retries=decided['extra_handoff_retries'], on_exhaustion=decided['on_exhaustion'], plan_correction=decided['plan_correction'],
                               execution_version=2))
         gen = project.get('gen', 0)
         if 'work' in project:
