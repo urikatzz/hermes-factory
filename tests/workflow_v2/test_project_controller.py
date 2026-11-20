@@ -1074,6 +1074,13 @@ class ProjectControllerTests(unittest.TestCase):
         # The unrun review card stays on the board (the controller never archives mid-transaction); the project moves on without it.
         self.assertTrue(self.conn.execute("SELECT 1 FROM factory_workflow_stages WHERE stage_key='task-code-implement'").fetchone())
 
+    def test_the_verifier_card_says_gates_needing_the_whole_checkout_are_writer_gates(self):
+        self.plan(); self.board.complete(self.only('developer')); self.tick()
+        card = self.board.cards[self.only('verifier')['task_id']]['body']
+        self.assertIn('are writer gates, not verifier checks', card)
+        self.assertIn('never record it in failed_checks', card)
+        self.assertIn('Not a Unity project', card)
+
     # --- uncovered project ACs are surfaced, reviewed and made explicit integration work ---
     def test_an_uncovered_project_ac_is_recorded_shown_to_the_plan_reviewer_and_is_not_an_error(self):
         self.start_planning()

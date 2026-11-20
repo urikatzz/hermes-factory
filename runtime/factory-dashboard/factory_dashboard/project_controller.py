@@ -7,7 +7,7 @@ import re
 import time
 
 from .model_policy import ConfigurationError
-from .project_cards import (ART_PLAN, ROLE_FINDINGS, APPROVED_COMPARISON, APPROVED_REFERENCES, INSPECTION, REFERENCE_AUDIT, VISUAL_TRACE, ARCHITECT, COMPARISON, CONFLICT_CHECK, SIMILARITY, DIRECTOR, PLAN_CORRECTION, PLAN_CORRECTION_REVIEW, PLAN_BLOCKED, PLAN_FINDING, SUPERSEDED,
+from .project_cards import (ART_PLAN, ROLE_FINDINGS, APPROVED_COMPARISON, APPROVED_REFERENCES, INSPECTION, REFERENCE_AUDIT, VISUAL_TRACE, ARCHITECT, COMPARISON, CONFLICT_CHECK, SIMILARITY, DIRECTOR, PLAN_CORRECTION, PLAN_CORRECTION_REVIEW, PLAN_BLOCKED, PLAN_FINDING, SUPERSEDED, WRITER_GATES,
                             PLAN_REVIEW, REPLAN, RETRO, SCOPE, SPEC_CONSTRAINTS, TOOL_INCIDENTS, project_card)
 from .project_decisions import (MAX_STAGE_RETRIES, constraint_view, constraints_of, normalize_decisions, preserved_conflict, record_applied, relevant_constraints,
                                 validate_plan_constraints, validate_spec_conflicts)
@@ -700,7 +700,7 @@ class ProjectController:
                           'Verify only TASK acceptance IDs against the exact cumulative manifest. Run tests, integration checks, asset lint gates and release audit. '
                           'Record repair_domains (code/art/audio) for failed asset or integration checks. Missing tools are environment gaps, never passes. '
                           'Never use inline interpreter flags such as python -c or node -e (the safety guard blocks them): read files with the file tools or run a script file. '
-                          + TOOL_INCIDENTS + '\n' + SPEC_CONSTRAINTS + '\n' + PLAN_FINDING,
+                          + WRITER_GATES + '\n' + TOOL_INCIDENTS + '\n' + SPEC_CONSTRAINTS + '\n' + PLAN_FINDING,
                           inputs, task=task, cycle=cycle)
         if not node:
             return False

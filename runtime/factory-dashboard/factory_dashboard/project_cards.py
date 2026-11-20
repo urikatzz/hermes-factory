@@ -115,6 +115,10 @@ inherited project ac_ids.'''
 
 SUPERSEDED = '''Earlier attempts of this stage ({ids}) are superseded. Their verdicts and MANIFEST values do not describe the current state, and the "Recent work" list in your context may still show them as DONE. Only the BASELINE and MANIFEST fields in this card's header apply: BASELINE none means there is no baseline to check, so never run fw.py check --expect with a manifest taken from an earlier attempt or from a "Recent work" entry. Work from the files as they are now.'''
 
+WRITER_GATES = '''Gates that need the whole checkout (Unity compile, EditMode and PlayMode tests, any command that exits because the frozen copy is not a complete project, for example "Not a Unity project")
+are writer gates, not verifier checks, whether they come from a GATE header, the card text or a ticket note. Run one on the frozen copy only when that copy is a complete project (its include list carries
+the project files the gate needs). Otherwise do not run it and never record it in failed_checks: confirm the writer's own recorded result in checks_run, and note in residual_risk that it was not run on the manifest.'''
+
 PLAN_BLOCKED = '''If the task plan or an acceptance criterion is wrong, contradictory or untestable, or the available tools cannot express it, do not work around it and do not weaken the criterion:
 finish VERDICT=BLOCKED with blocked_reason naming the criterion and why. The project then stops for a human, who decides. Nothing is sent back to the architect.'''
 
