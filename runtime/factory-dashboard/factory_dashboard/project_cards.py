@@ -119,6 +119,8 @@ WRITER_GATES = '''Gates that need the whole checkout (Unity compile, EditMode an
 are writer gates, not verifier checks, whether they come from a GATE header, the card text or a ticket note. Run one on the frozen copy only when that copy is a complete project (its include list carries
 the project files the gate needs). Otherwise do not run it and never record it in failed_checks: confirm the writer's own recorded result in checks_run, and note in residual_risk that it was not run on the manifest.'''
 
+CONTINUES = '''This card continues from the files the superseded attempt left on disk. Its MANIFEST and BASELINE are the manifest that attempt reported, so the start check passes only if nothing else changed. Keep what is correct and fix forward; undo only what contradicts this card.'''
+
 PLAN_BLOCKED = '''If the task plan or an acceptance criterion is wrong, contradictory or untestable, or the available tools cannot express it, do not work around it and do not weaken the criterion:
 finish VERDICT=BLOCKED with blocked_reason naming the criterion and why. The project then stops for a human, who decides. Nothing is sent back to the architect.'''
 

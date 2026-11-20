@@ -1060,6 +1060,27 @@ class ProjectControllerTests(unittest.TestCase):
         card = self.board.cards[fresh['task_id']]['body']
         self.assertIn('F1|HIGH|AC1|code.py', card); self.assertNotIn('F2|MEDIUM', card)
 
+    def test_a_retried_writer_starts_from_the_manifest_its_failed_predecessor_left_on_disk(self):
+        self.plan()
+        first = self.only('developer')
+        self.assertIn('BASELINE none', self.board.cards[first['task_id']]['body'])
+        self.board.complete(first, verdict='BLOCKED', blocked_reason='Could not finish', manifest_sha12='fedcba654321')  # it edited files and rebuilt the manifest
+        self.tick(); self.board.complete(self.only('factory-retro')); self.tick()
+        self.controller.resume(self.conn, self.root, 'Retry the writer', dict(retry_stage=True))
+        self.tick()
+        card = self.board.cards[self.only('developer')['task_id']]['body']
+        self.assertIn('MANIFEST fedcba654321', card); self.assertIn('BASELINE fedcba654321', card)
+        self.assertIn('continues from the files the superseded attempt left on disk', card)
+
+    def test_a_retried_writer_whose_predecessor_reported_no_new_manifest_keeps_the_card_baseline(self):
+        self.plan()
+        first = self.only('developer')
+        self.board.complete(first, verdict='BLOCKED', blocked_reason='Could not finish', manifest_sha12='none')
+        self.tick(); self.board.complete(self.only('factory-retro')); self.tick()
+        self.controller.resume(self.conn, self.root, 'Retry the writer', dict(retry_stage=True)); self.tick()
+        card = self.board.cards[self.only('developer')['task_id']]['body']
+        self.assertIn('BASELINE none', card); self.assertNotIn('continues from the files', card)
+
     # --- the independent plan review is off by default ---
     def review_off(self):
         from unittest import mock
