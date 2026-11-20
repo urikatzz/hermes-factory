@@ -26,7 +26,8 @@ An independent reviewer checks this plan before any task starts.'''
 REPLAN = '''This is a revision of the earlier plan; PROJECT_CONTEXT.replan gives the reason, the failing task and its findings.
 Correct the plan defect: fix wrong or untestable acceptance criteria, split oversized tasks, add missing tasks or dependencies.
 Tasks in PROJECT_CONTEXT.completed_tasks already passed: keep each of them in project-plan.json exactly as captured.
-Do not weaken an acceptance criterion merely so failing work passes; do not change director intent.'''
+Do not weaken an acceptance criterion merely so failing work passes; do not change director intent.
+A revision inherits nothing from the earlier round's files: write PLAN.md, project-plan.json and reference-inspection.json again in full, including the top-level "role_findings" of reference-inspection.json (one "carry" entry per approved requirement). Re-check that every task lists in its "visual" only ids that its own acceptance text names, that each criterion is at most 1000 characters, and that metadata.cycle is the cycle in your card header.'''
 
 APPROVED_REFERENCES = '''Approved references. PROJECT_CONTEXT.approved_references lists human-approved visual references (path, sha256, roles, requirement ids V*, any
 human-approved deferrals). Authority order, highest first: human-approved decisions and references > GDD > style bible and architecture > implementation
