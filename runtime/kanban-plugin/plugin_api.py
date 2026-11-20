@@ -1417,6 +1417,23 @@ def _board_counts(slug: str) -> dict[str, int]:
         return {}
 
 
+def _board_awaiting(slug: str) -> int:
+    """How many blocked cards on a board wait for a human decision; ``0`` on a missing board or one without factory tables.
+
+    Every Factory run lives on its own board, so the switcher needs this per board to show where approval is pending."""
+    try:
+        if not kanban_db.kanban_db_path(board=slug).exists():
+            return 0
+        with closing(kbc.connect(board=slug)) as conn:
+            ids = _awaiting_human_task_ids(conn)
+            if not ids:
+                return 0
+            marks = ",".join("?" for _ in ids)
+            return int(conn.execute(f"SELECT COUNT(*) FROM tasks WHERE status = 'blocked' AND id IN ({marks})", tuple(ids)).fetchone()[0])
+    except Exception:
+        return 0
+
+
 def _default_workspace_kind(board: dict[str, Any]) -> str:
     """Recommend a non-destructive task workspace from board metadata."""
     workdir = str(board.get("default_workdir") or "").strip()
@@ -1459,6 +1476,7 @@ def list_boards(include_archived: bool = Query(False)):
         # Live cards only — archived tasks are hidden from every default board view,
         # so counting them in the switcher badge would visibly disagree.
         b["total"] = sum(n for status, n in b["counts"].items() if status != "archived")
+        b["awaiting"] = _board_awaiting(b["slug"]) if not b.get("archived") else 0
         b["default_workspace_kind"] = _default_workspace_kind(b)
         pid = b["project_id"] = b.get("project_id") or None
         proj = proj_map.get(pid) if pid else None

@@ -2168,9 +2168,9 @@
               title: "Boards are independent work streams. Each board has its own tasks, tenants, and assignees.",
             }, selectChangeHandler(function (v) { if (v) props.onSwitch(v); })),
               list.map(function (b) {
-                const label = b.total > 0
+                const label = (b.total > 0
                   ? `${b.name || b.slug} · ${b.total}`
-                  : (b.name || b.slug);
+                  : (b.name || b.slug)) + (b.awaiting > 0 ? ` · ⚑ ${b.awaiting} awaiting approval` : "");
                 return h(SelectOption, { key: b.slug, value: b.slug }, label);
               }),
             ),

@@ -4,6 +4,7 @@ Run through test_multi_board.py (a subprocess, because Hermes keeps process-glob
 """
 from concurrent.futures import ThreadPoolExecutor
 import shutil
+import sys
 import tempfile
 import threading
 import unittest
@@ -280,6 +281,81 @@ class Scenarios(unittest.TestCase):
         self.assertEqual(self.f.resolver.resolve(self.f.default_path, 'default').kind, 'default')
         # Another board's default-label ticks never touch it.
         self.assertEqual(self.f.dispatch('default'), [])
+
+    # ---- dashboard and CLI over real boards
+    def test_14_cli_and_dashboard_operate_one_board_without_touching_others(self):
+        import http.client
+        import json
+        self.f.install_for_cli()
+        _, p, rp = self.run_for('ops p')
+        _, q, rq = self.run_for('ops q')
+        listing = self.f.cli('list', '--json')
+        self.assertEqual(listing.returncode, 0, listing.stderr[-800:])
+        ids = {row['board_id'] for row in json.loads(listing.stdout)}
+        self.assertTrue({p.board_id, q.board_id} <= ids)
+        resolved = json.loads(self.f.cli('resolve', '--db', str(self.f.default_path)).stdout)
+        self.assertEqual(resolved['kind'], 'default')
+        self.assertIsNone(json.loads(self.f.cli('resolve', '--db', str(self.f.home / 'elsewhere.db')).stdout))
+        # The dashboard service lists every board and operates exactly the board named.
+        from factory_dashboard.runs_service import RunsService
+        from factory_dashboard.http_server import create_server
+        service = RunsService(self.f.resolver, self.f.home, cli_python=sys.executable)
+        overview = service.overview()
+        self.assertTrue({p.board_id, q.board_id} <= {r['board_id'] for r in overview['runs']})
+        server = create_server(object(), '127.0.0.1', 0)
+        server.runs = service
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            port = server.server_port
+            def request(method, path, body=None, headers=None):
+                conn = http.client.HTTPConnection('127.0.0.1', port, timeout=60)
+                conn.request(method, path, body=json.dumps(body) if body is not None else None, headers=headers or {})
+                response = conn.getresponse()
+                return response.status, json.loads(response.read() or b'null')
+            status, data = request('GET', '/api/runs')
+            self.assertEqual(status, 200)
+            self.assertTrue(data['totals']['live'] >= 2)
+            status, _ = request('POST', '/api/runs/%s/pause' % p.board_id, {})
+            self.assertEqual(status, 403)  # a mutation needs the page's own origin and token
+            headers = {'Origin': 'http://127.0.0.1:%d' % port, 'X-Factory-Token': server.token, 'Content-Type': 'application/json'}
+            status, data = request('POST', '/api/runs/%s/pause' % p.board_id, {'reason': 'review window'}, headers)
+            self.assertEqual((status, data['status']), (200, 'paused'), data)
+            self.assertEqual(self.f.registry.get(q.board_id).status, 'active')
+            status, data = request('POST', '/api/runs/default/pause', {}, headers)
+            self.assertEqual(status, 400)
+            status, data = request('POST', '/api/runs/%s/resume' % p.board_id, {}, headers)
+            self.assertEqual((status, data['status']), (200, 'active'), data)
+            status, _ = request('GET', '/api/runs/%s' % p.board_id)
+            self.assertEqual(status, 200)
+        finally:
+            server.shutdown()
+            server.server_close()
+
+    def test_15_kanban_board_switcher_reports_approval_per_board(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location('kanban_plugin_api_under_test', Path(__file__).resolve().parents[2] / 'runtime/kanban-plugin/plugin_api.py')
+        api = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(api)
+        _, waiting, rw = self.run_for('switcher waiting')
+        _, working, rk = self.run_for('switcher working')
+        with self.f.conn(waiting.board_id) as conn:
+            root = self.f.WorkflowState().read_root(conn, rw)
+            with conn:
+                self.f.WorkflowController(self.f.kb, self.f.WorkflowState(), self.f.home)._stop(conn, root, 'human_review', 'Awaiting human approval')
+        self.assertEqual(api._board_awaiting(waiting.board_id), 1)
+        self.assertEqual(api._board_awaiting(working.board_id), 0)
+        self.assertEqual(api._board_awaiting('no-such-board'), 0)
+        self.assertEqual(api._board_awaiting('default'), 0)
+
+    def test_16_plugin_announces_run_board_support_for_the_intake_interlock(self):
+        import os
+        marker = Path(self.f.store.path).parent / 'board-support' / str(os.getpid())
+        self.assertTrue(marker.is_file())
+        import json
+        info = json.loads(marker.read_text())
+        self.assertEqual((info['contract'], info['pid']), (1, os.getpid()))
+        self.assertTrue(info['started'])  # identifies this very process, so a reused pid cannot pass
 
 
 if __name__ == '__main__':

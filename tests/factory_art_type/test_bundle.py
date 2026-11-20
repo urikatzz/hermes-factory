@@ -25,5 +25,7 @@ class BundleTests(unittest.TestCase):
                                    capture_output=True, text=True, cwd=out)
             self.assertEqual(probe.stdout.strip(), "art ('implement', 'repair')", probe.stderr)
             if LIVE_PLUGIN.is_dir():
-                for name in ('plugin.yaml', '__init__.py'):
+                # The plugin manifest must match the live install. The entry point (__init__.py) is deliberately not compared: this copy is a
+                # frozen 2026-10-26 build and the live entry point has since gained run-board support (see docs/multi-board-factory.md).
+                for name in ('plugin.yaml',):
                     self.assertTrue(filecmp.cmp(out / name, LIVE_PLUGIN / name, shallow=False), name)

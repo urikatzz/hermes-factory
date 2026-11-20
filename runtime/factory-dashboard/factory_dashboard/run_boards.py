@@ -18,6 +18,27 @@ class ProvisionError(ConfigurationError):
     pass
 
 
+def describe_root(conn, root_id):
+    """Workflow phase and approval state of one root on a read-only board connection; {} when the board has no workflow state."""
+    conn.row_factory = sqlite3.Row
+    if not conn.execute("SELECT 1 FROM sqlite_master WHERE name='factory_workflow_roots'").fetchone():
+        return {}
+    state = conn.execute('SELECT phase, cycle, reason FROM factory_workflow_roots WHERE root_id=?', (root_id,)).fetchone()
+    if not state:
+        return {}
+    result = dict(phase=state['phase'], cycle=state['cycle'], reason=state['reason'])
+    project = None
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE name='factory_project_execution'").fetchone():
+        row = conn.execute('SELECT document FROM factory_project_execution WHERE root_id=?', (root_id,)).fetchone()
+        project = json.loads(row[0]) if row else None
+    # Same rule as the Kanban board's "Awaiting approval" column.
+    result['awaiting'] = bool((project and project.get('awaiting') and not project.get('terminal')) or state['phase'] == 'human_review')
+    if project:
+        result['project_mode'] = project.get('mode')
+        result['active_stages'] = list(project.get('active_keys', []))
+    return result
+
+
 class HermesBoards:
     """The only place the Factory touches Hermes' board API; replaceable in tests."""
 
@@ -82,7 +103,7 @@ class RunBoards:
         path = board.db_path
         if board.status == 'archived' and dict(board.meta).get('archived_path'):
             path = Path(dict(board.meta)['archived_path']) / 'kanban.db'
-        result = dict(board.public(), counts={}, phase='', reason='', awaiting=False, needs_intervention=False, blockers=[], stages=[], tokens=None, cost_usd=None, available=False)
+        result = dict(board.public(), counts={}, phase='', reason='', awaiting=False, needs_intervention=False, blockers=[], stages=[], available=False)
         if not Path(path).is_file():
             return result
         with closing(sqlite3.connect('file:' + quote(str(Path(path).resolve())) + '?mode=ro', uri=True)) as conn:
@@ -92,18 +113,8 @@ class RunBoards:
             root = conn.execute("SELECT id, title, status, result FROM tasks WHERE title LIKE 'FACTORY:%' ORDER BY created_at LIMIT 1").fetchone()
             if root:
                 result['root'] = dict(root)
-            if conn.execute("SELECT 1 FROM sqlite_master WHERE name='factory_workflow_roots'").fetchone() and root:
-                state = conn.execute('SELECT phase, cycle, reason FROM factory_workflow_roots WHERE root_id=?', (root['id'],)).fetchone()
-                if state:
-                    result.update(phase=state['phase'], cycle=state['cycle'], reason=state['reason'])
-                    project = None
-                    if conn.execute("SELECT 1 FROM sqlite_master WHERE name='factory_project_execution'").fetchone():
-                        row = conn.execute('SELECT document FROM factory_project_execution WHERE root_id=?', (root['id'],)).fetchone()
-                        project = json.loads(row[0]) if row else None
-                    result['awaiting'] = bool((project and project.get('awaiting') and not project.get('terminal')) or state['phase'] == 'human_review')
-                    if project:
-                        result['project_mode'] = project.get('mode')
-                        result['active_stages'] = list(project.get('active_keys', []))
+            if root:
+                result.update(describe_root(conn, root['id']))
             # The root card is always "blocked" while the controller owns it; only other blocked cards, or a stopped phase, are blockers.
             root_id = root['id'] if root else ''
             result['blockers'] = [dict(r) for r in conn.execute("SELECT id, title, block_kind, result FROM tasks WHERE status='blocked' AND id != ? ORDER BY created_at LIMIT 20", (root_id,))]
@@ -111,11 +122,6 @@ class RunBoards:
                 result['blockers'].insert(0, dict(id=root_id, title=root['title'], block_kind='needs_input', result=result['reason']))
             result['needs_intervention'] = bool(result['blockers']) and not result['awaiting'] and not (root and root['status'] == 'done')
             result['stages'] = [dict(r) for r in conn.execute("SELECT id, title, status, assignee FROM tasks WHERE status IN ('ready','running','review','scheduled') ORDER BY created_at LIMIT 20")]
-            cols = {r[1] for r in conn.execute('PRAGMA table_info(task_runs)')}
-            if {'input_tokens', 'output_tokens'} <= cols:
-                row = conn.execute('SELECT COALESCE(SUM(input_tokens),0) i, COALESCE(SUM(output_tokens),0) o' + (', COALESCE(SUM(cost_usd),0) c' if 'cost_usd' in cols else ', NULL c') + ' FROM task_runs').fetchone()
-                result['tokens'] = dict(input=row['i'], output=row['o'])
-                result['cost_usd'] = row['c']
         return result
 
     # ---- lifecycle

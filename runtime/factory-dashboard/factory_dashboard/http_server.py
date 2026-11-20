@@ -11,7 +11,7 @@ from .model_policy import ConfigurationError, ModelSelection
 from .policy_store import RevisionConflict
 
 ASSETS = Path(__file__).parent / 'assets'
-ASSET_TYPES = {'live.js':'text/javascript', 'timeline.js':'text/javascript', 'timeline.css':'text/css', 'formatters.js':'text/javascript', 'task_forms.js':'text/javascript', 'workflow_forms.js':'text/javascript'}
+ASSET_TYPES = {'runs.js':'text/javascript', 'live.js':'text/javascript', 'timeline.js':'text/javascript', 'timeline.css':'text/css', 'formatters.js':'text/javascript', 'task_forms.js':'text/javascript', 'workflow_forms.js':'text/javascript'}
 
 
 class RequestError(Exception):
@@ -66,7 +66,13 @@ class FactoryHandler(BaseHTTPRequestHandler):
         if path.startswith(('/api/workflows','/api/workflow-defaults')) and hasattr(service,'workflows'):
             from .workflow_http import route_workflows
             return route_workflows(self,path)
+        if path.startswith('/api/runs'):
+            from .runs_http import route_runs
+            return route_runs(self,path)
         if self.command == 'GET':
+            if path == '/runs' and getattr(self.server,'runs',None) is not None:
+                page=(ASSETS/'runs.html').read_text().replace('@@TOKEN@@',self.server.token)
+                return self._send(200,page.encode(),'text/html')
             if path == '/':
                 page=(ASSETS/'live.html').read_text().replace('@@TOKEN@@',self.server.token)
                 return self._send(200,page.encode(),'text/html')

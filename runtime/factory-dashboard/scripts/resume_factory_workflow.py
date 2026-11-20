@@ -29,6 +29,17 @@ def main():
     package=consumer.module.__name__+'.factory_dashboard.'
     controller_type=importlib.import_module(package+'workflow_controller').WorkflowController
     state_type=importlib.import_module(package+'workflow_state').WorkflowState
+    registry_module=importlib.import_module(package+'board_registry')
+    # Only a governed board can be resumed, and a run board must be active: a paused, cancelled or failed run needs `factory_boards.py` first.
+    import os, yaml
+    home=Path(os.environ.get('FACTORY_HERMES_HOME') or os.environ.get('HERMES_HOME') or Path.home()/'.hermes')
+    settings=(((yaml.safe_load((home/'config.yaml').read_text()) or {}).get('plugins') or {}).get('entries') or {}).get('factory-models',{}).get('settings') or {}
+    if settings.get('board_path'):
+        found=registry_module.build_resolver(settings).resolve(args.board_db,args.board)
+        if found is None:
+            parser.error('Board %s is not a Factory board; refusing to apply Factory recovery to it'%args.board)
+        if found.is_run and found.status!='active':
+            parser.error('Run board %s is %s; resume it with factory_boards.py first'%(found.board_id,found.status))
     controller=controller_type(kanban_db,state_type(),args.new_project_root)
     with closing(kanban_db_connect.connect(args.board_db,board=args.board)) as conn:
         decisions=json.loads(args.decision_file.read_text()) if args.decision_file else None

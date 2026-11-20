@@ -178,3 +178,18 @@ class Factory:
         with self.conn(board) as conn:
             state = self.WorkflowState().read_root(conn, root)
             return state['phase'] if state else None
+
+    def install_for_cli(self):
+        """Install the bundled plugin and its settings into this home, so scripts/factory_boards.py and the dashboard see what production does."""
+        import yaml
+        bundle_spec = importlib.util.spec_from_file_location('multi_bundle_installer', REPO / 'runtime/factory-dashboard/scripts/bundle_factory_plugin.py')
+        bundler = importlib.util.module_from_spec(bundle_spec); bundle_spec.loader.exec_module(bundler)
+        bundler.bundle_plugin(self.home / 'plugins' / 'factory-models')
+        config = {'plugins': {'enabled': ['factory-models'], 'entries': {'factory-models': {'enabled': True, 'settings': dict(self.settings)}}}}
+        (self.home / 'config.yaml').write_text(yaml.safe_dump(config))
+
+    def cli(self, *args):
+        import subprocess
+        env = dict(os.environ, HERMES_HOME=str(self.home), HERMES_KANBAN_HOME=str(self.home))
+        return subprocess.run([sys.executable, str(REPO / 'runtime/factory-dashboard/scripts/factory_boards.py'), '--hermes-source',
+                               str(Path.home() / '.hermes/hermes-agent'), *args], capture_output=True, text=True, env=env, timeout=300)

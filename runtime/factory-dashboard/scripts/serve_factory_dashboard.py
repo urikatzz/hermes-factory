@@ -27,6 +27,7 @@ def main():
     parser.add_argument('--hermes-home',type=Path)
     parser.add_argument('--published-state',type=Path)
     parser.add_argument('--evidence-root',type=Path)
+    parser.add_argument('--registry-db',type=Path,help='Run-board registry (default: board-registry.db beside --settings-db)')
     args=parser.parse_args()
     if args.demo:
         from factory_dashboard.demo import DemoCollector, DemoReportBuilder, demo_catalog
@@ -71,6 +72,15 @@ def main():
         service=ProfileService(service,settings)
     service.initialize_defaults()
     server=create_server(service,'127.0.0.1',args.port)
+    if args.settings_db and not args.demo:
+        # Every registered run board is listed and operable; the default board stays the timeline above.
+        from factory_dashboard.board_registry import build_resolver
+        from factory_dashboard.runs_service import RunsService
+        resolver=build_resolver(dict(board_path=str(args.board_db),board_id=args.board_id,snapshot_path=str(args.settings_db),
+                                     registry_path=str(args.registry_db) if args.registry_db else None),create=True)
+        def collect(database,board_id,published):
+            return SnapshotCollector(SourcePaths(database,board_id,args.hermes_home,published,args.evidence_root)).collect()
+        server.runs=RunsService(resolver,args.hermes_home,evidence_root=args.evidence_root,collector_factory=collect,builder=ReportBuilder())
     if args.hermes_home:
         from factory_dashboard.otel_source import OtelSource
         server.otel=OtelSource(args.hermes_home)

@@ -113,8 +113,35 @@ def register(ctx):
             if not factory_board.is_run:
                 raise
 
+    def announce():
+        """Record, AFTER every hook is registered, that this process runs the run-board-aware plugin: {contract, pid, started}.
+        The intake pump creates dedicated boards only when the live gateway (same pid and start time) has written it, so a gateway
+        still running older code, a reused pid or a half-loaded plugin never receives a board it would not govern."""
+        import json, os, subprocess
+        try:
+            snapshot = ctx.get_config('snapshot_path')
+            if not snapshot:
+                return
+            started = subprocess.run(['/bin/ps', '-o', 'lstart=', '-p', str(os.getpid())], capture_output=True, text=True, timeout=10).stdout.strip()
+            folder = Path(snapshot).parent / 'board-support'
+            folder.mkdir(parents=True, exist_ok=True)
+            target = folder / str(os.getpid())
+            temporary = folder / ('.%d.tmp' % os.getpid())
+            temporary.write_text(json.dumps(dict(contract=BOARD_CONTRACT_VERSION, pid=os.getpid(), started=started)))
+            os.replace(temporary, target)
+            for entry in folder.iterdir():
+                try:
+                    os.kill(int(entry.name), 0)
+                except ProcessLookupError:
+                    entry.unlink(missing_ok=True)
+                except (ValueError, PermissionError):
+                    pass
+        except Exception as exc:  # never let bookkeeping break plugin loading
+            log.debug('board-support announcement failed: %s', exc)
+
     ctx.register_hook('on_kanban_dispatch_tick', reconcile)
     ctx.register_hook('kanban_task_completed', reconcile)
     ctx.register_hook('before_kanban_task_mutation', before_mutation)
     ctx.register_hook('resolve_kanban_worker_model', resolve)
     ctx.register_hook('before_kanban_task_create', before_create)
+    announce()  # last: only a fully registered plugin may claim run-board support

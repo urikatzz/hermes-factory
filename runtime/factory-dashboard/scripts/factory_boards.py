@@ -5,6 +5,7 @@
   factory_boards.py show BOARD [--json]
   factory_boards.py provision TICKET [--name N --project P --workflow W --project-dir D --branch B]
   factory_boards.py pause|resume|cancel|archive BOARD [--reason R]
+  factory_boards.py bind-root BOARD ROOT
   factory_boards.py reset BOARD           (give a failed board a fresh provisioning budget)
   factory_boards.py resolve --db PATH [--label SLUG]   (what the Factory hooks decide for a board)
 
@@ -63,6 +64,7 @@ def main(argv=None):
         prov.add_argument('--' + name, default='')
     for name in ('pause', 'resume', 'cancel', 'archive'):
         op = sub.add_parser(name);op.add_argument('board');op.add_argument('--reason', default=name + ' by operator')
+    bind = sub.add_parser('bind-root');bind.add_argument('board');bind.add_argument('root')
     rst = sub.add_parser('reset');rst.add_argument('board')
     res = sub.add_parser('resolve');res.add_argument('--db', required=True);res.add_argument('--label')
     args = parser.parse_args(argv)
@@ -82,9 +84,16 @@ def main(argv=None):
             raise SystemExit('Unknown run board ' + args.board)
         print(json.dumps(service.summary(board), indent=2, default=str))
     elif args.command == 'provision':
-        board = service.provision(args.ticket, name=args.name, project_id=args.project, workflow_id=args.workflow,
-                                  project_dir=args.project_dir, branch=args.branch)
-        print(board.board_id)
+        try:
+            board = service.provision(args.ticket, name=args.name, project_id=args.project, workflow_id=args.workflow,
+                                      project_dir=args.project_dir, branch=args.branch)
+        except Exception as exc:  # machine-readable for the intake pump; never a traceback
+            record = registry.by_ticket(args.ticket)
+            print(json.dumps(dict(error=str(exc), status=record.status if record else 'unregistered')))
+            raise SystemExit(2)
+        print(json.dumps(dict(board=board.board_id, status=board.status)))
+    elif args.command == 'bind-root':
+        print(json.dumps(dict(board=args.board, root=registry.set_root(args.board, args.root).root_id)))
     elif args.command in ('pause', 'resume', 'cancel', 'archive'):
         method = getattr(service, args.command)
         result = method(args.board) if args.command in ('resume', 'archive') else method(args.board, args.reason)

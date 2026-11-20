@@ -17,6 +17,7 @@ from .model_policy import ConfigurationError
 
 DEFAULT_BOARD = 'default'
 SLUG = re.compile(r'^[a-z0-9][a-z0-9_-]{0,63}$')
+TICKET = re.compile(r'^[a-z0-9][a-z0-9_-]{0,50}$')
 # provisioning/active/paused boards are governed and counted; cancelled/archived boards are history; failed boards fail closed.
 STATES = ('provisioning', 'active', 'paused', 'cancelled', 'archived', 'failed')
 GOVERNED = ('provisioning', 'active', 'paused')
@@ -80,8 +81,9 @@ class FactoryBoard:
 
 
 def run_board_slug(ticket_id):
-    slug = 'run-' + str(ticket_id).strip().lower()
-    if not SLUG.match(slug):
+    ticket = str(ticket_id)
+    slug = 'run-' + ticket
+    if not TICKET.match(ticket) or not SLUG.match(slug):
         raise ConfigurationError('Ticket id cannot name a run board: %r' % (ticket_id,))
     return slug
 
@@ -179,6 +181,10 @@ class BoardRegistry:
         with self._txn() as conn:
             row = conn.execute('SELECT * FROM factory_boards WHERE source_board_id=? AND ticket_id=?', (source_board_id, ticket_id)).fetchone()
             if row:
+                # A retry must describe the same run; a different directory or branch means the caller lost track of the reservation.
+                for field, given in (('project_dir', project_dir), ('branch', branch), ('project_id', project_id)):
+                    if given and row[field] and row[field] != given:
+                        raise ConfigurationError('Run board %s reserved %s=%r; refusing a retry with %r' % (row['board_id'], field, row[field], given))
                 return self._wrap(row)
             clash = conn.execute('SELECT board_id FROM factory_boards WHERE board_id=?', (board_id,)).fetchone()
             if clash:
