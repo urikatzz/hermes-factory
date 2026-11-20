@@ -142,6 +142,39 @@ class ReferenceModuleTests(unittest.TestCase):
         self.assertEqual(refs.find_contradictions(self.records, {'PLAN.md': 'Draw hazard stripes on the platform and the door frame.'}), [])
         self.assertEqual(refs.find_contradictions(self.records, {'PLAN.md': 'No cast shadows, no reflections.'}), [])
 
+    def test_faithful_plan_sentences_the_first_scan_wrongly_rejected_are_accepted(self):
+        faithful = write_project(self.temp.name, [dict(REFERENCE, requirements=[
+            dict(id='V1', text='stripes', keywords=['hazard stripe', 'corner mark', 'untextured']),
+            dict(id='V2', text='slanted segments', keywords=['slanted', 'gradient', 'painted'])])], extra=MILESTONE_ONE)['references']
+        for sentence in (
+                '5. Rendering (V2): painted matte art with panel wear and texture; no cast shadows, no floor reflections, no gradient-based fake shadows.',
+                '6. Floor and walls: the GDD says "flat and matte" while the reference shows painted texture and wear. The plan interprets this as matte (no gloss), not untextured. Confirm.',
+                '4. Procedural only (no image generation): HUD health segments drawn as slanted parallelograms (V2), divider, frame counter text, corner marks, message text in amber stencil.',
+                'REQUEST: No grey-box presentation, placeholder artwork or simplified geometry stands in for the approved direction. Painted sprites are produced with the art skill.',
+                'No placeholder art and no simplified geometry: V1 hazard stripes and V2 slanted segments are built as shown.',
+                'T1 amends STYLE.md to remove the superseded greybox-only rules and add painted classes that carry V1 hazard stripes and V2 slanted segments.',
+                'SUPERSEDED (rewrite, do not preserve): AC10 grey-box assertions for V1 hazard stripes; greybox-only assertions replaced by V2 slanted segment checks.'):
+            self.assertEqual(refs.find_contradictions(faithful, {'PLAN.md': sentence}), [], sentence)
+
+    def test_the_original_failures_are_still_caught_verbatim_after_the_precision_fix(self):
+        original_s1 = ('S1 (blocking) Grey-box only: every world object is the existing `Assets/Art/GreyBox/WhiteSquare.png` sprite tinted by a palette colour. '
+                       'No new textures, gradients, outlines, particles, cast shadows, extra lights or post-processing; one Global Light 2D only.')
+        original_s9 = 'S9 Deferred look: no hazard stripes, crosshair corner marks, frame counter, target heads, joints, strobe prop or painted art (GDD milestone 6).'
+        loaded = write_project(self.temp.name, [dict(REFERENCE, requirements=[
+            dict(id='V1', text='a', keywords=['hazard stripe', 'crosshair', 'frame counter', 'target head', 'joint']),
+            dict(id='V2', text='b', keywords=['painted', 'texture', 'gradient', 'particle'])])], extra=MILESTONE_ONE)['references']
+        found = refs.find_contradictions(loaded, {'STYLE.md': original_s1 + '\n' + original_s9})
+        pairs = {(c['kind'], c['requirement']) for c in found}
+        self.assertEqual(pairs, {('forbids', 'V1'), ('forbids', 'V2'), ('implicit_deferral', 'V1')})
+        by_line = {(c['line'], c['requirement']) for c in found if c['kind'] == 'forbids'}
+        self.assertEqual(by_line, {(1, 'V2'), (2, 'V1'), (2, 'V2')})  # S1 forbids V2's texture/gradient/particle; S9 forbids V1's stripes/crosshair/joints and V2's painted art
+        self.assertTrue({c['keyword'] for c in found if c['kind'] == 'implicit_deferral'} >= {'grey-box only', 'deferred look'})
+
+    def test_a_negation_does_not_reach_across_a_new_idea_or_a_bracket(self):
+        self.assertEqual(refs.find_contradictions(self.records, {'PLAN.md': 'No cloth physics, the hazard stripe trim is drawn on the door frame.'}), [])
+        self.assertEqual(refs.find_contradictions(self.records, {'PLAN.md': 'No time is lost (hazard stripe trim is built first).'}), [])
+        self.assertNotEqual(refs.find_contradictions(self.records, {'PLAN.md': 'Never include hazard stripe trim on the door.'}), [])
+
     def test_a_conforming_rule_that_merely_contains_a_negation_elsewhere_is_not_flagged(self):
         rule = 'S9 Room 1 presents hazard stripes and a HUD that does not exist yet for weapons. S1 slanted segments; do not count blockout squares.'
         self.assertEqual(refs.find_contradictions(self.records, {'STYLE.md': rule}), [])

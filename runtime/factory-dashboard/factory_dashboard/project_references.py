@@ -264,17 +264,45 @@ def _strip(line, phrases):
 
 
 def _clauses(line, phrases=()):
-    return [c for c in re.split(r'[.;]\s+|[.;]$', _strip(line, phrases)) if c.strip()]
+    """Clauses end at sentence punctuation, colons, semicolons, brackets and dashes: a negation never reaches across them."""
+    return [c for c in re.split(r'\.(?=\s|$)|[;:()\[\]]|\s[-\u2013\u2014]\s', _strip(line, phrases)) if c.strip()]
+
+
+# Words that start a new idea: a negation does not govern a keyword beyond one of them ("no image generation, HUD drawn as slanted ...").
+_STOP = re.compile(r"\b(is|are|was|were|be|uses?|using|used|drawn|draws?|built|made|with|for|when|while|that|which|as|via|by|but|however|then|so|because|since|if|and then)\b", re.I)
+MAX_REACH = 20
+_NEW_CLAUSE = re.compile(r',\s*(?:the|a|an|this|that|these|those|it|they|we|you)\b', re.I)  # a comma followed by a subject starts a new clause
+
+
+def _keyword(keyword):
+    return re.compile(r'(?<![\w])' + re.escape(keyword) + r'(?:e?s)?(?![\w-])', re.I)
+
+
+def _governs(clause, start):
+    """True when a prohibition word before position `start` governs it: same clause, a short list of nouns in between, no new idea."""
+    for match in _PREFIX.finditer(clause):
+        if match.end() > start:
+            break
+        between = clause[match.end():start]
+        if len(between.split()) <= MAX_REACH and not _STOP.search(between) and not _NEW_CLAUSE.search(between):
+            return True
+    return False
+
+
+_REMOVING = re.compile(r"\b(remov\w*|supersed\w*|replac\w*|rewrit\w*|amend\w*|correct\w*|delet\w*|drop\w*|retir\w*|eliminat\w*|no longer|stop\w*|conflict\w*|contradict\w*|obsolete|legacy)\b", re.I)
+
+
+def _rejects(clause, start, line):
+    """Simplification wording that is negated, or sits on a line that removes, replaces or supersedes it, is a rejection of the simplification, not a deferral."""
+    return _governs(clause, start) or bool(_REMOVING.search(line))
 
 
 def _forbids(clause, keyword):
     """True when the clause forbids, excludes or postpones the keyword's subject."""
-    lowered = clause.lower()
-    found = re.search(r'(?<![\w])' + re.escape(keyword) + r'(?:e?s)?(?![\w])', lowered)
+    found = _keyword(keyword).search(clause)
     if not found:
         return False
-    before = _PREFIX.search(clause)
-    return bool((before and before.end() <= found.start()) or _POSTPONING.search(clause))
+    return _governs(clause, found.start()) or bool(_POSTPONING.search(clause))
 
 
 def _documents_lines(documents):
@@ -325,21 +353,21 @@ def find_contradictions(references, documents, visual_documents=None):
                 names = [r'(?<![\w])' + re.escape(requirement['id']) + r'(?![\w])'] + [r'(?<![\w])' + re.escape(k) + r'(?:e?s)?(?![\w])' for k in requirement['keywords']]
                 for clause in clauses:
                     simple = _SIMPLIFY.search(clause)
-                    if simple and not _PRESERVING.search(clause) and any(re.search(n, clause, re.I) for n in names):
+                    if simple and not _PRESERVING.search(clause) and not _rejects(clause, simple.start(), line) and any(re.search(n, clause, re.I) for n in names):
                         add('implicit_deferral', requirement['id'], reference['id'], simple.group(0).lower(), label, number, line)
     if required:
         first = next(iter(required.values()))
         for label, number, line in _documents_lines(documents):
             for clause in _clauses(line, approved_negations):
                 whole = _GLOBAL_DEFERRAL.search(clause)
-                if whole and not _PRESERVING.search(clause):
+                if whole and not _PRESERVING.search(clause) and (whole.group(0).lower().startswith('no ') or not _rejects(clause, whole.start(), line)):
                     add('implicit_deferral', first['id'], first['reference'], whole.group(0).lower(), label, number, line)
     for label, ids in (visual_documents or {}).items():
         carried = [i for i in ids if i in required]
         for _, number, line in _documents_lines({label: documents.get(label, '')}):
             for clause in _clauses(line, approved_negations):
                 simple = _SIMPLIFY.search(clause)
-                if simple and carried and not _PRESERVING.search(clause):
+                if simple and carried and not _PRESERVING.search(clause) and not _rejects(clause, simple.start(), line):
                     add('implicit_deferral', carried[0], required[carried[0]]['reference'], simple.group(0).lower(), label, number, line)
     if authority and required:
         first = next(iter(required.values()))
@@ -347,7 +375,7 @@ def find_contradictions(references, documents, visual_documents=None):
         for derived in (r for r in references if r not in authority):
             name = Path(derived['path']).name
             for label, number, line in _documents_lines(documents):
-                for clause in _clauses(line, approved_negations):
+                for clause in re.split(r'\.(?=\s|$)|;', line):  # a mockup named near a target word, brackets and colons included (JSON lines)
                     if name in clause and _TARGETING.search(clause) and not any(n in clause for n in approved_names):
                         add('derived_source', first['id'], first['reference'], name, label, number, line)
     return found

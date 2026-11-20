@@ -126,11 +126,13 @@ class TaskSettingsStore:
     def list_submissions(self,board):
         with self._connect() as c:return [dict(r) for r in c.execute('SELECT * FROM factory_submissions WHERE board=?',(board,))]
 
-    def bind_task(self,board,task_id,snapshot_id,kind,submission_id=None):
+    def bind_task(self,board,task_id,snapshot_id,kind,submission_id=None,*,source_board=None):
+        # A run board's root inherits its ticket's snapshot, which lives under the ticket board's identity.
+        # The caller names that source board explicitly (after checking the board registry); no other board qualifies.
         with self._connect() as c:
             c.execute('BEGIN IMMEDIATE')
             snap=c.execute('SELECT board FROM factory_snapshots WHERE id=?',(snapshot_id,)).fetchone()
-            if not snap or snap[0]!=board:raise ConfigurationError('Snapshot belongs to a different board')
+            if not snap or snap[0] not in {b for b in (board,source_board) if b}:raise ConfigurationError('Snapshot belongs to a different board')
             old=c.execute('SELECT snapshot_id FROM factory_tasks WHERE board=? AND task_id=?',(board,task_id)).fetchone()
             if old and old[0]!=snapshot_id:raise ConfigurationError('Task snapshot cannot be changed')
             c.execute('INSERT OR IGNORE INTO factory_tasks VALUES(?,?,?,?)',(board,task_id,snapshot_id,kind))
