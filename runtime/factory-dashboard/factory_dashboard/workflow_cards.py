@@ -32,7 +32,7 @@ def build_stage_card(definition, stage_key, cycle, context, inputs, *, stage_spe
         body.append('Read the supplied plan and review the exact manifest in a scratch snapshot. Retain report.md and evidence artifacts before completing.')
     if stage.kind=='verify':
         body.append('Run the gate, all acceptance checks and release audit. Record release_audit PASS/FAIL, snapshot path and publish_commands; do not publish.')
-    body.append('Managed handoff: contract=factory-worker/v2, workflow_contract=factory-workflow/v1, stage_key='+stage.key+'. Use the header STAGE and CYCLE; include real acceptance, manifest and retained evidence metadata. Required stages and limits cannot be waived.')
+    body.append('Managed handoff: contract=factory-worker/v2, workflow_contract=factory-workflow/v1, stage_key='+stage.key+'. Use the header STAGE and CYCLE; metadata.stage and the STAGE= value on the first summary line must be the identical string (the header STAGE, never the stage_key); include real acceptance, manifest and retained evidence metadata. Required stages and limits cannot be waived.')
     writer=stage.kind in ('implement','repair')
     return dict(title=f'{name} ({root})',body='\n'.join(body),assignee=stage.profile,
                 workspace_kind='dir' if writer else 'scratch',workspace_path=project if writer else None,
