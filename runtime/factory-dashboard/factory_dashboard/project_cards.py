@@ -122,6 +122,10 @@ is a complete project (its include list carries the files the gate needs). A rea
 
 CONTINUES = '''This card continues from the files the superseded attempt left on disk. Its MANIFEST and BASELINE are the manifest that attempt reported, so the start check passes only if nothing else changed. Keep what is correct and fix forward; undo only what contradicts this card.'''
 
+STYLE_CHANGED = '''The completed task {id} amended the style bible under art/style/, so the style_sha256 recorded in PLAN.md predates it and must not be used as --expect-style-hash.
+If your stage runs the art lint gate, take the expected hash when your stage starts: run art_lint.py PROJECT_DIR --style-hash before you write anything, use that value for --expect-style-hash, and record it in metadata.style_sha256.
+A verifier or reviewer on the frozen copy uses the style_sha256 the writer recorded. The gate still fails if art/style changes during the stage.'''
+
 PLAN_BLOCKED = '''If the task plan or an acceptance criterion is wrong, contradictory or untestable, or the available tools cannot express it, do not work around it and do not weaken the criterion:
 finish VERDICT=BLOCKED with blocked_reason naming the criterion and why. The project then stops for a human, who decides. Nothing is sent back to the architect.'''
 

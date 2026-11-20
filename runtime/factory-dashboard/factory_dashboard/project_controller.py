@@ -7,7 +7,7 @@ import re
 import time
 
 from .model_policy import ConfigurationError
-from .project_cards import (ART_PLAN, ROLE_FINDINGS, APPROVED_COMPARISON, APPROVED_REFERENCES, INSPECTION, REFERENCE_AUDIT, VISUAL_TRACE, ARCHITECT, COMPARISON, CONFLICT_CHECK, SIMILARITY, DIRECTOR, PLAN_CORRECTION, PLAN_CORRECTION_REVIEW, CONTINUES, PLAN_BLOCKED, PLAN_FINDING, SUPERSEDED, WRITER_GATES,
+from .project_cards import (ART_PLAN, ROLE_FINDINGS, APPROVED_COMPARISON, APPROVED_REFERENCES, INSPECTION, REFERENCE_AUDIT, VISUAL_TRACE, ARCHITECT, COMPARISON, CONFLICT_CHECK, SIMILARITY, DIRECTOR, PLAN_CORRECTION, PLAN_CORRECTION_REVIEW, CONTINUES, PLAN_BLOCKED, PLAN_FINDING, STYLE_CHANGED, SUPERSEDED, WRITER_GATES,
                             PLAN_REVIEW, REPLAN, RETRO, SCOPE, SPEC_CONSTRAINTS, TOOL_INCIDENTS, project_card)
 from .project_decisions import (MAX_STAGE_RETRIES, constraint_view, constraints_of, normalize_decisions, preserved_conflict, record_applied, relevant_constraints,
                                 validate_plan_constraints, validate_spec_conflicts)
@@ -686,7 +686,7 @@ class ProjectController:
             if plan_files:
                 # Workers have mistyped the board folder (run-t_... with a hyphen) and then blocked on a file that was there.
                 instructions += '\nApproved plan files, read exactly these absolute paths (copy them, never retype them): ' + '; '.join(plan_files)
-            instructions += '\n' + SPEC_CONSTRAINTS + '\n' + PLAN_BLOCKED
+            instructions += '\n' + SPEC_CONSTRAINTS + '\n' + PLAN_BLOCKED + self._style_note(conn, project)
             node = self._node(conn, root, definition, context, project, key, 'repair' if repair else 'implement', profile,
                               instructions, work['writer_inputs'], task=task, cycle=cycle)
             if not node:
@@ -716,7 +716,7 @@ class ProjectController:
                           'Verify only TASK acceptance IDs against the exact cumulative manifest. Run tests, integration checks, asset lint gates and release audit. '
                           'Record repair_domains (code/art/audio) for failed asset or integration checks. Missing tools are environment gaps, never passes. '
                           'Never use inline interpreter flags such as python -c or node -e (the safety guard blocks them): read files with the file tools or run a script file. '
-                          + WRITER_GATES + '\n' + TOOL_INCIDENTS + '\n' + SPEC_CONSTRAINTS + '\n' + PLAN_FINDING,
+                          + WRITER_GATES + '\n' + TOOL_INCIDENTS + '\n' + SPEC_CONSTRAINTS + '\n' + PLAN_FINDING + self._style_note(conn, project),
                           inputs, task=task, cycle=cycle)
         if not node:
             return False
@@ -736,6 +736,7 @@ class ProjectController:
         work.update(step='reviewing', snapshot=verifier.metadata.get('snapshot'))
         changed = writer.metadata.get('changed_files')
         work['style_only'] = bool(changed) and isinstance(changed, list) and all(isinstance(p, str) and p.startswith('art/style/') for p in changed)
+        work['style_changed'] = isinstance(changed, list) and any(isinstance(p, str) and p.startswith('art/style/') for p in changed)
         profiles = self._panel([s.profile for s in definition.reviewers], task, work)
         readers, rows, waiting = [verifier], [verifier_row], False
         for profile in profiles:
@@ -839,7 +840,7 @@ class ProjectController:
         if decision.decision == 'pass':
             verifier = next(r for r in readers if r.kind == 'verify')
             project['completed'].append(dict(id=task['id'], evidence_task=next(r['task_id'] for r in rows if r['kind'] == 'verify'),
-                                             writer_task=work['writer_task'], manifest=work['manifest']))
+                                             writer_task=work['writer_task'], manifest=work['manifest'], style_changed=bool(work.get('style_changed'))))
             if task['id'] == 'integration':
                 project['delivery'] = dict(outcome='LOCAL_DELIVERED', manifest_sha12=work['manifest'],
                     ac_results=verifier.metadata['ac_results'], snapshot=verifier.metadata.get('snapshot'),
@@ -1002,6 +1003,19 @@ class ProjectController:
                 text = {}
         return {ac: ('NOT STATED BY ANY PLANNED TASK: implement and verify it here. ' + (text.get(ac) + ' ' if text.get(ac) else '') + 'Project PLAN.md: ' + ac)
                 if ac in uncovered else 'Project PLAN.md: ' + ac for ac in project['ac_ids']}
+
+    def _style_note(self, conn, project):
+        """The card text for stages that run after a completed task amended art/style/: the plan's pinned style hash is stale then."""
+        for done in project.get('completed', []):
+            changed = done.get('style_changed')
+            if changed is None:  # completed before it was recorded: read the writer's own result
+                row = conn.execute('SELECT * FROM factory_workflow_stages WHERE task_id=?', (done.get('writer_task'),)).fetchone()
+                result = self._controller._result(conn, dict(row)) if row else None
+                files = result.metadata.get('changed_files') if result is not None and result.valid else None
+                changed = isinstance(files, list) and any(isinstance(p, str) and p.startswith('art/style/') for p in files)
+            if changed:
+                return '\n' + STYLE_CHANGED.format(id=done['id'])
+        return ''
 
     @staticmethod
     def _repair_limit_reason(task, work, decision):

@@ -1155,6 +1155,33 @@ class ProjectControllerTests(unittest.TestCase):
         panel = ProjectController._panel(['claude-reviewer', 'art-reviewer', 'ui-reviewer'], task, dict(style_only=True))
         self.assertIn('art-reviewer', panel)
 
+    def test_stages_after_a_task_that_amended_the_style_bible_are_told_the_plans_style_hash_is_stale(self):
+        second = dict(CODE, id='more', dependencies=['code'])
+        self.plan(tasks=[CODE, second])
+        first_card = self.board.cards[self.only('developer')['task_id']]['body']
+        self.assertNotIn('amended the style bible', first_card)
+        self.board.complete(self.only('developer'), changed_files=['art/style/STYLE.md', 'art/style/style.json']); self.tick()
+        self.board.complete(self.only('verifier')); self.tick()
+        for row in self.board.ready(): self.board.complete(row)
+        self.tick()
+        self.assertTrue(self.project()['completed'][0]['style_changed'])
+        card = self.board.cards[self.only('developer')['task_id']]['body']
+        self.assertIn('The completed task code amended the style bible under art/style/', card)
+        self.assertIn('take the expected hash when your stage starts', card)
+        self.board.complete(self.only('developer')); self.tick()
+        verify = self.board.cards[self.only('verifier')['task_id']]['body']
+        self.assertIn('style_sha256 the writer recorded', verify)
+
+    def test_a_task_that_changed_no_style_file_does_not_trigger_the_style_note(self):
+        second = dict(CODE, id='more', dependencies=['code'])
+        self.plan(tasks=[CODE, second])
+        self.board.complete(self.only('developer'), changed_files=['Assets/Scripts/Game.cs']); self.tick()
+        self.board.complete(self.only('verifier')); self.tick()
+        for row in self.board.ready(): self.board.complete(row)
+        self.tick()
+        self.assertFalse(self.project()['completed'][0]['style_changed'])
+        self.assertNotIn('amended the style bible', self.board.cards[self.only('developer')['task_id']]['body'])
+
     # --- the independent plan review is off by default ---
     def review_off(self):
         from unittest import mock
