@@ -98,6 +98,8 @@ sh scripts/install_audio_production.sh
 
 The default destination is `~/.hermes/factory-skills/worker`. Set `HERMES_FACTORY_SKILLS` to use another worker-skill directory. Installers refuse to overwrite an existing destination.
 
+The architect's `task-writing` skill (how to write small, checkable tasks) is a runtime skill, kept in [`runtime/factory-skills/worker/task-writing`](runtime/factory-skills/worker/task-writing); copy that folder into the same destination.
+
 Installing skill files does not configure worker profiles or activate workflow types. Review the [art](docs/superpowers/specs/2026-10-26-game-art-factory-design.md) and [audio](docs/superpowers/specs/2026-11-06-game-audio-factory-design.md) integration designs before changing an installed environment. Migration scripts accept explicit runtime paths and provide preview modes:
 
 ```sh
