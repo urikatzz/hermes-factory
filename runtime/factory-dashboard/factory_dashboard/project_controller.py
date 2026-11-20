@@ -27,7 +27,9 @@ MAX_PLAN_VALIDATION_RETRIES = 2
 PLAN_SCHEMA = ('project-plan.json: {"tasks":[{"id":"lowercase-id","title":"...","owner":"developer|artist|sound-designer","dependencies":["task-id"],'
                '"acceptance":{"AC1":"observable criterion"},"needs":{"art":false,"audio":false,"ui":false,"ux":false},"risk":"normal|high",'
                '"preserve":["optional path"],"visual":["optional approved visual requirement ids V1.."]}],"constraints":[optional structured constraints]}; every task needs numbered acceptance criteria '
-               '(AC1, AC2, ...); together the tasks cover every project AC; completed tasks stay byte-for-byte unchanged.')
+               '(AC1, AC2, ...); together the tasks cover every project AC; completed tasks stay byte-for-byte unchanged. A task id is lowercase letters, digits and hyphens only, starting with a letter, '
+               'at most 24 characters (no underscores, no "t_" prefix). Every requirement id you list in a task\'s "visual" must also be written (for example "V2") in that same task\'s acceptance text, '
+               'and every demanded requirement must be listed by at least one task.')
 # Worker-side formatting slips are retried; a missing or foreign run is about who completed the stage, never the worker's formatting.
 NOT_RETRYABLE = ('Missing or stale completed worker run', 'Worker ownership evidence is missing')
 from .tool_incidents import tool_blockers
@@ -183,6 +185,23 @@ class ProjectController:
         """The exact words that approve the awaiting plan: bound to this root, the plan's hash and the approved-references digest."""
         awaiting = project['awaiting']
         return f"APPROVE {root_id} {awaiting['sha256'][:12]} {(awaiting.get('references_digest') or project.get('references_digest') or 'none')[:12]}"
+
+    def _reference_plan_errors(self, project, context, document, tasks):
+        """Reference-related plan problems (contradicting acceptance, traceability, an unamended bible), tolerant of a plan that also fails the schema check."""
+        if tasks is None:
+            raw = document.get('tasks') if isinstance(document, dict) else None
+            tasks = [dict(id=str(t.get('id')), title=str(t.get('title', '')), owner=t.get('owner'), visual=t.get('visual') if isinstance(t.get('visual'), list) else [],
+                          acceptance={str(k): str(v) for k, v in t['acceptance'].items()}) for t in (raw if isinstance(raw, list) else [])
+                     if isinstance(t, dict) and isinstance(t.get('acceptance'), dict)]
+        errors = []
+        records = project['reference_records']
+        texts = {'task ' + t['id']: t.get('title', '') + ': ' + '; '.join(t['acceptance'].values()) for t in tasks}
+        carried = {'task ' + t['id']: [i for i in t.get('visual', []) if isinstance(i, str)] for t in tasks}
+        clash = refs.find_contradictions(records, texts, carried)
+        if clash:
+            errors.append('Task acceptance contradicts, defers or replaces approved reference requirements: ' + self._describe(clash))
+        errors += refs.traceability_errors(records, tasks, self._bible_contradictions(project, context))
+        return errors
 
     @staticmethod
     def _open_candidates(project):
@@ -503,15 +522,17 @@ class ProjectController:
             evidence = plan_evidence('architect', row['task_id'], result.metadata)
             try:
                 plan_document = retained_json(result.metadata['artifacts'], 'project-plan.json')
-                tasks = validate_plan(plan_document, project['scope'], result.metadata['ac_ids'])
-                plan_constraints = validate_plan_constraints(plan_document.get('constraints'))
+                errors, tasks, plan_constraints = [], None, None
+                try:
+                    tasks = validate_plan(plan_document, project['scope'], result.metadata['ac_ids'])
+                    plan_constraints = validate_plan_constraints(plan_document.get('constraints'))
+                except ConfigurationError as exc:
+                    errors.append(str(exc))
                 if refs.authoritative(project.get('reference_records', [])):
-                    texts = {'task ' + t['id']: t['title'] + ': ' + '; '.join(t['acceptance'].values()) for t in tasks}
-                    carried = {'task ' + t['id']: t.get('visual', []) for t in tasks}
-                    clash = refs.find_contradictions(project['reference_records'], texts, carried)
-                    if clash:
-                        raise ConfigurationError('Task acceptance contradicts, defers or replaces approved reference requirements: ' + self._describe(clash))
-                    refs.validate_traceability(project['reference_records'], tasks, self._bible_contradictions(project, context))
+                    # All structural problems are reported together, even when the schema check failed: one error per retry would exhaust the budget.
+                    errors += self._reference_plan_errors(project, context, plan_document, tasks)
+                if errors:
+                    raise ConfigurationError('; '.join(errors))
             except ConfigurationError as exc:
                 # Structural failure, not an architectural one: the architect corrects it with the exact errors, off the replan budget.
                 tries = project.setdefault('plan_validation_retries', {}).get(str(gen), 0)

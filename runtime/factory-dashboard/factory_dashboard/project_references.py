@@ -394,37 +394,46 @@ def find_contradictions(references, documents, visual_documents=None):
     return found
 
 
-def validate_traceability(references, tasks, bible_contradictions=()):
-    """Every undeferred approved requirement is carried by a task whose acceptance cites its id; known ids only.
+def traceability_errors(references, tasks, bible_contradictions=()):
+    """Every problem of requirement traceability at once (a plan fixed one error per round would exhaust its retries).
 
-    A style bible that contradicts a requirement must be amended by an artist task that carries that requirement."""
+    Every undeferred approved requirement is carried by a task whose acceptance cites its id; known ids only; and a style bible that contradicts a
+    requirement must be amended by an artist task that carries that requirement."""
     required = {r['id'] for r in required_requirements(references)}
     known = {q['id'] for r in references for q in r['requirements']}
-    carried = set()
+    carried, errors = set(), []
     for task in tasks:
         ids = task.get('visual', [])
         if not isinstance(ids, list) or any(not isinstance(i, str) for i in ids):
-            raise ConfigurationError('Task ' + task['id'] + ': "visual" must be a list of requirement ids')
+            errors.append('Task ' + task['id'] + ': "visual" must be a list of requirement ids')
+            continue
         unknown = [i for i in ids if i not in known]
         if unknown:
-            raise ConfigurationError('Task ' + task['id'] + ' cites unknown visual requirement(s): ' + ', '.join(unknown))
+            errors.append('Task ' + task['id'] + ' cites unknown visual requirement(s): ' + ', '.join(unknown))
         text = ' '.join(task['acceptance'].values())
-        silent = [i for i in ids if not re.search(r'\b' + re.escape(i) + r'\b', text)]
+        silent = [i for i in ids if i in known and not re.search(r'\b' + re.escape(i) + r'\b', text)]
         if silent:
-            raise ConfigurationError('Task ' + task['id'] + ' lists ' + ', '.join(silent) + ' in "visual" but no acceptance criterion states it')
-        carried.update(ids)
+            errors.append('Task ' + task['id'] + ' lists ' + ', '.join(silent) + ' in "visual" but no acceptance criterion states it (write each id, for example "' + silent[0] + '", into that task\'s acceptance text)')
+        carried.update(i for i in ids if i in known)
     missing = sorted(required - carried)
     if missing:
-        raise ConfigurationError('Approved visual requirement(s) are not traced into any task acceptance: ' + ', '.join(missing)
-                                 + '. Declare each in a task "visual" list and state it in that task\'s acceptance, or ask a human for an explicit deferral.')
+        errors.append('Approved visual requirement(s) are not traced into any task acceptance: ' + ', '.join(missing)
+                      + '. Declare each in a task "visual" list and state it in that task\'s acceptance, or ask a human for an explicit deferral.')
     for item in bible_contradictions:
-        amended = any(t['owner'] == 'artist' and item['requirement'] in t.get('visual', []) and item['document'] in ' '.join(t['acceptance'].values())
+        amended = any(t.get('owner') == 'artist' and item['requirement'] in t.get('visual', []) and item['document'] in ' '.join(t['acceptance'].values())
                       for t in tasks)
         if not amended:
-            raise ConfigurationError('The existing ' + item['document'] + ' contradicts approved requirement ' + item['requirement']
-                                     + ' (line ' + str(item['line']) + ': ' + item['text'] + '). Plan an artist task that amends it, lists '
-                                     + item['requirement'] + ' in "visual" and names ' + item['document'] + ' in its acceptance.')
-    return sorted(carried)
+            errors.append('The existing ' + item['document'] + ' contradicts approved requirement ' + item['requirement']
+                          + ' (line ' + str(item['line']) + ': ' + item['text'] + '). Plan an artist task that amends it, lists '
+                          + item['requirement'] + ' in "visual" and names ' + item['document'] + ' in its acceptance.')
+    return errors
+
+
+def validate_traceability(references, tasks, bible_contradictions=()):
+    errors = traceability_errors(references, tasks, bible_contradictions)
+    if errors:
+        raise ConfigurationError('; '.join(errors))
+    return sorted({i for t in tasks for i in t.get('visual', []) if isinstance(i, str)})
 
 
 HOLISTIC_VERDICTS = ('accept', 'reject')

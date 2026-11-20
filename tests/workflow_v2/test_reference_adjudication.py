@@ -205,5 +205,23 @@ class HandoffGrantTests(AdjudicationFlow):
             self.controller.resume(self.conn, self.root, '', dict(extra_handoff_retries=1))
 
 
+class AllErrorsAtOnceTests(AdjudicationFlow):
+    def test_every_structural_and_reference_problem_of_a_plan_is_reported_in_one_rejection(self):
+        self.explained_director()
+        self.approve()
+        bad = self.visual_task(id='t_bible')  # underscore id, V1/V2 listed ...
+        outside = self.visual_task(id='other', acceptance={'AC9': 'Looks right'})  # ... another task with an AC outside the plan and V1/V2 never stated
+        self.architect([bad, outside])
+        stage, context = self.rejection('architect')
+        reason = context['previous_handoff_rejected']['reason']
+        self.assertEqual(stage['evidence_retry'], 1)
+        for part in ('Invalid or duplicate task ID', 'outside the architecture plan', 'lists V1, V2 in "visual" but no acceptance criterion states it'):
+            self.assertIn(part, reason)
+        self.assertEqual(self.document()['plan_validation_retries'], {'0': 1})  # one round, not one per error
+        schema = context['previous_handoff_rejected']['required_schema']
+        self.assertIn('lowercase letters, digits and hyphens only', schema)
+        self.assertIn('must also be written (for example "V2") in that same task', schema)
+
+
 if __name__ == '__main__':
     unittest.main()
