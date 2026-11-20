@@ -45,6 +45,10 @@ class ReleaseTests(unittest.TestCase):
             self.assertIn('factory-retro',store.read_defaults().roles)
             self.assertEqual(capture.preview({'type':'feature'}).execution_version,2)
             self.assertTrue((home/'profiles/factory-retro/plugins/factory-models/factory_dashboard/project_controller.py').is_file())
+            for role in ('architect','art-director','art-reviewer','claude-reviewer'):
+                self.assertIn('vision',yaml.safe_load((home/'profiles'/role/'config.yaml').read_text())['platform_toolsets']['cli'],role)
+                self.assertIn('Authority, highest first',(home/'profiles'/role/'SOUL.md').read_text())
+            self.assertNotIn('vision',yaml.safe_load((home/'profiles/developer/config.yaml').read_text()).get('platform_toolsets',{}).get('cli',[]))
             files,_=release_files(home)
             self.assertEqual(preview(home,files)['changes'],[])
 
@@ -65,6 +69,15 @@ class ReleaseTests(unittest.TestCase):
             self.assertEqual(store.get_snapshot(sid).workflow.execution_version,1)
             activate_templates(store)
             self.assertEqual(capture.preview({'type':'feature'}).revision,updated.revision)
+
+    def test_the_previous_managed_block_upgrades_to_the_authority_block_in_place(self):
+        from install_project_workflows import BASE,MANAGED,managed_text
+        upgraded=managed_text('Role intro\n\n'+BASE+'# Rest\n')
+        self.assertEqual(upgraded,'Role intro\n\n'+MANAGED+'# Rest\n')
+        self.assertEqual(managed_text(upgraded),upgraded)
+        from install_project_workflows import _PREVIOUS_AUTHORITY
+        self.assertEqual(managed_text('Role intro\n\n'+_PREVIOUS_AUTHORITY+'# Rest\n'),upgraded)
+        self.assertIn('never blocks for lacking vision',MANAGED)
 
     def test_plugin_bundle_contains_project_controller_and_policy(self):
         import importlib.util

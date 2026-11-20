@@ -64,6 +64,31 @@ Asset lint remains required, but it cannot establish perceptual approval. The ar
 
 Evidence is operator/worker-retained reporting, not an independent authentication system. The controller validates identity, shape, retention and linkage, not the truth of a subjective observation.
 
+## Approved references and authority
+
+A human-approved visual direction is the highest authority in a project: human-approved decisions and references > GDD > style bible and architecture > implementation plan > implementation and tests. A lower layer may refine a higher one; it may never contradict, replace, defer or silently drop it. Grey-box means gameplay scope and production-asset fidelity may be simplified; everything that is implemented follows the approved composition, palette, HUD and defining visual characteristics.
+
+A project declares its references in `docs/references.json` (or `art/references.json`). This file and the images are human-owned and are hashed when a run starts:
+
+```json
+{"schema": "factory-references/v1", "milestone": 1, "references": [
+  {"id": "look", "path": "docs/look/look.png", "roles": ["visual_reference", "immutable"], "authority": "human_approved",
+   "topics": ["composition", "palette", "hud", "subjects", "materials", "lighting"],
+   "approved_negations": ["no cast shadows"],
+   "requirements": [{"id": "V1", "text": "Hazard-stripe trim on the door", "keywords": ["hazard stripe"]},
+                    {"id": "V2", "text": "Combo readout top right", "keywords": ["combo readout"], "introduced_at": 3}],
+   "deferrals": [{"requirement": "V1", "until": "milestone 6", "reason": "...", "approved_by": "human"}]}]}
+```
+
+- **Roles** are a set: `visual_reference` (how it must look), `production_asset` (may ship), `immutable` (never edited), `example` (illustration only). One file can be an immutable visual reference that is not a production asset. Without a references file, an image the GDD names as the reference image (a `docs/...png` on a line mentioning "reference", "look" or "direction") is adopted as an authoritative visual reference.
+- **Scoping is a human decision.** A requirement is demanded unless a human lists it under `deferrals`, or sets `introduced_at` to a milestone later than the file's human-set `milestone` (a feature that does not exist yet). Plans, the bible and milestone names never exclude anything: wording such as grey-box, placeholder, generic, flat squares or "until milestone N" next to a requirement id or keyword, in a task that carries a requirement, or declaring the whole style deferred, is an implicit deferral and is rejected.
+- **Inspection with proof.** The architect, art director, plan reviewer and art reviewer must retain `reference-inspection.json` (sha256 of the exact image, the requirement ids, one concrete observation per topic) and the controller checks the worker's own session log: a successful `vision_analyze` call on each approved reference file must exist (the art reviewer must also have opened a rendered screenshot). A well-formed JSON file without those calls is sent back. The controller refuses to create these stages for a profile whose toolsets lack `vision` (the installer adds it). The scope stage never receives reference material.
+- **Traceability.** Every demanded requirement must appear in the director and architect PLAN.md and in a task's `visual` list in `project-plan.json`, and that task's acceptance must state the id. A plan that does not is corrected off the replan budget.
+- **Contradictions.** A deterministic scan rejects director and architect plans, task acceptance and the style bible (`STYLE.md`, `style.json`) that forbid, defer, exclude or simplify an approved characteristic, or that use a factory mockup as the comparison target. An existing bible that does so must be amended by an artist task that carries the requirement, and is rescanned before final integration. The scan is a floor over wording: the plan reviewer must still write a "Reference audit" and report contradictions as BLOCKER findings. `approved_negations` lists characteristics that are themselves negations ("no cast shadows") so they are not mistaken for prohibitions.
+- **Verification.** The art reviewer's `comparison.json` cites each approved reference by sha256, carries one criterion per demanded requirement judged on real in-engine screenshots, and a `holistic` judgement of the whole against the whole (`accept` or `reject`, a written summary, a `matches|close|differs` rating per topic, and a `HOLISTIC` criterion with the same outcome). Every requirement passing does not make a rejected whole acceptable. The similarity gate is not used and no score or pixel threshold approves anything.
+- **Mockups never override.** Factory-made mockups, bibles and tiles are derived evidence. They cannot be a comparison target, cannot appear as evidence for a criterion, and cannot become authoritative unless a human edits the references file.
+- **Freezing.** A change to the references file or an image mid-run (including promoting a mockup or lowering an authority) stops the project for a human, who re-approves by resuming.
+
 ## Integration and retrospective
 
 After all tasks pass, the developer assembles the project and a final verifier-first cycle checks every project AC and the integrated visual/audio result. Only this cycle's manifest/snapshot can become the delivered project.

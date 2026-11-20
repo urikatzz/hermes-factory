@@ -54,5 +54,11 @@ class ComparisonTests(unittest.TestCase):
         result.metadata['artifacts']=[str(self.directory/'comparison.json'),str(self.directory/'render.png')]
         validate_comparison('art-reviewer',result,[self.plan],False)
 
+    def test_with_an_approved_reference_the_comparison_must_cite_it_and_hold_a_holistic_judgement(self):
+        with self.assertRaisesRegex(ConfigurationError,'Invalid perceptual comparison record'):
+            validate_comparison('art-reviewer',self.result(),[self.plan],False,True)  # a plain comparison no longer suffices
+        self.record['references']=[dict(id='lookd',sha256='c'*64)]
+        self.record['holistic']=dict(verdict='accept',summary='x',dimensions={},screenshots=['render.png'])
+        self.assertTrue(validate_comparison('art-reviewer',self.result(),[self.plan],False,True))  # key set is right; the content rules live in validate_reference_comparison
 
 if __name__ == '__main__': unittest.main()

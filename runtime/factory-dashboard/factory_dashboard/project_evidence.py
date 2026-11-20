@@ -65,7 +65,7 @@ def validate_similarity(result):
     return passed
 
 
-def validate_comparison(profile, result, plans, integration):
+def validate_comparison(profile, result, plans, integration, approved=False):
     """A linter success is never perceptual approval. Missing evidence stops the run."""
     if profile != 'art-reviewer':
         raise ConfigurationError('No perceptual comparison is defined for ' + profile)
@@ -73,7 +73,8 @@ def validate_comparison(profile, result, plans, integration):
     if plan is None:
         raise ConfigurationError('Specialist review has no captured director plan')
     record = retained_json(result.metadata['artifacts'], 'comparison.json')
-    if not isinstance(record, dict) or set(record) != {'schema', 'plan_sha256', 'manifest_sha12', 'mode', 'source', 'outcome', 'criteria', 'evidence'}:
+    keys = {'schema', 'plan_sha256', 'manifest_sha12', 'mode', 'source', 'outcome', 'criteria', 'evidence'} | ({'references', 'holistic'} if approved else set())
+    if not isinstance(record, dict) or set(record) != keys:
         raise ConfigurationError('Invalid perceptual comparison record')
     mode = 'rendered_in_engine' if integration else 'rendered_asset'
     if record['schema'] != 'factory-comparison/v1' or record['plan_sha256'] != plan['sha256'] or record['manifest_sha12'] != result.metadata['manifest_sha12']:

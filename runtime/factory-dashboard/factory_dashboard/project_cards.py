@@ -24,6 +24,44 @@ Correct the plan defect: fix wrong or untestable acceptance criteria, split over
 Tasks in PROJECT_CONTEXT.completed_tasks already passed: keep each of them in project-plan.json exactly as captured.
 Do not weaken an acceptance criterion merely so failing work passes; do not change director intent.'''
 
+APPROVED_REFERENCES = '''Approved references. PROJECT_CONTEXT.approved_references lists human-approved visual references (path, sha256, roles, requirement ids V*, any
+human-approved deferrals). Authority order, highest first: human-approved decisions and references > GDD > style bible and architecture > implementation
+plan > implementation and tests. A lower layer may refine a higher one; it may never contradict, replace or silently drop it. A style bible rule, plan
+step or acceptance criterion that forbids, defers or excludes something an approved reference shows is a defect in that lower layer, never a reason to
+build less. Roles: visual_reference = how the game must look (authoritative); production_asset = may be shipped; immutable = never edited; example =
+illustrative only. One file can be an immutable visual reference and still not a production asset: "do not ship it" never means "do not follow it".
+Milestone semantics: grey-box means gameplay scope and asset fidelity may be simplified; everything that is implemented now follows the approved reference's
+composition, palette, HUD and defining visual characteristics, and "grey-box", "placeholder", "generic" or a milestone name next to a requirement is an implicit
+deferral that is rejected. Only a human decision recorded in approved_references postpones a requirement: a listed deferral (approved_by human) or an
+introduced_at milestone later than the human-set milestone (a feature that does not exist yet). Nobody else may. A factory-made mockup, bible, tile or
+screenshot is derived evidence: it is never the comparison target, never replaces the original reference, and only a human editing the references file can change that.'''
+
+INSPECTION = '''Mandatory reference inspection: before you plan, decide or judge anything visual, open every approved reference image yourself with
+vision_analyze (a path or a hash is not an inspection). Retain reference-inspection.json: {"schema":"factory-reference-inspection/v1","references":[{"id":"<ref id>",
+"path":"<path>","sha256":"<the sha256 in approved_references>","tool":"vision_analyze","requirement_ids":["V1",...every id of that reference],
+"observations":[{"topic":"<each of the reference's inspect_topics>","observation":"what the image actually shows, at least one concrete sentence per topic"}]}]}.
+Attach it as a completion artifact. The controller verifies your session log: a successful vision_analyze call on each exact reference file must exist, so a
+correctly formatted JSON file without the tool calls is rejected. If you cannot open images, finish BLOCKED with blocked_reason naming the missing vision capability; never guess.'''
+
+VISUAL_TRACE = '''Visual traceability: every approved requirement (V ids in approved_references, minus human-approved deferrals) must appear in PLAN.md, in the style
+bible rules it affects, and in at least one task: add "visual":["V1",...] to that task in project-plan.json AND state each id in that task's acceptance text.
+If the existing style bible (art/style/STYLE.md) forbids, defers or excludes anything an approved reference shows, plan an artist task that amends it:
+list the contradicted ids in its "visual", and name the bible path in its acceptance. Never carry a contradicting rule forward.'''
+
+REFERENCE_AUDIT = '''Reference audit (mandatory): compare each derived rule and acceptance criterion with the approved references and the GDD. Every rule, step or
+criterion that forbids, defers, excludes or weakens something an approved reference shows is a BLOCKER finding "contradicts <V id>: <rule>" with
+finding class architectural. Write the audit as a "Reference audit" section of PLAN-REVIEW.md listing each requirement id and where the plan carries it.
+The controller also runs a deterministic contradiction scan; a plan it flags cannot be approved.'''
+
+APPROVED_COMPARISON = '''Approved-reference comparison. Judge the real rendered result against the ORIGINAL approved reference images (never against a factory mockup),
+requirement by requirement. No similarity score or pixel threshold approves anything here. In comparison.json add "references":[{"id":"<ref id>","sha256":"<sha256>"}]
+for every approved reference, and one criterion per approved requirement whose "rule" starts with its V id (for example "V2: ..."), with expected = what the
+reference shows and observed = what the retained screenshot shows. Retained screenshots must be real in-engine renders for final integration. Also judge the WHOLE:
+open the reference and the screenshots side by side with vision_analyze and add "holistic":{"verdict":"accept"|"reject","summary":"at least 120 characters on how the
+whole screenshot compares with the whole reference: would the human who approved it recognise this as the same game?","dimensions":{<each of the reference's inspect_topics>:
+"matches"|"close"|"differs"},"screenshots":[retained screenshot names]} and exactly one criterion whose rule starts "HOLISTIC" with the same outcome as the verdict.
+Every requirement passing does not make the result acceptable: reject when the overall result does not read as the approved look. Never cite a factory mockup.'''
+
 PLAN_REVIEW = '''Review the architect's PLAN.md and project-plan.json against the request, scope and inherited director plans. Read-only.
 Check: every request requirement maps to an acceptance criterion; each criterion is observable and testable; tasks are small,
 correctly owned and ordered; dependencies are complete; director asset paths and criteria are preserved; scope booleans are right.
@@ -106,6 +144,8 @@ def project_card(definition, stage, cycle, context, inputs, project, task=None):
     details = dict(scope=project.get('scope'), director_and_architecture_plans=project.get('plans', []),
                    task=task, project_ac_ids=project.get('ac_ids', []),
                    completed_tasks=project.get('completed', []), terminal=project.get('terminal'))
+    if project.get('references') and stage.key != 'project-scope':
+        details['approved_references'] = project['references']
     if project.get('replan'):
         details['replan'] = project['replan']
     if project.get('approvals'):

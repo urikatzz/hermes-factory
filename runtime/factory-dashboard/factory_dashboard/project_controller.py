@@ -1,15 +1,18 @@
 """Restart-safe two-level Factory execution over the existing guarded board API."""
 from dataclasses import asdict, replace
 import json
+import os
 from pathlib import Path
+import re
 import time
 
 from .model_policy import ConfigurationError
-from .project_cards import (ARCHITECT, COMPARISON, CONFLICT_CHECK, SIMILARITY, DIRECTOR, PLAN_CORRECTION, PLAN_CORRECTION_REVIEW, PLAN_DEFECT,
+from .project_cards import (APPROVED_COMPARISON, APPROVED_REFERENCES, INSPECTION, REFERENCE_AUDIT, VISUAL_TRACE, ARCHITECT, COMPARISON, CONFLICT_CHECK, SIMILARITY, DIRECTOR, PLAN_CORRECTION, PLAN_CORRECTION_REVIEW, PLAN_DEFECT,
                             PLAN_REVIEW, REPLAN, RETRO, SCOPE, SPEC_CONSTRAINTS, TOOL_INCIDENTS, project_card)
 from .project_decisions import (constraint_view, constraints_of, normalize_decisions, preserved_conflict, record_applied, relevant_constraints,
                                 validate_plan_constraints, validate_spec_conflicts)
 from .project_evidence import plan_evidence, retained_json, validate_comparison, validate_similarity
+from . import project_references as refs
 from .project_policy import (MAX_ORCHESTRATION_RECOVERIES, MAX_PLAN_CORRECTIONS, MAX_REPLANS, blocking_findings, budget_used, finding_id,
                              missing_baseline_tokens, plan_architecture_diff, repair_origin, finding_ac, planning_profiles, route_findings, rereview_profiles,
                              review_profiles, scope_additions, validate_plan, validate_scope)
@@ -21,7 +24,7 @@ MAX_HANDOFF_RETRIES = 2
 MAX_PLAN_VALIDATION_RETRIES = 2
 PLAN_SCHEMA = ('project-plan.json: {"tasks":[{"id":"lowercase-id","title":"...","owner":"developer|artist|sound-designer","dependencies":["task-id"],'
                '"acceptance":{"AC1":"observable criterion"},"needs":{"art":false,"audio":false,"ui":false,"ux":false},"risk":"normal|high",'
-               '"preserve":["optional path"]}],"constraints":[optional structured constraints]}; every task needs numbered acceptance criteria '
+               '"preserve":["optional path"],"visual":["optional approved visual requirement ids V1.."]}],"constraints":[optional structured constraints]}; every task needs numbered acceptance criteria '
                '(AC1, AC2, ...); together the tasks cover every project AC; completed tasks stay byte-for-byte unchanged.')
 # Worker-side formatting slips are retried; a missing or foreign run is about who completed the stage, never the worker's formatting.
 NOT_RETRYABLE = ('Missing or stale completed worker run', 'Worker ownership evidence is missing')
@@ -92,12 +95,26 @@ class ProjectController:
                     # Replace the legacy asset-only preflight, preserving captured custom guidance.
                     extra = extra.replace(GAME_ART['prepare'], '').replace(GAME_AUDIO['prepare'], '')
                 instructions += '\n' + extra
+        approved = refs.authoritative(project.get('reference_records', [])) if key != 'project-scope' else []
+        if approved:
+            instructions += '\n' + APPROVED_REFERENCES
+            if refs.must_inspect(profile, key):
+                instructions += '\n' + INSPECTION
+            if profile in ('architect', 'art-director'):
+                instructions += '\n' + VISUAL_TRACE
+            if key == refs.PLAN_REVIEW_KEY:
+                instructions += '\n' + REFERENCE_AUDIT
         rows = self._controller._rows(conn, root, key, cycle)
         token = f'{key}:{cycle}'
         if token not in project['active_keys']:
             project['active_keys'].append(token)
         retry_requested = token in project.get('retry_keys', [])
         if not rows or retry_requested:
+            if approved and refs.must_inspect(profile, key):
+                # A stage that must look at the reference cannot be created for a profile that cannot open images.
+                problem = refs.vision_problem(profile, os.environ.get('FACTORY_HERMES_HOME') or os.environ.get('HERMES_HOME') or Path.home() / '.hermes')
+                if problem:
+                    raise ProjectBlocked('Visual capability missing: ' + problem)
             retry = rows[0]['evidence_retry'] + 1 if rows else 0
             stage = StageSpec(key, kind, profile, instructions)
             self._save(conn, root, project)
@@ -117,16 +134,18 @@ class ProjectController:
             if not task_row or task_row.status in ('blocked', 'triage', 'archived'):
                 raise ProjectBlocked('Project stage requires intervention: ' + key)
             return None
-        if not result.valid:
+        reason = None if not result.valid else self._inspection_problem(conn, project, profile, key, result, context)
+        if not result.valid or reason:
+            reason = reason or result.reason
             tries = project.setdefault('handoff_retries', {}).get(token, 0)
-            if result.reason in NOT_RETRYABLE or tries >= MAX_HANDOFF_RETRIES:
-                raise ConfigurationError(result.reason + ': ' + key)
+            if reason in NOT_RETRYABLE or tries >= MAX_HANDOFF_RETRIES:
+                raise ConfigurationError(reason + ': ' + key)
             # A malformed handoff is a worker slip, not a failed milestone: retry only this stage, telling the worker exactly what to fix.
             project['handoff_retries'][token] = tries + 1
-            project.setdefault('orchestration_log', []).append(dict(kind='handoff_retry', key=key, attempt=tries + 1, reason=result.reason, at=int(time.time())))
-            project.setdefault('handoff_rejections', {})[key] = self._rejection(conn, row, result, kind, key, cycle, root, tries + 1)
+            project.setdefault('orchestration_log', []).append(dict(kind='handoff_retry', key=key, attempt=tries + 1, reason=reason, at=int(time.time())))
+            project.setdefault('handoff_rejections', {})[key] = self._rejection(conn, row, result, kind, key, cycle, root, tries + 1, reason)
             project.setdefault('retry_keys', []).append(token)
-            self._state.event(conn, root['root_id'], 'handoff_rejected', dict(key=key, task_id=row['task_id'], reason=result.reason, attempt=tries + 1))
+            self._state.event(conn, root['root_id'], 'handoff_rejected', dict(key=key, task_id=row['task_id'], reason=reason, attempt=tries + 1))
             return self._node(conn, root, definition, context, project, key, kind, profile, original, [*inputs, row['task_id']], task=task, cycle=cycle)
         if result.metadata['verdict'] == 'BLOCKED' and not self._defect([result]):
             # A BLOCKED stage that declares a plan defect is not blocked work: it goes on to the architect (bounded replans).
@@ -150,7 +169,79 @@ class ProjectController:
             self._state.event(conn, root['root_id'], 'project_stage_accepted', history)
         return row, result
 
-    def _rejection(self, conn, row, result, kind, key, cycle, root, attempt):
+    @staticmethod
+    def _hermes_home():
+        return Path(os.environ.get('FACTORY_HERMES_HOME') or os.environ.get('HERMES_HOME') or Path.home() / '.hermes')
+
+    @staticmethod
+    def _describe(findings):
+        return '; '.join(f"{c['requirement']} [{c['kind']}: '{c['keyword']}'] {c['document']}:{c['line']}: {c['text']}" for c in findings[:5])
+
+    def _inspection_problem(self, conn, project, profile, key, result, context):
+        """A stage that decides or judges visuals must prove it opened each approved reference image. None when satisfied or not required.
+
+        Proof is the worker's own session log: a successful vision_analyze call on the exact reference file. A well-formed JSON file alone is not evidence."""
+        records = project.get('reference_records', [])
+        if not refs.authoritative(records) or not refs.must_inspect(profile, key) or result.metadata.get('verdict') == 'BLOCKED':
+            return None
+        try:
+            try:
+                refs.validate_inspection(retained_json(result.metadata['artifacts'], 'reference-inspection.json'), records)
+            except ConfigurationError as exc:
+                return 'Reference inspection rejected: ' + str(exc)
+            try:
+                run = self._board.get_run(conn, result.run_id)
+                session = (getattr(run, 'metadata', None) or {}).get('worker_session_id')
+            except Exception:
+                session = None
+            root = Path(context['project_dir'])
+            wanted = {r['id']: root / r['path'] for r in refs.authoritative(records)}
+            absent = refs.vision_proof(profile, session, self._hermes_home(), wanted)
+            if absent:
+                return ('Reference inspection rejected: the worker session shows no successful vision_analyze call on ' + ', '.join(
+                    f"{i} ({wanted[i]})" for i in absent) + '. Open each approved image with vision_analyze before describing it.')
+            if profile == 'art-reviewer':
+                shots = {Path(a).name: a for a in result.metadata['artifacts'] if Path(a).suffix.lower() in refs.IMAGE_SUFFIXES}
+                if shots and len(refs.vision_proof(profile, session, self._hermes_home(), shots)) == len(shots):
+                    return 'Reference inspection rejected: the worker session shows the reviewer never opened any of the rendered screenshots with vision_analyze.'
+            if profile in ('art-director', 'architect'):
+                plan = next((Path(a) for a in result.metadata['artifacts'] if Path(a).name == 'PLAN.md' or re.fullmatch(r'PLAN_[0-9]+\.md', Path(a).name)), None)
+                text = plan.read_text(errors='replace') if plan and plan.is_file() else ''
+                missing = [r['id'] for r in refs.required_requirements(records) if not re.search(r'\b' + re.escape(r['id']) + r'\b', text)]
+                if missing:
+                    raise ConfigurationError('PLAN.md does not carry approved visual requirement(s): ' + ', '.join(missing))
+                clash = refs.find_contradictions(records, {profile + ' PLAN.md': text})
+                if clash:
+                    raise ConfigurationError('PLAN.md contradicts, defers or replaces approved reference requirements: ' + self._describe(clash))
+        except ConfigurationError as exc:
+            return 'Approved-reference check rejected: ' + str(exc)
+        return None
+
+    def _refresh_references(self, project, context):
+        """Load the approved references; they are frozen for the run: a changed image or references file needs a human."""
+        loaded = refs.load_references(context['project_dir'])
+        if loaded['problems']:
+            raise ProjectBlocked('; '.join(loaded['problems']) + '. A human must re-approve the reference.')
+        prior = project.get('references_digest')
+        if prior and loaded['digest'] != prior:
+            raise ProjectBlocked('Approved references changed during the run. A human must re-approve them (resume with a note) before work continues.')
+        project['reference_records'] = loaded['references']
+        project['references'] = refs.view(loaded['references'])
+        project['references_digest'] = loaded['digest']
+        project['references_source'] = loaded['source']
+        return loaded['references']
+
+    @staticmethod
+    def _bible_contradictions(project, context):
+        """The existing style bible against the approved references."""
+        documents = {}
+        for name in ('art/style/STYLE.md', 'art/style/style.json'):
+            path = Path(context['project_dir']) / name
+            if path.is_file():
+                documents[name] = path.read_text(errors='replace')
+        return refs.find_contradictions(project.get('reference_records', []), documents)
+
+    def _rejection(self, conn, row, result, kind, key, cycle, root, attempt, reason=None):
         """What a retried worker is told: the exact reason, the required identity/schema, and the valid part of what it sent."""
         kept = {}
         try:
@@ -163,7 +254,7 @@ class ProjectController:
             kept = {}
         required = dict(contract='factory-worker/v2', workflow_contract='factory-workflow/v1', root=root['root_id'], stage_key=key,
                         cycle=cycle + 1, verdict='one of ' + ' | '.join(VERDICTS[kind]))
-        return dict(attempt=attempt, max_attempts=MAX_HANDOFF_RETRIES, rejected_task=row['task_id'], reason=result.reason, required_identity=required,
+        return dict(attempt=attempt, max_attempts=MAX_HANDOFF_RETRIES, rejected_task=row['task_id'], reason=reason or result.reason, required_identity=required,
                     instruction='Resubmit the handoff with the missing or wrong fields corrected. Keep what was valid; redo work only if the reason requires it. '
                                 'Prior attachments are readable from the rejected task.', previous_valid_metadata=kept)
 
@@ -292,6 +383,8 @@ class ProjectController:
 
     def _advance(self, conn, root, definition, context, project):
         mode = project['mode']
+        if mode not in ('retro', 'finished'):
+            self._refresh_references(project, context)
         if mode == 'retro':
             return self._retro(conn, root, definition, context, project)
         if mode == 'finished':
@@ -351,6 +444,13 @@ class ProjectController:
                 plan_document = retained_json(result.metadata['artifacts'], 'project-plan.json')
                 tasks = validate_plan(plan_document, project['scope'], result.metadata['ac_ids'])
                 plan_constraints = validate_plan_constraints(plan_document.get('constraints'))
+                if refs.authoritative(project.get('reference_records', [])):
+                    texts = {'task ' + t['id']: t['title'] + ': ' + '; '.join(t['acceptance'].values()) for t in tasks}
+                    carried = {'task ' + t['id']: t.get('visual', []) for t in tasks}
+                    clash = refs.find_contradictions(project['reference_records'], texts, carried)
+                    if clash:
+                        raise ConfigurationError('Task acceptance contradicts, defers or replaces approved reference requirements: ' + self._describe(clash))
+                    refs.validate_traceability(project['reference_records'], tasks, self._bible_contradictions(project, context))
             except ConfigurationError as exc:
                 # Structural failure, not an architectural one: the architect corrects it with the exact errors, off the replan budget.
                 tries = project.setdefault('plan_validation_retries', {}).get(str(gen), 0)
@@ -408,6 +508,13 @@ class ProjectController:
             return self._plan_correction(conn, root, definition, context, project)
         if mode == 'tasks':
             task = self._current(project)
+            if task is None and refs.authoritative(project.get('reference_records', [])):
+                left = self._bible_contradictions(project, context)
+                if left:
+                    findings = [f"F{i}|BLOCKER|-|{c['document']}|contradicts {c['requirement']}: {c['text']}" for i, c in enumerate(left[:10], 1)]
+                    if not self._replan(conn, root, project, None, 'The style bible still contradicts an approved reference', findings, []):
+                        raise ConfigurationError('Style bible still contradicts approved reference ' + left[0]['requirement'] + ' after the replan limit')
+                    return True
             if task is None:
                 # A read-only verification is insufficient: the developer assembles the final project first.
                 project['integration'] = dict(id='integration', title='Final project integration', owner='developer',
@@ -503,9 +610,10 @@ class ProjectController:
         readers, rows, waiting = [verifier], [verifier_row], False
         for profile in profiles:
             instructions = 'Review only your discipline against TASK acceptance and the inherited plans; report actionable findings.\n' + TOOL_INCIDENTS + '\n' + SPEC_CONSTRAINTS + '\n' + PLAN_DEFECT
+            human_approved = bool(refs.authoritative(project.get('reference_records', [])))
             if profile == 'art-reviewer':
-                instructions += '\n' + COMPARISON
-            if profile == 'art-reviewer' and task['id'] != 'integration':
+                instructions += '\n' + COMPARISON + ('\n' + APPROVED_COMPARISON if human_approved else '')
+            if profile == 'art-reviewer' and task['id'] != 'integration' and not human_approved:
                 instructions += '\n' + SIMILARITY
             selected = next((r.instructions for r in definition.reviewers if r.profile == profile), '')
             instructions += '\n' + selected
@@ -519,9 +627,12 @@ class ProjectController:
             if review_blockers:
                 raise ProjectBlocked('Review requires unavailable tools: ' + profile + ': ' + '; '.join(review_blockers))
             # Below 80% the reviewer stops at the score, so there is no detailed comparison to validate.
-            close_enough = profile != 'art-reviewer' or task['id'] == 'integration' or validate_similarity(result)
+            # With a human-approved reference no score substitutes for the requirement-by-requirement judgement against the original image.
+            close_enough = profile != 'art-reviewer' or task['id'] == 'integration' or human_approved or validate_similarity(result)
             if profile == 'art-reviewer' and close_enough:
-                validate_comparison(profile, result, project['plans'], task['id'] == 'integration')
+                record = validate_comparison(profile, result, project['plans'], task['id'] == 'integration', human_approved)
+                if human_approved:
+                    refs.validate_reference_comparison(record, project['reference_records'])
             readers.append(result)
             rows.append(row)
         if waiting:
@@ -781,6 +892,7 @@ class ProjectController:
         if root['phase'] not in stopped or project.get('terminal', {}).get('phase') not in stopped:
             raise ConfigurationError('Only an infrastructure-blocked project can resume; changed scope requires a new task')
         project.update(mode=project['resume_mode'], active_keys=[], recoveries=project.get('recoveries', 0)+1, recovery_note=note)
+        project.pop('references_digest', None)  # a human resuming re-approves the references as they now stand
         project.pop('terminal', None);project.pop('retro', None)
         known = {w['id'] for w in project.setdefault('waivers', [])}
         project['waivers'].extend(w for w in decided['waivers'] if w['id'] not in known)

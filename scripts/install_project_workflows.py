@@ -18,10 +18,11 @@ sys.path.insert(0, str(SOURCE))
 
 from factory_dashboard.model_policy import ConfigurationError
 from factory_dashboard.project_policy import V2_PROFILES
+from factory_dashboard.project_references import INSPECTING_PROFILES
 from factory_dashboard.task_settings_store import TaskSettingsStore, encode
 from factory_dashboard.workflow_types import WorkflowDefinition
 
-MANAGED = '''# Project workflow v2
+BASE = '''# Project workflow v2
 
 When your card includes PROJECT_WORKFLOW_VERSION 2, its captured stage instructions override legacy role sequencing.
 The controller owns all stage creation, dependencies and gates. Never create, reassign or complete another stage.
@@ -43,6 +44,26 @@ factory-retro proposes improvements only; changing Factory behavior requires a s
 All existing Git/publishing restrictions, approval floors and factory-worker handoff identity checks still apply.
 
 '''
+AUTHORITY_LINES_PREVIOUS = '''Authority, highest first: human-approved decisions and references > GDD > style bible and architecture > implementation plan >
+implementation and tests. A lower layer refines a higher one; it never contradicts, replaces or silently drops it. When the card lists
+approved_references, open each image yourself with vision_analyze before you plan, decide or judge anything visual (a path or hash is not an
+inspection), cite its V requirement ids, and retain reference-inspection.json as the card says. A rule or criterion that forbids, defers or excludes
+something an approved reference shows is a defect in the lower layer. Grey-box simplifies gameplay and production assets; it never waives an approved
+composition, palette, HUD or defining visual characteristic. Only a human-approved deferral listed in approved_references postpones a requirement.
+Factory mockups and screenshots are derived evidence, never the source of truth.
+'''
+AUTHORITY_LINES = '''Authority, highest first: human-approved decisions and references > GDD > style bible and architecture > implementation plan >
+implementation and tests. A lower layer refines a higher one; it never contradicts, replaces or silently drops it. When the card lists
+approved_references, follow this order and cite its V requirement ids. Only when your card has a "Mandatory reference inspection" section, open each image
+yourself with vision_analyze before you plan, decide or judge anything visual (a path or hash is not an inspection) and retain reference-inspection.json
+as that section says; a role whose card has no such section never needs to view images and never blocks for lacking vision. A rule or criterion that forbids, defers or excludes
+something an approved reference shows is a defect in the lower layer. Grey-box simplifies gameplay and production assets; it never waives an approved
+composition, palette, HUD or defining visual characteristic. Only a human-approved deferral listed in approved_references postpones a requirement.
+Factory mockups and screenshots are derived evidence, never the source of truth.
+'''
+ENDING = 'All existing Git/publishing restrictions, approval floors and factory-worker handoff identity checks still apply.\n'
+MANAGED = BASE.replace(ENDING, AUTHORITY_LINES + ENDING)
+_PREVIOUS_AUTHORITY = BASE.replace(ENDING, AUTHORITY_LINES_PREVIOUS + ENDING)
 PLANNING_LINES = '''A plan reviewer retains PLAN-REVIEW.md and reports plan defects as findings; it writes no plan of its own.
 If a failure comes from a wrong task plan or acceptance criterion, set metadata.plan_defect instead of forcing a repair.
 The architect sets metadata.scope_additions when the captured scope omits art, audio, UI or UX the work needs.
@@ -55,10 +76,14 @@ PERCEPTION_LINE = 'rendering. Missing perception is unavailable evidence, not a 
 LISTENING_LINES = '''rendering. Audio review requires a capable listening tool or retained human listening evaluation. Never claim to hear
 audio from waveforms or loudness. Missing perception is unavailable evidence, not a NIT, a waiver or an approval.
 '''
-_WITH_AUDIO_REVIEW = MANAGED.replace(PERCEPTION_LINE, LISTENING_LINES)
-RELEASED = (_WITH_AUDIO_REVIEW, _WITH_AUDIO_REVIEW.replace(PLANNING_LINES, ''),
+_WITH_AUDIO_REVIEW = BASE.replace(PERCEPTION_LINE, LISTENING_LINES)
+RELEASED = (_PREVIOUS_AUTHORITY, BASE, _WITH_AUDIO_REVIEW, _WITH_AUDIO_REVIEW.replace(PLANNING_LINES, ''),
             _WITH_AUDIO_REVIEW.replace(PLANNING_LINES, '').replace(BIBLE_LINES, ''))
-assert len({MANAGED, *RELEASED}) == 4
+assert len({MANAGED, *RELEASED}) == 6
+
+
+# The inspecting roles, plus both possible plan reviewers and the other visual reviewers.
+VISION_PROFILES = (*INSPECTING_PROFILES, 'claude-reviewer', 'codex-reviewer', 'ui-reviewer', 'ux-reviewer', 'verifier')
 
 
 def digest(data):
@@ -179,6 +204,11 @@ def release_files(home):
         for role in V2_PROFILES:
             if role not in roster:
                 roster.append(role)
+        if owner.name in VISION_PROFILES:
+            # These roles decide or judge visuals against approved reference images: they must be able to open images.
+            tools = configuration.setdefault('platform_toolsets', {}).setdefault('cli', [])
+            if 'vision' not in tools:
+                tools.append('vision')
         if owner.name == 'factory-orchestrator':
             tools = configuration.setdefault('platform_toolsets', {}).setdefault('cli', [])
             for tool in ('file', 'terminal'):

@@ -85,7 +85,7 @@ def validate_plan(document, scope, project_ac_ids):
     errors = []
     for task in tasks:
         try:
-            if not isinstance(task, dict) or set(task) - {'risk', 'preserve'} != {'id', 'title', 'owner', 'dependencies', 'acceptance', 'needs'}:
+            if not isinstance(task, dict) or set(task) - {'risk', 'preserve', 'visual'} != {'id', 'title', 'owner', 'dependencies', 'acceptance', 'needs'}:
                 raise ConfigurationError('Invalid task fields')
             if 'preserve' in task:
                 task['preserve'] = validate_preserve(task['preserve'])
