@@ -53,6 +53,13 @@ class ProjectPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ConfigurationError, 'numbered acceptance criteria'):
             validate_plan(plan, scope, ['AC1'])
 
+    def test_an_uncovered_project_ac_is_named(self):
+        from factory_dashboard.project_policy import validate_plan
+        scope = dict(art=False, audio=False, ui=False, ux=False)
+        plan = dict(tasks=[dict(id='code', title='Wire', owner='developer', dependencies=[], acceptance={'AC1': 'ok'}, needs=scope)])
+        with self.assertRaisesRegex(ConfigurationError, 'no task states AC2, AC3'):
+            validate_plan(plan, scope, ['AC1', 'AC2', 'AC3'])
+
     def test_plan_ignores_extra_top_level_keys_but_requires_tasks(self):
         from factory_dashboard.project_policy import validate_plan
         scope = dict(art=False, audio=False, ui=False, ux=False)

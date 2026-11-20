@@ -125,7 +125,7 @@ def validate_plan(document, scope, project_ac_ids):
     if errors:
         raise ConfigurationError('; '.join(errors))
     if covered != set(project_ac_ids):
-        raise ConfigurationError('Task graph does not cover every project acceptance criterion')
+        raise ConfigurationError('Task graph does not cover every project acceptance criterion; no task states ' + ', '.join(sorted(set(project_ac_ids) - covered)) + ' (each project AC must appear as a key in at least one task acceptance)')
     ordered, visiting, ancestors = [], set(), {}
 
     def visit(key):
