@@ -103,7 +103,7 @@ Integration failures have an owner. A failing acceptance criterion is attributed
 
 ## Hermes patches and updates
 
-The Factory depends on local patches to the Hermes source (`runtime/hermes-patches`: version-controlled git patches, a manifest, and `hermes_patches.py status|apply|export`). A Hermes update resets the source tree and removes them, so the plugin checks for them when it loads (`hermes_compat.py`) and withholds its run-board support claim if they are missing. The `factory_patch_check.py` cron job records `state/factory/hermes-patches.json`, alerts once per change, pauses new intake while patches are missing, and with `--repair` reapplies clean patches (never during an update, never over a conflict, never restarting the gateway). See `runtime/hermes-patches/README.md`.
+The Factory depends on local patches to the Hermes source (`runtime/hermes-patches`: version-controlled git patches, a manifest, and `hermes_patches.py status|apply|export`). A Hermes update resets the source tree and removes them, so the plugin checks for them when it loads (`hermes_compat.py`) and withholds its run-board support claim if they are missing. The `factory_patch_check.py` cron job records `state/factory/hermes-patches.json`, alerts once per change, pauses new intake while patches are missing, and reapplies clean patches by default (`--check-only` disables that) (never during an update, never over a conflict, never restarting the gateway). See `runtime/hermes-patches/README.md`.
 
 ## Manifest include list
 

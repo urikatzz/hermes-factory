@@ -83,33 +83,39 @@ class PatchCheckTests(unittest.TestCase):
         self.assertEqual(self.check(), "")
 
     def test_repair_waits_for_the_problem_to_settle_and_for_a_running_update(self):
-        self.check("--repair")
+        self.check()
         self.assertFalse(os.path.exists(os.path.join(self.source, "hermes_cli", "guard.py")))  # first sighting: an update may still be writing
         self.age_problem()
         self.sb._write_exe("pgrep", "echo 4242\nexit 0")  # an update is running
-        self.assertEqual(self.check("--repair"), "")
+        self.assertEqual(self.check(), "")
         self.assertFalse(os.path.exists(os.path.join(self.source, "hermes_cli", "guard.py")))
         self.sb._write_exe("pgrep", "exit 1")
-        out = self.check("--repair")
+        out = self.check()
         self.assertIn("HERMES PATCHES REAPPLIED (0001-core)", out); self.assertIn("Restart the Hermes gateway", out)
         self.assertTrue(os.path.exists(os.path.join(self.source, "hermes_cli", "guard.py")))
         self.assertTrue(self.state()["ok"])
-        self.assertEqual(self.check("--repair"), "")
+        self.assertEqual(self.check(), "")
 
     def test_a_git_lock_also_blocks_repair(self):
-        self.check("--repair"); self.age_problem()
+        self.check(); self.age_problem()
         open(os.path.join(self.source, ".git", "index.lock"), "w").close()
-        self.check("--repair")
+        self.check()
         self.assertFalse(os.path.exists(os.path.join(self.source, "hermes_cli", "guard.py")))
+
+    def test_check_only_never_applies_even_when_settled(self):
+        self.check("--check-only"); self.age_problem()
+        self.check("--check-only")
+        self.assertFalse(os.path.exists(os.path.join(self.source, "hermes_cli", "guard.py")))
+        self.assertFalse(self.state()["ok"])
 
     def test_a_conflict_is_reported_and_never_repaired(self):
         with open(os.path.join(self.source, "hermes_cli", "a.py"), "w") as f:
             f.write(BASE.replace("x3 = 3\n", "x3 = 33\n"))
         git(self.source, "commit", "-qam", "upstream moved")
-        out = self.check("--repair")
+        out = self.check()
         self.assertIn("conflict with this Hermes version", out)
         self.age_problem()
-        self.check("--repair")
+        self.check()
         self.assertFalse(os.path.exists(os.path.join(self.source, "hermes_cli", "guard.py")))
         self.assertEqual(self.state()["conflicts"], ["0001-core"])
 

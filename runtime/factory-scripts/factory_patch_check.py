@@ -4,17 +4,17 @@ update resets that tree and removes them. This checks the tree against the patch
 state/factory/hermes-patches.json (the intake pump starts no new work while patches are missing) and prints one message per change
 (empty output = silent):
   - patches missing or conflicting after an update
-  - patches restored (by --repair or by hand), with the reminder that a running gateway must be restarted to load them
---repair applies missing patches that apply cleanly, with backups and rollback (hermes_patches.py apply). It waits until the same problem
+  - patches restored (by the repair or by hand), with the reminder that a running gateway must be restarted to load them
+By default it also repairs: it applies missing patches that apply cleanly, with backups and rollback (hermes_patches.py apply). Repair waits until the same problem
 has been seen for SETTLE seconds, never runs while a Hermes update is in progress, and never touches a conflict (a human resolves it).
 It never restarts anything.
-Usage: factory_patch_check.py [--repair] [--source DIR] [--dry-run]"""
+Usage: factory_patch_check.py [--check-only] [--source DIR] [--dry-run]"""
 import argparse, contextlib, io, json, os, subprocess, sys, time
 from factory_lib import HOME, STATE_DIR, atomic_write_json
 
 PATCH_HOME = os.environ.get("HERMES_PATCHES_DIR") or os.path.join(HOME, "hermes-patches")
 STATE = os.path.join(STATE_DIR, "hermes-patches.json")
-SETTLE = 120  # seconds the same problem must persist before --repair acts (an update may still be writing the tree)
+SETTLE = 120  # seconds the same problem must persist before the repair acts (an update may still be writing the tree)
 
 
 def load_state():
@@ -38,7 +38,7 @@ def update_running(source):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--repair", action="store_true")
+    ap.add_argument("--check-only", action="store_true", help="report only; never apply patches")
     ap.add_argument("--source", default=None)
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
@@ -55,7 +55,7 @@ def main():
     signature = json.dumps([report["head"], report["missing"], report["conflicts"]])
     first_seen = previous.get("first_seen", now) if previous.get("signature") == signature and not report["ok"] else now
     messages, repaired = [], []
-    if not report["ok"] and args.repair and not args.dry_run and not report["conflicts"] \
+    if not report["ok"] and not args.check_only and not args.dry_run and not report["conflicts"] \
             and now - first_seen >= SETTLE and not update_running(source):
         sink = io.StringIO()
         with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
@@ -71,7 +71,7 @@ def main():
         what = ("conflict with this Hermes version (a human must resolve it, see runtime/hermes-patches/README.md): " + ", ".join(report["conflicts"])
                 if report["conflicts"] else "missing: " + ", ".join(report["missing"]))
         messages.append("HERMES PATCHES %s (Hermes %s). The Factory cannot create stages until they are restored: run `hermes_patches.py apply` "
-                        "(or enable --repair on this job), then restart the Hermes gateway. New factory work is paused." % (what, report["head"][:12]))
+                        "(this job repairs by itself unless it runs with --check-only), then restart the Hermes gateway. New factory work is paused." % (what, report["head"][:12]))
     elif report["ok"] and previous.get("ok") is False and not repaired:
         messages.append("Hermes patches are present again on Hermes %s. Restart the Hermes gateway if it started before they were restored." % report["head"][:12])
     if not args.dry_run:

@@ -36,6 +36,6 @@ python3 runtime/hermes-patches/hermes_patches.py apply           # backs up repl
 ## Automatic detection
 
 - The Factory plugin checks for the patches when it loads (`factory_dashboard/hermes_compat.py`), logs an error naming what is missing, and does not claim run-board support.
-- `runtime/factory-scripts/factory_patch_check.py` is a cron job (no agent). It records `state/factory/hermes-patches.json`, prints one message when the situation changes, and the intake pump starts no new work while patches are missing. With `--repair` it applies clean patches itself, but only after the problem has persisted for two minutes, never while a Hermes update is running, and never over a conflict. It does not restart the gateway.
+- `runtime/factory-scripts/factory_patch_check.py` is a cron job (no agent). It records `state/factory/hermes-patches.json`, prints one message when the situation changes, and the intake pump starts no new work while patches are missing. It also applies clean patches itself (`--check-only` turns that off), but only after the problem has persisted for two minutes, never while a Hermes update is running, and never over a conflict. It does not restart the gateway.
 
 Install the set where the cron job finds it: `cp -R runtime/hermes-patches ~/.hermes/hermes-patches` (or set `HERMES_PATCHES_DIR`).
