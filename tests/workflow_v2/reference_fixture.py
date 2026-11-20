@@ -168,7 +168,7 @@ class ReferenceFlow(unittest.TestCase):
         return [self.project / r['path'] for r in refs.authoritative(self.loaded['references'])]
 
     def finish(self, stage, plan_text, inspected=True, viewed=True, succeeded=True, extra=(), tasks=(), screenshots=(), per_requirement=None,
-               mockup=True, art_plan=True, document='PLAN.md', inspection_change=None, inspection_top=None, shots_viewed=None, duplicates=False, adjudication=None, **overrides):
+               mockup=True, art_plan=True, document='PLAN.md', inspection_change=None, inspection_top=None, shots_viewed=None, duplicates=False, adjudication=None, session=True, **overrides):
         """Complete a stage the way a worker would: its document, the inspection JSON with role findings, real vision calls in its session log.
 
         An art-director stage also gets the art-plan headings and a representative mockup (both can be switched off)."""
@@ -199,14 +199,15 @@ class ReferenceFlow(unittest.TestCase):
                 copy.write_bytes(source.read_bytes() if duplicates is True else (source.read_bytes() + b' ' if source.suffix == '.json' else source.read_bytes()))
                 listed.append(str(copy))
         self.board.complete(stage, artifacts=listed, **overrides)
-        self.sessions += 1
-        session = f'session{self.sessions:04d}{stage["stage_key"].replace("-", "")}'
-        row = self.conn.execute('SELECT id,metadata FROM task_runs WHERE task_id=? ORDER BY id DESC', (stage['task_id'],)).fetchone()
-        metadata = json.loads(row[1])
-        metadata['worker_session_id'] = session
-        self.conn.execute('UPDATE task_runs SET metadata=? WHERE id=?', (json.dumps(metadata), row[0]))
-        self.conn.commit()
-        record_session(self.home, stage['profile'], session, seen, succeeded)
+        if session:
+            self.sessions += 1
+            session = f'session{self.sessions:04d}{stage["stage_key"].replace("-", "")}'
+            row = self.conn.execute('SELECT id,metadata FROM task_runs WHERE task_id=? ORDER BY id DESC', (stage['task_id'],)).fetchone()
+            metadata = json.loads(row[1])
+            metadata['worker_session_id'] = session
+            self.conn.execute('UPDATE task_runs SET metadata=? WHERE id=?', (json.dumps(metadata), row[0]))
+            self.conn.commit()
+            record_session(self.home, stage['profile'], session, seen, succeeded)
         self.tick()
 
     def rejection(self, profile):

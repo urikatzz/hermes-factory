@@ -144,5 +144,13 @@ class PlanReviewRulingTests(AdjudicationFlow):
         self.assertEqual([r['profile'] for r in self.board.ready()], ['developer'])
 
 
+class InfrastructureFaultTests(AdjudicationFlow):
+    def test_a_missing_worker_session_stops_for_recovery_and_spends_no_worker_retry(self):
+        self.start()
+        self.finish(self.only('art-director'), 'V1 V2 carried.', session=False)  # the run recorded no worker session: the factory cannot verify the inspection
+        self.assertIn('infrastructure fault, not a worker defect', self.terminal()['reason'])
+        self.assertEqual(self.document().get('handoff_retries', {}), {})  # nothing charged to the worker
+
+
 if __name__ == '__main__':
     unittest.main()

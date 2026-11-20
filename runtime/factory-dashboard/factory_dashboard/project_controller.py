@@ -220,7 +220,11 @@ class ProjectController:
             mockup = refs.plan_mockup(result.metadata['artifacts']) if profile == 'art-director' else None
             if mockup:
                 wanted['plan-mockup'] = mockup
-            absent = refs.vision_proof(profile, session, self._hermes_home(), wanted, scratch_ok={'plan-mockup'})
+            try:
+                absent = refs.vision_proof(profile, session, self._hermes_home(), wanted, scratch_ok={'plan-mockup'})
+            except ConfigurationError as exc:
+                # The log or the worker session is missing or unreadable: that is the factory's problem, not a worker slip. Stop for recovery; no worker retry is spent.
+                raise ProjectBlocked('Image inspection cannot be verified for ' + profile + ' (' + str(exc) + '). This is an infrastructure fault, not a worker defect; recover and resume.') from exc
             if absent:
                 return ('Reference inspection rejected: the worker session shows no successful vision_analyze call on ' + ', '.join(
                     f"{i} ({wanted[i]})" for i in absent) + '. Open each approved image with vision_analyze before describing it.')
@@ -264,6 +268,8 @@ class ProjectController:
                     raise ConfigurationError('Scan candidates in PLAN.md: ' + self._describe(unresolved) + '. Reword each, or explain it in a top-level "scan_explanations" list of '
                                              '{"quote":"<15+ characters of the flagged text>","requirement_id":"V..","explanation":"<why it is not a contradiction, 40+ characters>"}. '
                                              'An explained candidate is shown to the human and ruled on by the plan reviewer; it is not dismissed.')
+        except ProjectBlocked:
+            raise
         except ConfigurationError as exc:
             return 'Approved-reference check rejected: ' + str(exc)
         return None
