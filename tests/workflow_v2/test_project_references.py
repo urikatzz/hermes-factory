@@ -288,11 +288,35 @@ class RoleFindingTests(unittest.TestCase):
             record['role_findings'][0].update(change)
             with self.assertRaisesRegex(ConfigurationError, message):
                 refs.validate_role_findings(record, self.records, 'achieve')
-        record = self.findings('achieve')
+        three = write_project(self.temp.name, [REFERENCE], extra=dict(milestone=3))['references']
+        from reference_fixture import role_findings
+        record = dict(role_findings=role_findings(dict(references=three), 'achieve'))
         for entry in record['role_findings']:
             entry['region'] = [0.1, 0.1, 0.2, 0.2]
-        with self.assertRaisesRegex(ConfigurationError, 'identical region'):
-            refs.validate_role_findings(record, self.records, 'achieve')
+        with self.assertRaisesRegex(ConfigurationError, 'reuse the same few regions'):
+            refs.validate_role_findings(record, three, 'achieve')
+
+    def test_requirements_that_concern_the_whole_image_may_share_a_region(self):
+        three = write_project(self.temp.name, [REFERENCE], extra=dict(milestone=3))['references']
+        from reference_fixture import role_findings
+        record = dict(role_findings=role_findings(dict(references=three), 'achieve'))
+        record['role_findings'][1]['region'] = record['role_findings'][0]['region']  # three findings, two share the whole-image box
+        refs.validate_role_findings(record, three, 'achieve')
+
+    def test_the_error_names_the_offending_entry_and_the_exact_reason(self):
+        for change, message in ((dict(kind='carry'), r'entry #1 has kind .carry.; your role writes kind "achieve"'),
+                                (dict(requirement_id='V99'), r'entry #1 names requirement_id .V99.'),
+                                (dict(requirement_id='V2'), 'two entries for V2')):
+            record = self.findings('achieve')
+            record['role_findings'][0].update(change)
+            with self.assertRaisesRegex(ConfigurationError, message):
+                refs.validate_role_findings(record, self.records, 'achieve')
+
+    def test_a_finding_for_a_known_requirement_scheduled_for_later_is_allowed_but_not_demanded(self):
+        record = self.findings('achieve')
+        record['role_findings'].append(dict(kind='achieve', requirement_id='V3', subject='generated', region=[0.5, 0.5, 0.2, 0.2],
+                                            finding='In the image the readout area shows detail that a later milestone will reproduce exactly'))
+        refs.validate_role_findings(record, self.records, 'achieve')
 
     def test_the_architect_must_name_a_task_that_really_carries_the_requirement(self):
         record = self.findings('carry')

@@ -199,13 +199,19 @@ def _region(region, label):
     return tuple(round(v, 3) for v in region)
 
 
-def _grounded(regions, label):
-    """Observations must point at different parts of the image: distinct boxes that fall in several cells of a 3x3 grid."""
-    if len(set(regions)) != len(regions):
+def _grounded(regions, label, repeats=False):
+    """Observations must point at different parts of the image: distinct boxes that fall in several cells of a 3x3 grid.
+
+    Role findings may share a region (palette or composition really do concern the whole image) but at least half of them must be distinct."""
+    if repeats:
+        if len(set(regions)) * 2 < len(regions):
+            raise ConfigurationError(label + ' reuse the same few regions; at least half of the findings must point at their own part of the image')
+    elif len(set(regions)) != len(regions):
         raise ConfigurationError(label + ' repeats an identical region; each observation must point at its own part of the image')
     cells = {(min(2, int((x + w / 2) * 3)), min(2, int((y + h / 2) * 3))) for x, y, w, h in regions}
-    if len(cells) < min(3, len(regions)):
-        raise ConfigurationError(label + ' describes only ' + str(len(cells)) + ' area(s) of the image; observations must span at least ' + str(min(3, len(regions))) + ' cells of a 3x3 grid')
+    needed = min(2, len(set(regions))) if repeats else min(3, len(regions))
+    if len(cells) < needed:
+        raise ConfigurationError(label + ' describes only ' + str(len(cells)) + ' area(s) of the image; they must span at least ' + str(needed) + ' cells of a 3x3 grid')
 
 
 def validate_inspection(record, references):
@@ -492,10 +498,21 @@ def validate_role_findings(record, references, kind, tasks=(), screenshots=(), f
     required = {r['id']: r for r in required_requirements(references)}
     seen, regions, texts = {}, [], set()
     task_ids = {t['id']: t for t in tasks}
-    for entry in entries:
-        if not isinstance(entry, dict) or entry.get('kind') != kind or entry.get('requirement_id') not in required or entry['requirement_id'] in seen:
-            raise ConfigurationError('Each role finding is {"kind":"' + kind + '","requirement_id":<one demanded id, once>,"finding":...,"subject":...,"region":[x,y,w,h]'
-                                     + (',"verdict":"' + '|'.join(ROLE_VERDICTS[kind]) + '"' if kind in ROLE_VERDICTS else '') + '}')
+    known = {q['id'] for ref in references for q in ref['requirements']}
+    form = ('{"kind":"' + kind + '","requirement_id":"V..","finding":"...","region":[x,y,w,h]' + (',"subject":"..."' if kind != 'plan_check' else '')
+            + (',"verdict":"' + '|'.join(ROLE_VERDICTS[kind]) + '"' if kind in ROLE_VERDICTS else '') + '}')
+    for position, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            raise ConfigurationError('role_findings entry #%d is not an object; each is %s' % (position + 1, form))
+        if entry.get('kind') != kind:
+            raise ConfigurationError('role_findings entry #%d has kind %r; your role writes kind "%s": %s' % (position + 1, entry.get('kind'), kind, form))
+        if entry.get('requirement_id') not in known:
+            raise ConfigurationError('role_findings entry #%d names requirement_id %r, which is not one of: %s' % (position + 1, entry.get('requirement_id'), ', '.join(sorted(known))))
+        if entry['requirement_id'] in seen:
+            raise ConfigurationError('role_findings has two entries for %s; write exactly one per requirement' % entry['requirement_id'])
+        if entry['requirement_id'] not in required:
+            seen[entry['requirement_id']] = entry  # a known requirement a human scheduled for a later milestone: allowed, not demanded
+            continue
         identifier = entry['requirement_id']
         text = ' '.join(str(entry.get('finding', '')).split())
         if len(text) < MIN_FINDING or text.lower() in texts or required[identifier]['text'].lower() in text.lower() or text.lower() in required[identifier]['text'].lower():
@@ -520,7 +537,7 @@ def validate_role_findings(record, references, kind, tasks=(), screenshots=(), f
     missing = sorted(set(required) - set(seen))
     if missing:
         raise ConfigurationError('Missing ' + kind + ' findings for approved requirement(s): ' + ', '.join(missing))
-    _grounded(regions, 'The ' + kind + ' findings')
+    _grounded(regions, 'The ' + kind + ' findings', repeats=True)
     return entries
 
 
