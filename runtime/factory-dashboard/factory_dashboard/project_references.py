@@ -299,9 +299,14 @@ def _governs(clause, start):
 _REMOVING = re.compile(r"\b(remov\w*|supersed\w*|replac\w*|rewrit\w*|amend\w*|correct\w*|delet\w*|drop\w*|retir\w*|eliminat\w*|no longer|stop\w*|conflict\w*|contradict\w*|obsolete|legacy)\b", re.I)
 
 
-def _rejects(clause, start, line):
-    """Simplification wording that is negated, or sits on a line that removes, replaces or supersedes it, is a rejection of the simplification, not a deferral."""
-    return _governs(clause, start) or bool(_REMOVING.search(line))
+def _rejects(clause, start, line, word):
+    """Simplification wording that is negated, or sits within a few words of a removal, replacement or supersession, is a rejection of the simplification, not a deferral."""
+    if _governs(clause, start):
+        return True
+    offset = line.find(clause)
+    position = offset + start if offset >= 0 else line.lower().find(word.lower())
+    window = line[max(0, position - 90):position + len(word) + 90] if position >= 0 else clause
+    return bool(_REMOVING.search(window))
 
 
 def _forbids(clause, keyword):
@@ -345,8 +350,9 @@ def find_contradictions(references, documents, visual_documents=None):
         key = (kind, requirement, label, number, keyword)
         if key not in seen:
             seen.add(key)
-            found.append(dict(kind=kind, requirement=requirement, reference=reference, keyword=keyword, document=label, line=number,
-                              text=' '.join(line.split())[:240]))
+            text = ' '.join(line.split())[:240]
+            found.append(dict(id=hashlib.sha256('|'.join((kind, requirement, text)).encode()).hexdigest()[:8], kind=kind, requirement=requirement, reference=reference,
+                              keyword=keyword, document=label, line=number, text=text))
 
     for reference in authority:
         for requirement in reference['requirements']:
@@ -360,21 +366,21 @@ def find_contradictions(references, documents, visual_documents=None):
                 names = [r'(?<![\w])' + re.escape(requirement['id']) + r'(?![\w])'] + [r'(?<![\w])' + re.escape(k) + r'(?:e?s)?(?![\w])' for k in requirement['keywords']]
                 for clause in clauses:
                     simple = _SIMPLIFY.search(clause)
-                    if simple and not _PRESERVING.search(clause) and not _rejects(clause, simple.start(), line) and any(re.search(n, clause, re.I) for n in names):
+                    if simple and not _PRESERVING.search(clause) and not _rejects(clause, simple.start(), line, simple.group(0)) and any(re.search(n, clause, re.I) for n in names):
                         add('implicit_deferral', requirement['id'], reference['id'], simple.group(0).lower(), label, number, line)
     if required:
         first = next(iter(required.values()))
         for label, number, line in _documents_lines(documents):
             for clause in _clauses(line, approved_negations):
                 whole = _GLOBAL_DEFERRAL.search(clause)
-                if whole and not _PRESERVING.search(clause) and (whole.group(0).lower().startswith('no ') or not _rejects(clause, whole.start(), line)):
+                if whole and not _PRESERVING.search(clause) and (whole.group(0).lower().startswith('no ') or not _rejects(clause, whole.start(), line, whole.group(0))):
                     add('implicit_deferral', first['id'], first['reference'], whole.group(0).lower(), label, number, line)
     for label, ids in (visual_documents or {}).items():
         carried = [i for i in ids if i in required]
         for _, number, line in _documents_lines({label: documents.get(label, '')}):
             for clause in _clauses(line, approved_negations):
                 simple = _SIMPLIFY.search(clause)
-                if simple and carried and not _PRESERVING.search(clause) and not _rejects(clause, simple.start(), line):
+                if simple and carried and not _PRESERVING.search(clause) and not _rejects(clause, simple.start(), line, simple.group(0)):
                     add('implicit_deferral', carried[0], required[carried[0]]['reference'], simple.group(0).lower(), label, number, line)
     if authority and required:
         first = next(iter(required.values()))
@@ -608,3 +614,48 @@ def plan_mockup(artifacts):
                 if width >= 640 and height >= 360 and path.stat().st_size >= 20000:
                     return path
     return None
+
+
+ADJUDICATION_SCHEMA = 'factory-scan-adjudication/v1'
+MIN_EXPLANATION = 40
+SCAN_VERDICTS = ('contradiction', 'benign', 'ambiguous')
+
+
+def _norm(text):
+    return ' '.join(str(text).lower().split())
+
+
+def split_explained(findings, explanations):
+    """Findings in plan prose (never in operative rules) the author explained: (unresolved, explained with the explanation attached).
+
+    An explanation quotes the flagged text (at least 15 characters of it) and says why it is not a contradiction (at least 40 characters).
+    It does not dismiss the finding: it is shown to the human at the gate and ruled on by the plan reviewer."""
+    unresolved, explained = [], []
+    for finding in findings:
+        match = next((e for e in (explanations or []) if isinstance(e, dict) and isinstance(e.get('quote'), str) and len(_norm(e['quote'])) >= 15
+                      and _norm(e['quote']) in _norm(finding['text']) and len(' '.join(str(e.get('explanation', '')).split())) >= MIN_EXPLANATION
+                      and e.get('requirement_id', finding['requirement']) == finding['requirement']), None)
+        (explained if match else unresolved).append(dict(finding, explanation=' '.join(str(match['explanation']).split())) if match else finding)
+    return unresolved, explained
+
+
+def validate_adjudication(record, candidates):
+    """The plan reviewer ruled on every explained candidate, quoting it: contradiction | benign | ambiguous, each with a rationale. Returns the entries."""
+    if not isinstance(record, dict) or record.get('schema') != ADJUDICATION_SCHEMA or not isinstance(record.get('adjudications'), list):
+        raise ConfigurationError('scan-adjudication.json must be {"schema":"' + ADJUDICATION_SCHEMA + '","adjudications":[{"id","verdict","quote","rationale"}]}')
+    by_id = {}
+    for entry in record['adjudications']:
+        if not isinstance(entry, dict) or entry.get('id') in by_id:
+            raise ConfigurationError('Invalid or duplicate entry in scan-adjudication.json')
+        by_id[entry.get('id')] = entry
+    for candidate in candidates:
+        entry = by_id.get(candidate['id'])
+        if entry is None:
+            raise ConfigurationError('scan-adjudication.json has no ruling on candidate ' + candidate['id'] + ': ' + candidate['text'][:120])
+        if entry.get('verdict') not in SCAN_VERDICTS:
+            raise ConfigurationError('Candidate ' + candidate['id'] + ' needs verdict ' + '|'.join(SCAN_VERDICTS))
+        if not isinstance(entry.get('quote'), str) or len(_norm(entry['quote'])) < 15 or _norm(entry['quote']) not in _norm(candidate['text']):
+            raise ConfigurationError('The ruling on ' + candidate['id'] + ' must quote at least 15 characters of the flagged text')
+        if len(' '.join(str(entry.get('rationale', '')).split())) < MIN_EXPLANATION:
+            raise ConfigurationError('The ruling on ' + candidate['id'] + ' needs a rationale of at least ' + str(MIN_EXPLANATION) + ' characters')
+    return [by_id[c['id']] for c in candidates]

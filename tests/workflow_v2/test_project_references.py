@@ -171,6 +171,12 @@ class ReferenceModuleTests(unittest.TestCase):
         self.assertEqual(by_line, {(1, 'V2'), (2, 'V1'), (2, 'V2')})  # S1 forbids V2's texture/gradient/particle; S9 forbids V1's stripes/crosshair/joints and V2's painted art
         self.assertTrue({c['keyword'] for c in found if c['kind'] == 'implicit_deferral'} >= {'grey-box only', 'deferred look'})
 
+    def test_a_removal_word_far_from_the_simplification_does_not_excuse_it(self):
+        far = 'We removed the old compiler warnings last week and then reviewed every other open item at length, and meanwhile V1 hazard stripes are delivered as placeholder rectangles.'
+        self.assertEqual({c['kind'] for c in refs.find_contradictions(self.records, {'PLAN.md': far})}, {'implicit_deferral'})
+        near = 'V1 hazard stripes: the placeholder rectangles are removed and replaced by painted trim.'
+        self.assertEqual(refs.find_contradictions(self.records, {'PLAN.md': near}), [])
+
     def test_a_negation_does_not_reach_across_a_new_idea_or_a_bracket(self):
         self.assertEqual(refs.find_contradictions(self.records, {'PLAN.md': 'No cloth physics, the hazard stripe trim is drawn on the door frame.'}), [])
         self.assertEqual(refs.find_contradictions(self.records, {'PLAN.md': 'No time is lost (hazard stripe trim is built first).'}), [])
@@ -459,7 +465,7 @@ class ReferenceWorkflowTests(ReferenceFlow):
         self.start()
         self.finish(self.only('art-director'), 'V1 V2. Deferred look: no hazard stripes until milestone 6.')
         _, context = self.rejection('art-director')
-        self.assertIn('contradicts, defers or replaces approved reference requirements', context['previous_handoff_rejected']['reason'])
+        self.assertIn('Scan candidates in PLAN.md', context['previous_handoff_rejected']['reason'])
 
     def test_a_director_plan_that_drops_a_requirement_is_sent_back(self):
         self.start()

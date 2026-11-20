@@ -74,13 +74,13 @@ def role_findings(loaded, kind, tasks=(), screenshots=(), **per_requirement):
     return result
 
 
-def inspection(loaded, kind='achieve', tasks=(), screenshots=(), per_requirement=None, **change):
+def inspection(loaded, kind='achieve', tasks=(), screenshots=(), per_requirement=None, top=None, **change):
     reference = refs.authoritative(loaded['references'])[0]
     entry = dict(id=reference['id'], path=reference['path'], sha256=reference['sha256'], tool='vision_analyze',
                  requirement_ids=[q['id'] for q in reference['requirements']],
                  observations=[dict(topic=t, region=REGIONS[i % len(REGIONS)], observation=f'Concrete description of the {t} that the reference image really shows') for i, t in enumerate(reference['topics'])])
     entry.update(change)
-    return dict(schema=refs.INSPECTION_SCHEMA, references=[entry], role_findings=role_findings(loaded, kind, tasks, screenshots, **(per_requirement or {})))
+    return dict(schema=refs.INSPECTION_SCHEMA, references=[entry], role_findings=role_findings(loaded, kind, tasks, screenshots, **(per_requirement or {})), **(top or {}))
 
 
 def record_session(home, profile, session, viewed=(), succeeded=True):
@@ -168,7 +168,7 @@ class ReferenceFlow(unittest.TestCase):
         return [self.project / r['path'] for r in refs.authoritative(self.loaded['references'])]
 
     def finish(self, stage, plan_text, inspected=True, viewed=True, succeeded=True, extra=(), tasks=(), screenshots=(), per_requirement=None,
-               mockup=True, art_plan=True, document='PLAN.md', inspection_change=None, shots_viewed=None, duplicates=False, **overrides):
+               mockup=True, art_plan=True, document='PLAN.md', inspection_change=None, inspection_top=None, shots_viewed=None, duplicates=False, adjudication=None, **overrides):
         """Complete a stage the way a worker would: its document, the inspection JSON with role findings, real vision calls in its session log.
 
         An art-director stage also gets the art-plan headings and a representative mockup (both can be switched off)."""
@@ -185,7 +185,9 @@ class ReferenceFlow(unittest.TestCase):
                 seen.append(Path(self.temp.name) / 'gone-scratch' / 'plan-mockup.png')  # the director opened its scratch copy, deleted by the time it is checked
         if inspected:
             kind = refs.role_kind(stage['profile'], stage['stage_key'])
-            artifacts.append(self.write(stage, 'reference-inspection.json', inspection(self.loaded, kind, tasks, screenshots, per_requirement, **(inspection_change or {}))))
+            artifacts.append(self.write(stage, 'reference-inspection.json', inspection(self.loaded, kind, tasks, screenshots, per_requirement, inspection_top, **(inspection_change or {}))))
+        if adjudication is not None:
+            artifacts.append(self.write(stage, 'scan-adjudication.json', dict(schema=refs.ADJUDICATION_SCHEMA, adjudications=adjudication)))
         if shots_viewed:
             seen.extend(shots_viewed)
         listed = [*artifacts, *extra]

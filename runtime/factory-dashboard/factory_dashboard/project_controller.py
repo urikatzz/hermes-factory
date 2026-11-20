@@ -19,6 +19,8 @@ from .project_policy import (MAX_ORCHESTRATION_RECOVERIES, MAX_PLAN_CORRECTIONS,
 
 REPAIR_LIMIT = 'Captured repair limit reached'
 MAX_HANDOFF_RETRIES = 2
+# Scan candidates in plan prose have their own budget: a keyword match is not a worker slip and must not exhaust the retries meant for malformed handoffs.
+MAX_SCAN_RETRIES = 3
 # A plan that fails structural validation (missing fields, no numbered criteria, bad graph) is corrected by the architect with the exact
 # errors; this never spends an architectural replan. Past the bound a human decides.
 MAX_PLAN_VALIDATION_RETRIES = 2
@@ -72,7 +74,7 @@ class ProjectController:
         if project.get('awaiting') and not project.get('terminal'):
             # A pause for a human decision, not a failure: no retro, nothing retired.
             return self._controller._stop(conn, root, 'blocked', 'Awaiting human approval of the art-director plan: ' + project['awaiting']['path'] + (' (mockup: ' + project['awaiting']['mockup'] + ')' if project['awaiting'].get('mockup') else '')
-                                          + '. Approve with the note "' + self._approval_phrase(root['root_id'], project) + '" or reject with "REJECT: <feedback>"; no other note approves.')
+                                          + (' (' + str(len(project['awaiting'].get('explained') or [])) + ' flagged line(s) the director explained are listed in the awaiting record for you to judge)' if project['awaiting'].get('explained') else '') + '. Approve with the note "' + self._approval_phrase(root['root_id'], project) + '" or reject with "REJECT: <feedback>"; no other note approves.')
         return self._state.read_root(conn, root['root_id'])
 
     def _save(self, conn, root, project):
@@ -142,13 +144,15 @@ class ProjectController:
         reason = None if not result.valid else self._inspection_problem(conn, project, profile, key, result, context)
         if not result.valid or reason:
             reason = reason or result.reason
-            tries = project.setdefault('handoff_retries', {}).get(token, 0)
-            if reason in NOT_RETRYABLE or tries >= MAX_HANDOFF_RETRIES:
+            scan = 'Scan candidates' in reason
+            budget_key, limit = (token + ':scan', MAX_SCAN_RETRIES) if scan else (token, MAX_HANDOFF_RETRIES)
+            tries = project.setdefault('handoff_retries', {}).get(budget_key, 0)
+            if reason in NOT_RETRYABLE or tries >= limit:
                 raise ConfigurationError(reason + ': ' + key)
             # A malformed handoff is a worker slip, not a failed milestone: retry only this stage, telling the worker exactly what to fix.
-            project['handoff_retries'][token] = tries + 1
+            project['handoff_retries'][budget_key] = tries + 1
             project.setdefault('orchestration_log', []).append(dict(kind='handoff_retry', key=key, attempt=tries + 1, reason=reason, at=int(time.time())))
-            project.setdefault('handoff_rejections', {})[key] = self._rejection(conn, row, result, kind, key, cycle, root, tries + 1, reason)
+            project.setdefault('handoff_rejections', {})[key] = self._rejection(conn, row, result, kind, key, cycle, root, tries + 1, reason, limit)
             project.setdefault('retry_keys', []).append(token)
             self._state.event(conn, root['root_id'], 'handoff_rejected', dict(key=key, task_id=row['task_id'], reason=reason, attempt=tries + 1))
             return self._node(conn, root, definition, context, project, key, kind, profile, original, [*inputs, row['task_id']], task=task, cycle=cycle)
@@ -179,6 +183,12 @@ class ProjectController:
         """The exact words that approve the awaiting plan: bound to this root, the plan's hash and the approved-references digest."""
         awaiting = project['awaiting']
         return f"APPROVE {root_id} {awaiting['sha256'][:12]} {(awaiting.get('references_digest') or project.get('references_digest') or 'none')[:12]}"
+
+    @staticmethod
+    def _open_candidates(project):
+        """Explained scan candidates (director and architect prose) nobody has resolved yet."""
+        resolved = set(project.get('scan_resolved', []))
+        return [c for group in project.get('explained_candidates', {}).values() for c in group if c['id'] not in resolved]
 
     @staticmethod
     def _hermes_home():
@@ -229,6 +239,13 @@ class ProjectController:
                 refs.validate_role_findings(inspection, records, kind, tasks, [p.name for p in images], result.metadata.get('findings', []), result.metadata.get('verdict'))
             except ConfigurationError as exc:
                 return 'Reference inspection rejected: ' + str(exc)
+            if key == refs.PLAN_REVIEW_KEY:
+                candidates = self._open_candidates(project)
+                if candidates:
+                    ruled = refs.validate_adjudication(retained_json(result.metadata['artifacts'], 'scan-adjudication.json'), candidates)
+                    for entry in ruled:
+                        if entry['verdict'] == 'contradiction' and not any(entry['id'] in f and f.split('|', 4)[1] in ('BLOCKER', 'HIGH') for f in result.metadata.get('findings', [])):
+                            raise ConfigurationError('A contradiction ruling on ' + entry['id'] + ' needs a BLOCKER/HIGH finding naming that id')
             if profile == 'art-director':
                 if not mockup:
                     raise ConfigurationError('The art plan has no representative mockup: retain plan-mockup.png (a PNG of at least 640x360) next to PLAN.md; it stays subordinate to the approved reference')
@@ -241,8 +258,12 @@ class ProjectController:
                 if missing:
                     raise ConfigurationError('PLAN.md does not carry approved visual requirement(s): ' + ', '.join(missing))
                 clash = refs.find_contradictions(records, {profile + ' PLAN.md': text})
-                if clash:
-                    raise ConfigurationError('PLAN.md contradicts, defers or replaces approved reference requirements: ' + self._describe(clash))
+                unresolved, explained = refs.split_explained(clash, inspection.get('scan_explanations'))
+                project.setdefault('explained_candidates', {})[profile] = explained
+                if unresolved:
+                    raise ConfigurationError('Scan candidates in PLAN.md: ' + self._describe(unresolved) + '. Reword each, or explain it in a top-level "scan_explanations" list of '
+                                             '{"quote":"<15+ characters of the flagged text>","requirement_id":"V..","explanation":"<why it is not a contradiction, 40+ characters>"}. '
+                                             'An explained candidate is shown to the human and ruled on by the plan reviewer; it is not dismissed.')
         except ConfigurationError as exc:
             return 'Approved-reference check rejected: ' + str(exc)
         return None
@@ -271,7 +292,7 @@ class ProjectController:
                 documents[name] = path.read_text(errors='replace')
         return refs.find_contradictions(project.get('reference_records', []), documents)
 
-    def _rejection(self, conn, row, result, kind, key, cycle, root, attempt, reason=None):
+    def _rejection(self, conn, row, result, kind, key, cycle, root, attempt, reason=None, limit=MAX_HANDOFF_RETRIES):
         """What a retried worker is told: the exact reason, the required identity/schema, and the valid part of what it sent."""
         kept = {}
         try:
@@ -284,7 +305,7 @@ class ProjectController:
             kept = {}
         required = dict(contract='factory-worker/v2', workflow_contract='factory-workflow/v1', root=root['root_id'], stage_key=key,
                         cycle=cycle + 1, verdict='one of ' + ' | '.join(VERDICTS[kind]))
-        return dict(attempt=attempt, max_attempts=MAX_HANDOFF_RETRIES, rejected_task=row['task_id'], reason=reason or result.reason, required_identity=required,
+        return dict(attempt=attempt, max_attempts=limit, rejected_task=row['task_id'], reason=reason or result.reason, required_identity=required,
                     instruction='Resubmit the handoff with the missing or wrong fields corrected. Keep what was valid; redo work only if the reason requires it. '
                                 'Prior attachments are readable from the rejected task.', previous_valid_metadata=kept)
 
@@ -448,7 +469,7 @@ class ProjectController:
             if art and project.get('approvals', {}).get('art-director', {}).get('sha256') != art['sha256']:
                 # Visual direction is a human call: nothing is architected on an art plan nobody approved.
                 if project.get('awaiting', {}).get('sha256') != art['sha256']:
-                    project['awaiting'] = dict(profile='art-director', sha256=art['sha256'], path=art['path'], task_id=art['task_id'], references_digest=project.get('references_digest', ''),
+                    project['awaiting'] = dict(profile='art-director', sha256=art['sha256'], path=art['path'], task_id=art['task_id'], references_digest=project.get('references_digest', ''), explained=[dict(id=c['id'], requirement=c['requirement'], text=c['text'], explanation=c['explanation']) for c in project.get('explained_candidates', {}).get('art-director', [])],
                                            **({'mockup': art['mockup']} if art.get('mockup') else {}))
                     self._state.event(conn, root['root_id'], 'project_awaiting_human', project['awaiting'])
                 return False
@@ -515,6 +536,12 @@ class ProjectController:
             row, result = node
             if not any(Path(p).name.startswith('PLAN-REVIEW') and Path(p).suffix == '.md' for p in result.metadata['artifacts']):
                 raise ConfigurationError('Plan review did not retain PLAN-REVIEW.md')
+            candidates = self._open_candidates(project)
+            if candidates:
+                ambiguous = [e for e in refs.validate_adjudication(retained_json(result.metadata['artifacts'], 'scan-adjudication.json'), candidates) if e['verdict'] == 'ambiguous']
+                if ambiguous:
+                    raise ProjectBlocked('Plan prose the reviewer could not rule on needs a human: ' + '; '.join(f"{e['id']} ({e['rationale'][:120]})" for e in ambiguous)
+                                         + '. Resume with "SCAN-BENIGN <id>" for each you accept; anything else asks the reviewer again.')
             blocking = [reviewer + ':' + f for f in blocking_findings(result.metadata.get('findings', []))]
             if blocking:
                 classes = self._plan_classes(project, result, blocking)
@@ -929,6 +956,7 @@ class ProjectController:
         if root['phase'] not in stopped or project.get('terminal', {}).get('phase') not in stopped:
             raise ConfigurationError('Only an infrastructure-blocked project can resume; changed scope requires a new task')
         project.update(mode=project['resume_mode'], active_keys=[], recoveries=project.get('recoveries', 0)+1, recovery_note=note)
+        project.setdefault('scan_resolved', []).extend(i for i in re.findall(r'SCAN-BENIGN ([0-9a-f]{8})', note) if i not in project.get('scan_resolved', []))
         if project.get('references_digest'):
             task = self._board.get_task(conn, root['root_id'])
             current = refs.load_references(self._controller._context(task)['project_dir'])['digest']

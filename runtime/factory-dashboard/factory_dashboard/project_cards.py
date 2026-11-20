@@ -76,7 +76,10 @@ list the contradicted ids in its "visual", and name the bible path in its accept
 REFERENCE_AUDIT = '''Reference audit (mandatory): compare each derived rule and acceptance criterion with the approved references and the GDD. Every rule, step or
 criterion that forbids, defers, excludes or weakens something an approved reference shows is a BLOCKER finding "contradicts <V id>: <rule>" with
 finding class architectural. Write the audit as a "Reference audit" section of PLAN-REVIEW.md listing each requirement id and where the plan carries it.
-The controller also runs a deterministic contradiction scan; a plan it flags cannot be approved.'''
+The controller also runs a deterministic contradiction scan over operative rules (style bible, style.json, task acceptance): a rule it flags cannot be approved.
+Scan adjudication: PROJECT_CONTEXT.explained_scan_candidates lists lines of plan prose the scan flagged and the author explained (id, text, explanation). Rule on every one in a retained
+scan-adjudication.json: {"schema":"factory-scan-adjudication/v1","adjudications":[{"id":"<id>","verdict":"contradiction"|"benign"|"ambiguous","quote":"<15+ characters of the flagged text>",
+"rationale":"<40+ characters, judged against the approved image and the surrounding text>"}]}. A contradiction also needs a BLOCKER/HIGH finding naming the id; ambiguous goes to the human.'''
 
 APPROVED_COMPARISON = '''Approved-reference comparison. Judge the real rendered result against the ORIGINAL approved reference images (never against a factory mockup),
 requirement by requirement. No similarity score or pixel threshold approves anything here. In comparison.json add "references":[{"id":"<ref id>","sha256":"<sha256>"}]
@@ -171,6 +174,11 @@ def project_card(definition, stage, cycle, context, inputs, project, task=None):
                    completed_tasks=project.get('completed', []), terminal=project.get('terminal'))
     if project.get('references') and stage.key != 'project-scope':
         details['approved_references'] = project['references']
+    if stage.key == 'project-plan-review' and project.get('explained_candidates'):
+        resolved = set(project.get('scan_resolved', []))
+        open_candidates = [c for group in project['explained_candidates'].values() for c in group if c['id'] not in resolved]
+        if open_candidates:
+            details['explained_scan_candidates'] = open_candidates
     if project.get('replan'):
         details['replan'] = project['replan']
     if project.get('approvals'):
