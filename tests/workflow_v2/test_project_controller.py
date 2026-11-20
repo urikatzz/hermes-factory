@@ -1081,6 +1081,13 @@ class ProjectControllerTests(unittest.TestCase):
         card = self.board.cards[self.only('developer')['task_id']]['body']
         self.assertIn('BASELINE none', card); self.assertNotIn('continues from the files', card)
 
+    def test_a_writer_card_lists_the_approved_plan_files_as_exact_paths(self):
+        self.plan()
+        card = self.board.cards[self.only('developer')['task_id']]['body']
+        paths = [p['path'] for p in self.project()['plans'] if p.get('path')]
+        self.assertTrue(paths)
+        self.assertIn('read exactly these absolute paths (copy them, never retype them): ' + '; '.join(paths), card)
+
     # --- the independent plan review is off by default ---
     def review_off(self):
         from unittest import mock

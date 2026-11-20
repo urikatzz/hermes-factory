@@ -677,6 +677,10 @@ class ProjectController:
                              'VERDICT=BLOCKED; use BLOCKED only for a missing tool or capability you cannot provide. '
                              'The approved plan paths named in your card are your plan: read them there, and if you need the plan under '
                              'PROJECT_DIR/.factory copy it yourself. A plan attachment that looks missing is never a reason for BLOCKED.')
+            plan_files = [p['path'] for p in project.get('plans', []) if p.get('path')]
+            if plan_files:
+                # Workers have mistyped the board folder (run-t_... with a hyphen) and then blocked on a file that was there.
+                instructions += '\nApproved plan files, read exactly these absolute paths (copy them, never retype them): ' + '; '.join(plan_files)
             instructions += '\n' + SPEC_CONSTRAINTS + '\n' + PLAN_BLOCKED
             node = self._node(conn, root, definition, context, project, key, 'repair' if repair else 'implement', profile,
                               instructions, work['writer_inputs'], task=task, cycle=cycle)
