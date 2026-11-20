@@ -29,7 +29,21 @@ Check: every request requirement maps to an acceptance criterion; each criterion
 correctly owned and ordered; dependencies are complete; director asset paths and criteria are preserved; scope booleans are right.
 Retain PLAN-REVIEW.md. Report defects in metadata.findings as "F<n>|SEVERITY|AC or -|task-id|problem and required change".
 BLOCKER/HIGH (and MEDIUM tied to an AC) return the plan to the architect; use LOW/NIT for suggestions.
+Classify every finding in metadata.finding_classes {"F1":"correction"|"architectural"}: correction = a localized wording, metadata or consistency defect
+that can be fixed without changing any task, owner, dependency, need or acceptance criterion; architectural = anything else. When unsure, say architectural.
 Use the inherited project acceptance IDs in ac_ids and finish DONE; this stage creates no plan of its own.'''
+
+PLAN_CORRECTION = '''Targeted plan correction (not a replan). The findings below are localized wording, metadata or consistency defects of the approved plan.
+Correct only what they name, in PLAN.md and in project-plan.json constraints; keep every valid part. You must NOT change any task, id, title, owner, dependency,
+need, risk or acceptance criterion, add or remove tasks, or weaken anything. Integrity baselines (hashes, sizes) already in the plan stay exactly as they are,
+labelled as the baseline; report corrected or current values separately, measured from disk read-only, never in place of the baseline. Re-attach PLAN.md and
+project-plan.json (tasks unchanged) and finish DONE with the inherited project ac_ids.'''
+
+PLAN_CORRECTION_REVIEW = '''Focused plan-correction review (read-only). Check ONLY (1) that each listed finding is resolved by the corrected PLAN.md and project-plan.json, and
+(2) the requirements directly affected by the correction (the acceptance criteria and sections the findings name). Do not reopen unrelated parts of the plan and do
+not raise new wording nits. Retain PLAN-REVIEW.md. Report in metadata.findings, as "F<n>|SEVERITY|AC or -|where|problem", only a listed finding that is still unresolved
+or a defect the correction itself introduced. Set metadata.plan_defect if the correction changed the architecture or an acceptance criterion. Finish DONE with the
+inherited project ac_ids.'''
 
 PLAN_DEFECT = '''If the failure comes from a wrong, contradictory or untestable task plan or acceptance criterion rather than from the
 implementation, set metadata.plan_defect to a one-sentence reason. The engine then returns the project to the architect instead of repairing.'''

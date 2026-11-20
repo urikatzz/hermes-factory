@@ -5,7 +5,7 @@ from factory_dashboard.model_policy import ConfigurationError
 from factory_dashboard.project_decisions import (constraint_view, constraints_of, finding_file, normalize_constraint, normalize_decisions,
                                                  preserved_conflict, relevant_constraints, validate_plan_constraints, validate_spec_conflicts,
                                                  waiver_for)
-from factory_dashboard.project_policy import route_findings, validate_plan
+from factory_dashboard.project_policy import finding_id, missing_baseline_tokens, plan_architecture_diff, route_findings, validate_plan
 from factory_dashboard.workflow_gate import evaluate_cycle
 from factory_dashboard.workflow_handoffs import StageResult
 
@@ -190,6 +190,35 @@ class StructuredConstraintTests(unittest.TestCase):
         for bad in (-1, 3, '1', 1.5, True):
             with self.subTest(bad=bad), self.assertRaises(ConfigurationError):
                 normalize_decisions(dict(extra_repairs=bad), 'n')
+
+
+class PlanCorrectionPolicyTests(unittest.TestCase):
+    TASK = dict(id='code', title='Build code', owner='developer', dependencies=[], acceptance={'AC1': 'Works'}, needs=dict(art=False, audio=False, ui=False, ux=False))
+
+    def test_only_preserve_and_nothing_architectural_may_differ(self):
+        self.assertEqual(plan_architecture_diff([self.TASK], [dict(self.TASK, preserve=['a.png'])]), [])
+        for change in (dict(acceptance={'AC1': 'Weaker'}), dict(owner='artist'), dict(dependencies=['x']), dict(title='Renamed'),
+                       dict(needs=dict(art=True, audio=False, ui=False, ux=False)), dict(risk='high')):
+            with self.subTest(change=change):
+                self.assertEqual(plan_architecture_diff([self.TASK], [dict(self.TASK, **change)]), ['code'])
+        self.assertEqual(plan_architecture_diff([self.TASK], [self.TASK, dict(self.TASK, id='more')]), ['more'])
+        self.assertEqual(plan_architecture_diff([self.TASK], []), ['code'])
+        self.assertEqual(plan_architecture_diff([self.TASK], [dict(self.TASK, risk='normal')]), [])
+
+    def test_baseline_hashes_must_survive_but_additions_are_free(self):
+        old = 'Room01.unity acb98fe7 builder 937d9ee7abcd and 45 GiB'
+        self.assertEqual(missing_baseline_tokens(old, 'baseline acb98fe7 / 937d9ee7abcd; current ce04575547a29dfa, 31.6 GiB'), [])
+        self.assertEqual(missing_baseline_tokens(old, 'replaced by ce04575547a29dfa'), ['937d9ee7abcd', 'acb98fe7'])
+        self.assertEqual(missing_baseline_tokens('no hashes here', 'anything'), [])
+
+    def test_finding_ids_and_the_decision_field(self):
+        self.assertEqual((finding_id('claude-reviewer:F12|MEDIUM|AC1|x|y'), finding_id('F3|LOW|-|x|y')), ('F12', 'F3'))
+        self.assertEqual(normalize_decisions(dict(plan_correction=['F2', 'F1', 'F1']), 'n')['plan_correction'], ['F1', 'F2'])
+        for bad in ('F1', ['f1'], ['F1', 7], ['AC1'], ['F' + '9' * 5]):
+            with self.subTest(bad=bad), self.assertRaises(ConfigurationError):
+                normalize_decisions(dict(plan_correction=bad), 'n')
+        with self.assertRaises(ConfigurationError):
+            normalize_decisions(dict(plan_correction=['F1']), ' ')
 
 
 if __name__ == '__main__':

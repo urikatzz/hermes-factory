@@ -73,6 +73,9 @@ def normalize_handoff(task, run, expected_stage):
         parts = finding.split('|',4) if isinstance(finding,str) else []
         if len(parts)!=5 or parts[1] not in ('BLOCKER','HIGH','MEDIUM','LOW','NIT'):
             return invalid('Invalid finding schema')
+    classes = metadata.get('finding_classes')
+    if classes is not None and (not isinstance(classes, dict) or any(not isinstance(k, str) or v not in ('correction', 'architectural') for k, v in classes.items())):
+        return invalid('Invalid finding classes')
     truncated = metadata.get('findings_truncated',0)
     if type(truncated) is not int or truncated<0:
         return invalid('Invalid truncated finding count')

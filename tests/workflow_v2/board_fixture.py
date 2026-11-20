@@ -110,7 +110,7 @@ class Board:
         report.mkdir(exist_ok=True)
         artifacts = []
         if kind in ('prepare', 'review', 'verify'):
-            plan = report / ('RETRO.md' if stage['profile'] == 'factory-retro' else 'PLAN-REVIEW.md' if stage['stage_key'] == 'project-plan-review'
+            plan = report / ('RETRO.md' if stage['profile'] == 'factory-retro' else 'PLAN-REVIEW.md' if stage['stage_key'] == 'project-plan-review' or 'plan-correction-review' in stage['stage_key']
                              else 'PLAN.md' if kind == 'prepare' else 'report.md')
             plan.write_text('AC1: Expected behavior\n')
             artifacts.append(str(plan))

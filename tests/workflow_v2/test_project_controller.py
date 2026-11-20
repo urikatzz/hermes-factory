@@ -966,6 +966,127 @@ class ProjectControllerTests(unittest.TestCase):
         self.only('architect')
         self.assertEqual(developers(), before)
 
+    # --- bounded plan_correction, separate from architectural replans ---
+    BASELINE = 'deadbeefcafe1234'
+    LOCAL = ['F1|MEDIUM|AC1|code|State that the waived check is reported as waived, never as pass']
+
+    def reviewed_plan(self, findings, classes=None, original_text=None):
+        self.start_planning(); self.architect()
+        if original_text:
+            Path(next(p for p in self.project()['plans'] if p['profile'] == 'architect')['path']).write_text(original_text)
+        extra = dict(findings=findings, **({'finding_classes': classes} if classes else {}))
+        self.board.complete(self.only('claude-reviewer'), **extra); self.tick()
+
+    def correction_card(self):
+        return next(r for r in self.board.ready() if r['stage_key'].startswith('project-plan-correction-g') and 'review' not in r['stage_key'])
+
+    def correct(self, tasks=None, text='Plan text with the baseline deadbeefcafe1234 retained', **overrides):
+        stage = self.correction_card()
+        folder = Path(self.temp.name) / f'correction-{stage["task_id"]}'; folder.mkdir()
+        plan = folder / 'project-plan.json'; plan.write_text(json.dumps(dict(tasks=tasks or [CODE])))
+        metadata = self.board.complete(stage, **overrides)
+        Path(metadata['artifacts'][0]).write_text(text)
+        self.conn.execute('INSERT INTO attachments VALUES(?,?)', (stage['task_id'], str(plan)))
+        run = json.loads(self.conn.execute('SELECT metadata FROM task_runs WHERE task_id=?', (stage['task_id'],)).fetchone()[0]); run['artifacts'].append(str(plan))
+        self.conn.execute('UPDATE task_runs SET metadata=? WHERE task_id=?', (json.dumps(run), stage['task_id'])); self.conn.commit()
+        self.tick()
+
+    def focused_review(self, **overrides):
+        row = next(r for r in self.board.ready() if 'correction-review' in r['stage_key'])
+        self.board.complete(row, **overrides); self.tick()
+
+    def test_localized_findings_are_corrected_in_place_reviewed_in_focus_and_cost_no_replan(self):
+        self.reviewed_plan(self.LOCAL, {'F1': 'correction'}, self.BASELINE)
+        card = self.correction_card()
+        self.assertEqual(card['profile'], 'architect')
+        self.assertIn('Targeted plan correction', self.board.cards[card['task_id']]['body'])
+        self.assertIn('State that the waived check', self.board.cards[card['task_id']]['body'])
+        self.correct()
+        self.focused_review()
+        self.assertEqual(self.only('developer')['stage_key'], 'task-code-implement')  # the plan stands and execution proceeds
+        self.assertEqual(self.project().get('replans', 0), 0)
+        self.assertEqual(self.project()['plan_corrections'], {'0': 1})
+        self.assertIn('plan_correction_accepted', [e['kind'] for e in self.project()['orchestration_log']])
+
+    def test_an_unclassified_or_architectural_finding_still_triggers_a_replan(self):
+        self.reviewed_plan(self.LOCAL)  # no classification: architectural by default
+        self.assertEqual(self.only('architect')['cycle'], 1)
+        self.assertEqual(self.project()['replans'], 1)
+
+    def test_one_architectural_finding_among_corrections_makes_the_whole_review_a_replan(self):
+        self.reviewed_plan([*self.LOCAL, 'F2|HIGH|AC1|code|A task is missing'], {'F1': 'correction', 'F2': 'architectural'})
+        self.assertEqual(self.only('architect')['cycle'], 1)
+        self.assertNotIn('correction', self.project())
+
+    def test_a_correction_that_changes_an_acceptance_criterion_escalates_and_spends_no_budget(self):
+        self.reviewed_plan(self.LOCAL, {'F1': 'correction'}, self.BASELINE)
+        self.correct(tasks=[dict(CODE, acceptance={'AC1': 'A weaker criterion'})])
+        self.assertEqual(self.project()['terminal']['phase'], 'human_review')
+        self.assertIn('changed architecture or acceptance criteria', self.project()['terminal']['reason'])
+        self.assertEqual(self.project().get('replans', 0), 0)
+        self.assertEqual(self.project()['plan_corrections'], {})
+
+    def test_a_correction_that_adds_a_task_or_changes_an_owner_also_escalates(self):
+        self.reviewed_plan(self.LOCAL, {'F1': 'correction'}, self.BASELINE)
+        self.correct(tasks=[CODE, dict(CODE, id='extra', title='Extra', dependencies=['code'])])
+        self.assertIn('extra', self.project()['terminal']['reason'])
+
+    def test_a_correction_may_not_drop_the_original_integrity_baselines_and_may_retry_once(self):
+        self.reviewed_plan(self.LOCAL, {'F1': 'correction'}, self.BASELINE)
+        self.correct(text='The old hash was replaced by 0123456789abcdef')
+        retry = self.correction_card()
+        self.assertEqual(retry['cycle'], 1)
+        body = self.board.cards[retry['task_id']]['body']
+        self.assertIn('dropped original integrity baselines', body)
+        self.assertIn(self.BASELINE, body)
+        self.assertEqual(self.project()['plan_corrections'], {'0': 1})
+        self.correct(text=f'Baseline {self.BASELINE} (original) and current 0123456789abcdef (verified)')
+        self.focused_review()
+        self.only('developer')
+        self.assertEqual(self.project()['plan_corrections'], {'0': 2})
+
+    def test_corrections_that_never_pass_the_focused_review_exhaust_two_attempts_then_stop_for_a_human(self):
+        self.reviewed_plan(self.LOCAL, {'F1': 'correction'}, self.BASELINE)
+        for _ in range(2):
+            self.correct()
+            self.focused_review(verdict='DONE', findings=['F1|MEDIUM|AC1|code|Still unresolved'])
+        self.assertEqual(self.project()['terminal']['phase'], 'human_review')
+        self.assertIn('Plan correction budget exhausted after 2 attempts', self.project()['terminal']['reason'])
+        self.assertEqual(self.project().get('replans', 0), 0)  # the architectural budget was never touched
+        self.assertEqual([e['kind'] for e in self.project()['orchestration_log']].count('plan_correction_failed'), 2)
+
+    def test_the_focused_review_reports_a_plan_defect_when_the_architecture_changed(self):
+        self.reviewed_plan(self.LOCAL, {'F1': 'correction'}, self.BASELINE)
+        self.correct()
+        self.focused_review(plan_defect='The correction quietly changed what AC1 requires')
+        self.assertIn('architectural change', self.project()['terminal']['reason'])
+
+    def test_a_structurally_invalid_correction_is_an_attempt_not_a_replan(self):
+        self.reviewed_plan(self.LOCAL, {'F1': 'correction'}, self.BASELINE)
+        self.correct(tasks=[{**CODE, 'owner': 'nobody'}])
+        self.assertEqual(self.correction_card()['cycle'], 1)
+        self.assertIn('structural validation', self.board.cards[self.correction_card()['task_id']]['body'])
+        self.assertEqual(self.project().get('replans', 0), 0)
+
+    def test_a_human_classification_sends_the_current_findings_through_correction_after_the_replan_limit(self):
+        self.exhausted_plan_review()
+        reviews = lambda: self.conn.execute("SELECT COUNT(*) FROM factory_workflow_stages WHERE stage_key='project-plan-review'").fetchone()[0]
+        before = reviews()
+        self.controller.resume(self.conn, self.root, 'These findings are localized wording corrections', dict(plan_correction=['F1']), True)
+        self.assertEqual(self.correction_card()['profile'], 'architect')
+        self.assertEqual(reviews(), before)  # the plan was not reviewed again from scratch
+        self.assertEqual(self.project()['plan_class_overrides']['ids'], ['F1'])
+
+    def test_plan_correction_decisions_apply_only_to_a_plan_review_stop(self):
+        self.stalled_artist()
+        with self.assertRaises(ConfigurationError):
+            self.controller.resume(self.conn, self.root, 'Wrong place for this decision', dict(plan_correction=['F1']), True)
+
+    def test_a_malformed_finding_classification_is_a_handoff_error_and_is_retried(self):
+        self.start_planning(); self.architect()
+        self.board.complete(self.only('claude-reviewer'), findings=self.LOCAL, finding_classes={'F1': 'maybe'}); self.tick()
+        self.assertEqual(self.project()['handoff_retries'], {'project-plan-review:0': 1})
+
     def test_visual_mismatch_calls_artist_then_verifier_not_developer(self):
         tasks=[dict(id='sprites',title='Make sprites',owner='artist',dependencies=[],acceptance={'AC1':'Sprite'},
                     needs=dict(art=True,audio=False,ui=False,ux=False))]

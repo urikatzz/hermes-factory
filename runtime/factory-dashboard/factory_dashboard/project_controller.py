@@ -5,12 +5,13 @@ from pathlib import Path
 import time
 
 from .model_policy import ConfigurationError
-from .project_cards import (ARCHITECT, COMPARISON, CONFLICT_CHECK, SIMILARITY, DIRECTOR, PLAN_DEFECT, PLAN_REVIEW, REPLAN, RETRO, SCOPE,
-                            SPEC_CONSTRAINTS, TOOL_INCIDENTS, project_card)
+from .project_cards import (ARCHITECT, COMPARISON, CONFLICT_CHECK, SIMILARITY, DIRECTOR, PLAN_CORRECTION, PLAN_CORRECTION_REVIEW, PLAN_DEFECT,
+                            PLAN_REVIEW, REPLAN, RETRO, SCOPE, SPEC_CONSTRAINTS, TOOL_INCIDENTS, project_card)
 from .project_decisions import (constraint_view, constraints_of, normalize_decisions, preserved_conflict, record_applied, relevant_constraints,
                                 validate_plan_constraints, validate_spec_conflicts)
 from .project_evidence import plan_evidence, retained_json, validate_comparison, validate_similarity
-from .project_policy import (MAX_ORCHESTRATION_RECOVERIES, MAX_REPLANS, blocking_findings, budget_used, repair_origin, finding_ac, planning_profiles, route_findings, rereview_profiles,
+from .project_policy import (MAX_ORCHESTRATION_RECOVERIES, MAX_PLAN_CORRECTIONS, MAX_REPLANS, blocking_findings, budget_used, finding_id,
+                             missing_baseline_tokens, plan_architecture_diff, repair_origin, finding_ac, planning_profiles, route_findings, rereview_profiles,
                              review_profiles, scope_additions, validate_plan, validate_scope)
 
 REPAIR_LIMIT = 'Captured repair limit reached'
@@ -196,6 +197,80 @@ class ProjectController:
         return next((r.metadata['plan_defect'].strip() for r in results
                      if isinstance(r.metadata.get('plan_defect'), str) and r.metadata['plan_defect'].strip()), None)
 
+    @staticmethod
+    def _plan_classes(project, result, blocking):
+        """Each blocking plan-review finding is a localized correction or an architectural defect. A human decision classifies the current
+        findings by id; otherwise the reviewer's own classification counts; anything unclassified is architectural."""
+        reported = result.metadata.get('finding_classes') or {}
+        override = project.get('plan_class_overrides') or {}
+        human = set(override.get('ids', [])) if override.get('gen') == project.get('gen', 0) else set()
+        return {finding_id(f): 'correction' if finding_id(f) in human else reported.get(finding_id(f), 'architectural') for f in blocking}
+
+    def _plan_correction(self, conn, root, definition, context, project):
+        """Bounded, targeted correction of the approved plan: it may change wording, metadata and constraints only. The correction is checked
+        mechanically (structure, task architecture, original baselines) and then reviewed only for the findings and the requirements they touch."""
+        correction, gen = project['correction'], project['correction']['gen']
+        attempt, reviewer = correction['attempt'], next(s.profile for s in definition.reviewers if s.profile in ('claude-reviewer', 'codex-reviewer'))
+        key = f'project-plan-correction-g{gen}'
+        listing = '\nFINDINGS TO CORRECT ' + json.dumps(correction['findings'], sort_keys=True)
+        if correction.get('optional'):
+            listing += '\nNON-BLOCKING SUGGESTIONS (address where cheap) ' + json.dumps(correction['optional'], sort_keys=True)
+        inputs = [*self._inputs(project), correction['review_task']]
+        node = self._node(conn, root, definition, context, project, key, 'prepare', 'architect', PLAN_CORRECTION + listing, inputs, cycle=attempt)
+        if not node:
+            return False
+        row, result = node
+        try:
+            document = retained_json(result.metadata['artifacts'], 'project-plan.json')
+            tasks = validate_plan(document, project['scope'], result.metadata['ac_ids'])
+            constraints = validate_plan_constraints(document.get('constraints'))
+        except ConfigurationError as exc:
+            return self._correction_failed(conn, root, project, correction, key, 'Corrected plan failed structural validation: ' + str(exc))
+        if sorted(result.metadata['ac_ids']) != sorted(project['ac_ids']) or plan_architecture_diff(project['tasks'], tasks):
+            changed = plan_architecture_diff(project['tasks'], tasks) or ['project acceptance IDs']
+            raise ConfigurationError('Plan correction changed architecture or acceptance criteria (' + ', '.join(changed) + '): that needs an architectural replan or a human decision')
+        evidence = plan_evidence('architect', row['task_id'], result.metadata)
+        previous = next(p for p in project['plans'] if p['profile'] == 'architect')
+        try:
+            lost = missing_baseline_tokens(Path(previous['path']).read_text(), Path(evidence['path']).read_text())
+        except OSError as exc:
+            raise ConfigurationError('Cannot compare the corrected plan text with the approved plan: ' + str(exc))
+        if lost:
+            return self._correction_failed(conn, root, project, correction, key, 'Corrected plan dropped original integrity baselines (keep them, labelled as baseline): ' + ', '.join(lost[:8]))
+        review = self._node(conn, root, definition, context, project, f'project-plan-correction-review-g{gen}', 'prepare', reviewer,
+                            PLAN_CORRECTION_REVIEW + listing, [*inputs, row['task_id']], cycle=attempt)
+        if not review:
+            return False
+        review_row, verdict = review
+        if not any(Path(p).name.startswith('PLAN-REVIEW') and Path(p).suffix == '.md' for p in verdict.metadata['artifacts']):
+            raise ConfigurationError('Focused plan review did not retain PLAN-REVIEW.md')
+        defect = self._defect([verdict])
+        if defect:
+            raise ConfigurationError('Plan correction review found an architectural change: ' + defect)
+        remaining = [reviewer + ':' + f for f in blocking_findings(verdict.metadata.get('findings', []))]
+        if remaining:
+            return self._correction_failed(conn, root, project, correction, key, 'The focused review found unresolved findings', remaining)
+        project['plans'] = [p for p in project['plans'] if p['profile'] != 'architect'] + [evidence]
+        project.update(plan_constraints=constraints, mode='tasks')
+        project.pop('correction', None)
+        project.pop('replan', None)
+        project['plan_corrections'][str(gen)] = attempt + 1
+        project.setdefault('orchestration_log', []).append(dict(kind='plan_correction_accepted', generation=gen, attempts=attempt + 1, at=int(time.time())))
+        self._state.event(conn, root['root_id'], 'project_plan_corrected', dict(generation=gen, attempts=attempt + 1, task_id=row['task_id'], review_task=review_row['task_id']))
+        return True
+
+    def _correction_failed(self, conn, root, project, correction, key, reason, findings=None):
+        used = correction['attempt'] + 1
+        project['plan_corrections'][str(correction['gen'])] = used
+        project.setdefault('orchestration_log', []).append(dict(kind='plan_correction_failed', generation=correction['gen'], attempt=used, reason=reason[:400], at=int(time.time())))
+        self._state.event(conn, root['root_id'], 'project_plan_correction_failed', dict(generation=correction['gen'], attempt=used, reason=reason[:1000]))
+        if used >= MAX_PLAN_CORRECTIONS:
+            raise ConfigurationError(f'Plan correction budget exhausted after {used} attempts: {reason}')
+        correction.update(attempt=used, findings=findings or correction['findings'])
+        project.setdefault('handoff_rejections', {})[key] = dict(attempt=used, max_attempts=MAX_PLAN_CORRECTIONS, reason=reason,
+            instruction='Fix only what remains; the same limits apply: no task, owner, dependency or acceptance-criterion change, and original baselines stay.')
+        return True
+
     def _replan(self, conn, root, project, task, reason, findings, inputs):
         """Return the project to the architect. Bounded; completed tasks stay frozen."""
         grants = project.get('replan_grants', {})
@@ -311,6 +386,17 @@ class ProjectController:
                 raise ConfigurationError('Plan review did not retain PLAN-REVIEW.md')
             blocking = [reviewer + ':' + f for f in blocking_findings(result.metadata.get('findings', []))]
             if blocking:
+                classes = self._plan_classes(project, result, blocking)
+                if all(kind == 'correction' for kind in classes.values()):
+                    # Localized wording, metadata or consistency defects: corrected in place, off the architectural replan budget.
+                    used = project.setdefault('plan_corrections', {}).get(str(gen), 0)
+                    if used >= MAX_PLAN_CORRECTIONS:
+                        raise ConfigurationError(f'Plan correction budget exhausted ({used} attempts): {len(blocking)} finding(s) remain')
+                    optional = [reviewer + ':' + f for f in result.metadata.get('findings', []) if reviewer + ':' + f not in blocking]
+                    project['correction'] = dict(gen=gen, attempt=used, findings=blocking, optional=optional, review_task=row['task_id'])
+                    project['mode'] = 'plan_correction'
+                    self._state.event(conn, root['root_id'], 'project_plan_correction_started', dict(generation=gen, findings=blocking, classes=classes))
+                    return True
                 if not self._replan(conn, root, project, None, 'Plan review findings', blocking, [row['task_id']]):
                     raise ConfigurationError('Plan review findings remain after the replan limit')
                 return True
@@ -318,6 +404,8 @@ class ProjectController:
             project['mode'] = 'tasks'
             self._state.event(conn, root['root_id'], 'project_plan_approved', dict(task_id=row['task_id'], reviewer=reviewer, generation=gen))
             return True
+        if mode == 'plan_correction':
+            return self._plan_correction(conn, root, definition, context, project)
         if mode == 'tasks':
             task = self._current(project)
             if task is None:
@@ -665,6 +753,8 @@ class ProjectController:
         project = json.loads(row[0]) if row else {}
         if decided['extra_repairs'] and 'work' not in project:
             raise ConfigurationError('extra_repairs applies to a task in progress; none is')
+        if decided['plan_correction'] and 'plan_review' not in (project.get('mode'), project.get('resume_mode')):
+            raise ConfigurationError('plan_correction applies to a plan-review stop; this project did not stop there')
         awaiting = project.get('awaiting')
         if decisions and awaiting and not project.get('terminal'):
             raise ConfigurationError('Waivers and constraints apply to a blocked stage, not to plan approval')
@@ -696,6 +786,8 @@ class ProjectController:
         project['waivers'].extend(w for w in decided['waivers'] if w['id'] not in known)
         stored = [constraint_view(c) for c in project.setdefault('constraints', [])]  # decisions recorded before ids existed get one now
         project['constraints'] = stored + [c for c in decided['constraints'] if c['id'] not in {k['id'] for k in stored}]
+        if decided['plan_correction']:
+            project['plan_class_overrides'] = dict(gen=project.get('gen', 0), ids=decided['plan_correction'], note=note.strip()[:500], at=int(time.time()))
         if decided['extra_replans']:
             grants = project.setdefault('replan_grants', dict(granted=0, consumed=0, log=[]))
             grants['granted'] += decided['extra_replans']
@@ -708,7 +800,8 @@ class ProjectController:
         if decisions:
             self._state.event(conn, root['root_id'], 'human_decision', dict(note=note, waivers=[w['id'] for w in decided['waivers']],
                               constraints=decided['constraints'], extra_repairs=decided['extra_repairs'],
-                              extra_replans=decided['extra_replans'], on_exhaustion=decided['on_exhaustion'], execution_version=2))
+                              extra_replans=decided['extra_replans'], on_exhaustion=decided['on_exhaustion'], plan_correction=decided['plan_correction'],
+                              execution_version=2))
         gen = project.get('gen', 0)
         if 'work' in project:
             work = project['work']

@@ -232,3 +232,32 @@ def budget_used(work):
     if charges is None:
         return work.get('cycle', 0), 0
     return sum(c['kind'] == 'product' for c in charges), sum(c['kind'] == 'orchestration' for c in charges)
+
+
+# Plan correction: a localized wording, metadata or consistency defect in an approved plan is fixed in place, off the architectural replan
+# budget, and may never change the architecture or the acceptance criteria.
+MAX_PLAN_CORRECTIONS = 2
+_TASK_ARCHITECTURE = ('id', 'title', 'owner', 'dependencies', 'acceptance', 'needs', 'risk')
+_HASH_TOKEN = re.compile(r'\b[0-9a-f]{8,64}\b')
+
+
+def finding_id(finding):
+    """'claude-reviewer:F2|MEDIUM|...' or 'F2|MEDIUM|...' -> 'F2'."""
+    head = finding.split('|', 1)[0]
+    return head.split(':', 1)[-1].strip()
+
+
+def plan_architecture_diff(old_tasks, new_tasks):
+    """Task ids whose architecture changed between two plans (added, removed, or any field except ``preserve``). Empty means the correction
+    stayed within wording, metadata and constraints."""
+    old, new = {t['id']: t for t in old_tasks}, {t['id']: t for t in new_tasks}
+    changed = sorted(set(old) ^ set(new))
+    for key in set(old) & set(new):
+        if any(old[key].get(f, 'normal' if f == 'risk' else None) != new[key].get(f, 'normal' if f == 'risk' else None) for f in _TASK_ARCHITECTURE):
+            changed.append(key)
+    return sorted(changed)
+
+
+def missing_baseline_tokens(old_text, new_text):
+    """Hash-like integrity baselines present in the original plan text but absent from the corrected one: baselines are kept, never replaced."""
+    return sorted(set(_HASH_TOKEN.findall(old_text)) - set(_HASH_TOKEN.findall(new_text)))

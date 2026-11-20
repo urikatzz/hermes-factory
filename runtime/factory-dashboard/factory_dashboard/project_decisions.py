@@ -21,6 +21,8 @@ Extra repairs
     ``extra_repairs`` grants a bounded number of additional repair cycles to the task in progress, for that decision only.
     ``extra_replans`` (0 or 1 per decision) grants one additional architect replan to the current project. The grant, its reason, its
     consumption and every use are recorded under ``replan_grants``.
+    ``plan_correction`` lists the current plan-review finding ids a human classifies as localized corrections (wording, metadata,
+    consistency); they go through the bounded plan-correction workflow instead of an architectural replan.
     ``on_exhaustion: human_review`` makes that task stop for a human, instead of replanning, when the budget runs out again.
 """
 import fnmatch
@@ -111,11 +113,11 @@ def validate_plan_constraints(value):
 
 def normalize_decisions(decisions, note, now=None):
     """Validate a human decision document; return it ready to store."""
-    empty = dict(waivers=[], constraints=[], extra_repairs=0, extra_replans=0, on_exhaustion=None)
+    empty = dict(waivers=[], constraints=[], extra_repairs=0, extra_replans=0, on_exhaustion=None, plan_correction=[])
     if decisions in (None, {}):
         return empty
-    if not isinstance(decisions, dict) or set(decisions) - {'waivers', 'constraints', 'extra_repairs', 'extra_replans', 'on_exhaustion'}:
-        raise ConfigurationError('A decision may only contain waivers, constraints, extra_repairs, extra_replans and on_exhaustion')
+    if not isinstance(decisions, dict) or set(decisions) - {'waivers', 'constraints', 'extra_repairs', 'extra_replans', 'on_exhaustion', 'plan_correction'}:
+        raise ConfigurationError('A decision may only contain waivers, constraints, extra_repairs, extra_replans, on_exhaustion and plan_correction')
     stamp = int(time.time() if now is None else now)
     waivers = []
     for item in decisions.get('waivers') or []:
@@ -142,9 +144,12 @@ def normalize_decisions(decisions, note, now=None):
     extra_replans = decisions.get('extra_replans', 0)
     if type(extra_replans) is not int or not 0 <= extra_replans <= MAX_EXTRA_REPLANS:
         raise ConfigurationError(f'extra_replans must be an integer from 0 to {MAX_EXTRA_REPLANS} per decision')
-    if (extra or extra_replans or on_exhaustion) and not note.strip():
+    correction = decisions.get('plan_correction') or []
+    if not isinstance(correction, list) or len(correction) > 20 or any(not isinstance(i, str) or not re.fullmatch(r'F[0-9]{1,3}', i) for i in correction):
+        raise ConfigurationError('plan_correction must list plan-review finding ids such as F1')
+    if (extra or extra_replans or on_exhaustion or correction) and not note.strip():
         raise ConfigurationError('Granting repairs or changing exhaustion handling requires a recorded note')
-    return dict(waivers=waivers, constraints=constraints, extra_repairs=extra, extra_replans=extra_replans, on_exhaustion=on_exhaustion)
+    return dict(waivers=waivers, constraints=constraints, extra_repairs=extra, extra_replans=extra_replans, on_exhaustion=on_exhaustion, plan_correction=sorted(set(correction)))
 
 
 def finding_file(finding):
