@@ -75,7 +75,10 @@ class ReferenceModuleTests(unittest.TestCase):
         cases = [(dict(sha256='0' * 64), 'different image'), (dict(tool='human'), 'vision_analyze'), (dict(tool='guess'), 'vision_analyze'),
                  (dict(requirement_ids=['V1']), 'cite every requirement'),
                  (dict(observations=[dict(topic=t, observation='ok') for t in TOPICS]), 'empty, repeated'),
-                 (dict(observations=[dict(topic='palette', observation='Charcoal walls with amber accents everywhere')]), 'does not cover')]
+                 (dict(observations=[dict(topic='palette', region=[0.1, 0.1, 0.3, 0.3], observation='Charcoal walls with amber accents everywhere')]), 'does not cover'),
+                 (dict(observations=[dict(topic=t, observation=f'Concrete description of the {t} the image shows') for t in TOPICS]), 'region'),
+                 (dict(observations=[dict(topic=t, region=[0.0, 0.0, 0.2, 0.2], observation=f'Concrete description of the {t} the image shows {i}') for i, t in enumerate(TOPICS)]), 'identical region'),
+                 (dict(observations=[dict(topic=t, region=[0.0, 0.0, 0.2, 0.2 + i / 100], observation=f'Concrete description of the {t} the image shows {i}') for i, t in enumerate(TOPICS)]), 'describes only')]
         for change, message in cases:
             with self.assertRaisesRegex(ConfigurationError, message):
                 refs.validate_inspection(inspection(self.loaded, **change), self.records)
@@ -221,6 +224,87 @@ class ReferenceModuleTests(unittest.TestCase):
             refs.validate_reference_comparison(record, records)
 
 
+class RoleFindingTests(unittest.TestCase):
+    """Role-specific, image-grounded findings: a successful vision call is necessary but not sufficient."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.records = write_project(self.temp.name, [REFERENCE], extra=MILESTONE_ONE)['references']
+        self.loaded = dict(references=self.records)
+        self.tasks = [dict(id='look', visual=['V1', 'V2'])]
+
+    def findings(self, kind, **kwargs):
+        from reference_fixture import role_findings
+        return dict(role_findings=role_findings(self.loaded, kind, self.tasks, ['shot.png'], **kwargs))
+
+    def test_each_role_has_its_own_valid_form(self):
+        refs.validate_role_findings(self.findings('achieve'), self.records, 'achieve')
+        refs.validate_role_findings(self.findings('carry'), self.records, 'carry', self.tasks)
+        refs.validate_role_findings(self.findings('plan_check'), self.records, 'plan_check')
+        refs.validate_role_findings(self.findings('render_check'), self.records, 'render_check', screenshots=['shot.png'])
+
+    def test_a_finding_per_demanded_requirement_is_required_and_a_future_one_is_not(self):
+        record = self.findings('achieve')
+        record['role_findings'].pop()
+        with self.assertRaisesRegex(ConfigurationError, 'Missing achieve findings.*V2'):
+            refs.validate_role_findings(record, self.records, 'achieve')
+        self.assertEqual(sorted(r['id'] for r in refs.required_requirements(self.records)), ['V1', 'V2'])
+
+    def test_a_generic_copied_or_ungrounded_finding_is_rejected(self):
+        for change, message in ((dict(finding='fine'), 'empty, repeated'),
+                                (dict(finding='Hazard stripes on platforms and the door frame'), 'restates the requirement'),
+                                (dict(region=None), 'region'), (dict(region=[0.9, 0.9, 0.5, 0.5]), 'impossible region'),
+                                (dict(subject='magic'), 'generated.*procedural.*hybrid')):
+            record = self.findings('achieve')
+            record['role_findings'][0].update(change)
+            with self.assertRaisesRegex(ConfigurationError, message):
+                refs.validate_role_findings(record, self.records, 'achieve')
+        record = self.findings('achieve')
+        for entry in record['role_findings']:
+            entry['region'] = [0.1, 0.1, 0.2, 0.2]
+        with self.assertRaisesRegex(ConfigurationError, 'identical region'):
+            refs.validate_role_findings(record, self.records, 'achieve')
+
+    def test_the_architect_must_name_a_task_that_really_carries_the_requirement(self):
+        record = self.findings('carry')
+        record['role_findings'][0]['subject'] = 'elsewhere'
+        with self.assertRaisesRegex(ConfigurationError, 'must name in "subject" a task'):
+            refs.validate_role_findings(record, self.records, 'carry', self.tasks)
+        with self.assertRaisesRegex(ConfigurationError, 'must name in "subject" a task'):
+            refs.validate_role_findings(self.findings('carry'), self.records, 'carry', [dict(id='look', visual=['V1'])])
+
+    def test_a_plan_reviewer_who_finds_a_weakened_requirement_must_also_raise_a_blocking_finding(self):
+        record = self.findings('plan_check', V2=dict(verdict='weakened'))
+        with self.assertRaisesRegex(ConfigurationError, 'weakened V2 needs a BLOCKER/HIGH finding'):
+            refs.validate_role_findings(record, self.records, 'plan_check')
+        refs.validate_role_findings(record, self.records, 'plan_check', findings=['F1|HIGH|AC1|plan|V2 is weakened to flat bars'])
+
+    def test_an_art_reviewer_who_sees_a_difference_must_block_and_name_real_screenshots(self):
+        record = self.findings('render_check', V1=dict(verdict='differs'))
+        with self.assertRaisesRegex(ConfigurationError, 'differs V1 needs a BLOCKER/HIGH.*CHANGES_REQUIRED'):
+            refs.validate_role_findings(record, self.records, 'render_check', screenshots=['shot.png'], verdict='NO_BLOCKING_FINDINGS',
+                                        findings=['F1|HIGH|AC1|shot.png|V1 stripes missing'])
+        refs.validate_role_findings(record, self.records, 'render_check', screenshots=['shot.png'], verdict='CHANGES_REQUIRED', findings=['F1|HIGH|AC1|shot.png|V1 stripes missing'])
+        with self.assertRaisesRegex(ConfigurationError, 'retained rendered screenshot'):
+            refs.validate_role_findings(self.findings('render_check'), self.records, 'render_check', screenshots=['other.png'])
+
+    def test_the_art_plan_needs_every_section_and_a_real_mockup(self):
+        from reference_fixture import ART_PLAN_BLOCK, png
+        refs.validate_art_plan('# Plan\n' + ART_PLAN_BLOCK)
+        for name in ('procedural', 'milestone', 'mockup', 'compar'):
+            lines = [l for l in ART_PLAN_BLOCK.splitlines() if not (l.startswith('#') and name in l.lower())]
+            with self.assertRaisesRegex(ConfigurationError, 'no section'):
+                refs.validate_art_plan('\n'.join(lines))
+        folder = Path(self.temp.name)
+        (folder / 'plan-mockup.png').write_bytes(png())
+        self.assertEqual(refs.plan_mockup([str(folder / 'plan-mockup.png')]), folder / 'plan-mockup.png')
+        (folder / 'plan-mockup.png').write_bytes(png(300, 200))
+        self.assertIsNone(refs.plan_mockup([str(folder / 'plan-mockup.png')]))
+        (folder / 'plan-mockup.png').write_bytes(b'not a png' * 5000)
+        self.assertIsNone(refs.plan_mockup([str(folder / 'plan-mockup.png')]))
+
+
 class ReferenceWorkflowTests(ReferenceFlow):
     """Through the real controller: planning cannot start, pass or finish while ignoring the approved reference."""
     REFERENCES = [REFERENCE]
@@ -261,6 +345,29 @@ class ReferenceWorkflowTests(ReferenceFlow):
         _, context = self.rejection('art-director')
         self.assertIn('shows no successful vision_analyze call', context['previous_handoff_rejected']['reason'])
 
+    def test_an_art_plan_without_the_required_sections_or_the_mockup_is_not_offered_for_approval(self):
+        self.start()
+        self.finish(self.only('art-director'), 'V1 V2 carried.', art_plan=False)
+        self.assertIn('no section', self.rejection('art-director')[1]['previous_handoff_rejected']['reason'])
+        self.finish(self.only('art-director'), 'V1 V2 carried.', mockup=False)
+        self.assertIn('no representative mockup', self.rejection('art-director')[1]['previous_handoff_rejected']['reason'])
+
+    def test_the_director_must_have_looked_at_its_own_mockup_and_the_human_sees_where_it_is(self):
+        self.start()
+        stage = self.only('art-director')
+        folder = Path(self.temp.name) / 'unseen'
+        folder.mkdir()
+        self.finish(stage, 'V1 V2 carried.', viewed=False, shots_viewed=[])
+        self.assertIn('shows no successful vision_analyze call', self.rejection('art-director')[1]['previous_handoff_rejected']['reason'])
+        self.finish(self.only('art-director'), 'V1 V2 carried.')
+        self.assertTrue(self.document()['awaiting']['mockup'].endswith('plan-mockup.png'))
+        self.assertIn('mockup:', self.state.read_root(self.conn, self.root)['reason'])
+
+    def test_a_director_finding_without_a_production_approach_or_a_region_is_sent_back(self):
+        self.start()
+        self.finish(self.only('art-director'), 'V1 V2 carried.', per_requirement=dict(V1=dict(subject='whatever')))
+        self.assertIn('generated, procedural, hybrid', self.rejection('art-director')[1]['previous_handoff_rejected']['reason'])
+
     def test_a_director_plan_that_forbids_what_the_reference_shows_is_sent_back(self):
         self.start()
         self.finish(self.only('art-director'), 'V1 V2. Deferred look: no hazard stripes until milestone 6.')
@@ -280,11 +387,17 @@ class ReferenceWorkflowTests(ReferenceFlow):
 
     def test_an_architect_plan_that_does_not_trace_the_requirements_is_sent_back_off_the_replan_budget(self):
         self.approved_director()
-        self.architect([self.visual_task(visual=['V1'], acceptance={'AC1': 'V1 only'})])
+        self.architect([self.visual_task(acceptance={'AC1': 'The room looks right'})])
         stage, context = self.rejection('architect')
         self.assertEqual(stage['evidence_retry'], 1)
-        self.assertIn('not traced into any task acceptance: V2', context['previous_handoff_rejected']['reason'])
+        self.assertIn('no acceptance criterion states it', context['previous_handoff_rejected']['reason'])
         self.assertEqual(self.document().get('replans', 0), 0)
+
+    def test_an_architect_that_leaves_a_requirement_with_no_carrying_task_is_sent_back_with_the_task_rule(self):
+        self.approved_director()
+        self.architect([self.visual_task(visual=['V1'], acceptance={'AC1': 'V1 only'})])
+        _, context = self.rejection('architect')
+        self.assertIn('must name in "subject" a task of project-plan.json whose "visual" list has V2', context['previous_handoff_rejected']['reason'])
 
     def test_task_acceptance_that_excludes_an_approved_characteristic_is_sent_back(self):
         self.approved_director()

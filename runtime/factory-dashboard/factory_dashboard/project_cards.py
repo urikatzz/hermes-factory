@@ -34,12 +34,33 @@ Milestone semantics: grey-box means gameplay scope and asset fidelity may be sim
 composition, palette, HUD and defining visual characteristics, and "grey-box", "placeholder", "generic" or a milestone name next to a requirement is an implicit
 deferral that is rejected. Only a human decision recorded in approved_references postpones a requirement: a listed deferral (approved_by human) or an
 introduced_at milestone later than the human-set milestone (a feature that does not exist yet). Nobody else may. A factory-made mockup, bible, tile or
-screenshot is derived evidence: it is never the comparison target, never replaces the original reference, and only a human editing the references file can change that.'''
+screenshot is derived evidence: it is never the comparison target, never replaces the original reference, and only a human editing the references file can change that.
+The approved image is the primary visual authority. The written requirements describe important characteristics; they are not an exhaustive replacement for the image,
+and the absence of a characteristic from them is never permission to disregard it. Passing every requirement is necessary but not sufficient: the result must keep the
+reference's overall composition, proportions, art direction, visual density, atmosphere and identity. Never substitute grey-box, placeholder artwork or simplified geometry
+for the approved direction.'''
+
+ROLE_FINDINGS = dict(
+    achieve='''Role findings (art director): for each approved requirement id add {"kind":"achieve","requirement_id":"V1","finding":"what the image shows for it and exactly how the game will reproduce it","subject":"generated"|"procedural"|"hybrid","region":[x,y,w,h]} (generated = image-generation assets, procedural = built in code or the engine).''',
+    carry='''Role findings (architect): for each approved requirement id add {"kind":"carry","requirement_id":"V1","finding":"what the image shows for it and why this task delivers it","subject":"<id of a task in project-plan.json whose \"visual\" list contains it>","region":[x,y,w,h]}.''',
+    plan_check='''Role findings (plan reviewer): for each approved requirement id add {"kind":"plan_check","requirement_id":"V1","verdict":"faithful"|"weakened"|"missing","finding":"what the image shows and how the plan's tasks, bible and acceptance reproduce, weaken or omit it","region":[x,y,w,h]}. A weakened or missing requirement also needs a BLOCKER or HIGH finding that names its id.''',
+    render_check='''Role findings (art reviewer): for each approved requirement id add {"kind":"render_check","requirement_id":"V1","verdict":"matches"|"differs","subject":"<name of a retained rendered screenshot>","finding":"what the reference shows there and what the screenshot shows","region":[x,y,w,h]}. A differs verdict needs a BLOCKER or HIGH finding naming the id and the verdict CHANGES_REQUIRED.''')
+
+ART_PLAN = '''Art plan content (the human approves this before anything is built). PLAN.md needs a markdown heading for each of: how the approved visual direction will be achieved; the
+production assets that must be created; which assets need image generation versus procedural implementation; how characters or subjects are articulated and animated
+(say so if there are none); how environment composition, lighting and the interface are implemented; how the final rendered result will be compared with the approved
+reference (real in-engine renders, requirement by requirement plus a holistic judgement, no score or threshold); and which requirements are active at each milestone
+(use the introduced_at and milestone values in approved_references; do not invent scoping). Also produce ONE representative mockup of the intended result: generate it
+in your scratch workspace with the image-generation tool as plan-mockup.png (at least 640x360), open it with vision_analyze next to the approved reference, say in PLAN.md
+under a "Representative mockup" heading what it shows and where it differs from the reference, and retain it as a completion artifact. The mockup is subordinate to the approved
+reference: it is a proposal for the human to judge, never a comparison target.'''
 
 INSPECTION = '''Mandatory reference inspection: before you plan, decide or judge anything visual, open every approved reference image yourself with
 vision_analyze (a path or a hash is not an inspection). Retain reference-inspection.json: {"schema":"factory-reference-inspection/v1","references":[{"id":"<ref id>",
 "path":"<path>","sha256":"<the sha256 in approved_references>","tool":"vision_analyze","requirement_ids":["V1",...every id of that reference],
-"observations":[{"topic":"<each of the reference's inspect_topics>","observation":"what the image actually shows, at least one concrete sentence per topic"}]}]}.
+"observations":[{"topic":"<each of the reference's inspect_topics>","observation":"what the image actually shows, at least one concrete sentence per topic","region":[x,y,w,h]}]}],
+"role_findings":[...]} where region is the part of the image the observation is about, as fractions 0..1; observations must point at different parts (at least three cells of a
+3x3 grid) and no two share a region. Your role also writes role_findings (below), one per approved requirement, each with its own region.
 Attach it as a completion artifact. The controller verifies your session log: a successful vision_analyze call on each exact reference file must exist, so a
 correctly formatted JSON file without the tool calls is rejected. If you cannot open images, finish BLOCKED with blocked_reason naming the missing vision capability; never guess.'''
 

@@ -7,7 +7,7 @@ import re
 import time
 
 from .model_policy import ConfigurationError
-from .project_cards import (APPROVED_COMPARISON, APPROVED_REFERENCES, INSPECTION, REFERENCE_AUDIT, VISUAL_TRACE, ARCHITECT, COMPARISON, CONFLICT_CHECK, SIMILARITY, DIRECTOR, PLAN_CORRECTION, PLAN_CORRECTION_REVIEW, PLAN_DEFECT,
+from .project_cards import (ART_PLAN, ROLE_FINDINGS, APPROVED_COMPARISON, APPROVED_REFERENCES, INSPECTION, REFERENCE_AUDIT, VISUAL_TRACE, ARCHITECT, COMPARISON, CONFLICT_CHECK, SIMILARITY, DIRECTOR, PLAN_CORRECTION, PLAN_CORRECTION_REVIEW, PLAN_DEFECT,
                             PLAN_REVIEW, REPLAN, RETRO, SCOPE, SPEC_CONSTRAINTS, TOOL_INCIDENTS, project_card)
 from .project_decisions import (constraint_view, constraints_of, normalize_decisions, preserved_conflict, record_applied, relevant_constraints,
                                 validate_plan_constraints, validate_spec_conflicts)
@@ -71,7 +71,7 @@ class ProjectController:
         self._state.mark_reconciled(conn, root['root_id'])
         if project.get('awaiting') and not project.get('terminal'):
             # A pause for a human decision, not a failure: no retro, nothing retired.
-            return self._controller._stop(conn, root, 'blocked', 'Awaiting human approval of the art-director plan: ' + project['awaiting']['path'])
+            return self._controller._stop(conn, root, 'blocked', 'Awaiting human approval of the art-director plan: ' + project['awaiting']['path'] + (' (mockup: ' + project['awaiting']['mockup'] + ')' if project['awaiting'].get('mockup') else ''))
         return self._state.read_root(conn, root['root_id'])
 
     def _save(self, conn, root, project):
@@ -99,7 +99,9 @@ class ProjectController:
         if approved:
             instructions += '\n' + APPROVED_REFERENCES
             if refs.must_inspect(profile, key):
-                instructions += '\n' + INSPECTION
+                instructions += '\n' + INSPECTION + '\n' + ROLE_FINDINGS[refs.role_kind(profile, key)]
+            if profile == 'art-director':
+                instructions += '\n' + ART_PLAN
             if profile in ('architect', 'art-director'):
                 instructions += '\n' + VISUAL_TRACE
             if key == refs.PLAN_REVIEW_KEY:
@@ -186,7 +188,7 @@ class ProjectController:
             return None
         try:
             try:
-                refs.validate_inspection(retained_json(result.metadata['artifacts'], 'reference-inspection.json'), records)
+                inspection = refs.validate_inspection(retained_json(result.metadata['artifacts'], 'reference-inspection.json'), records)
             except ConfigurationError as exc:
                 return 'Reference inspection rejected: ' + str(exc)
             try:
@@ -196,6 +198,9 @@ class ProjectController:
                 session = None
             root = Path(context['project_dir'])
             wanted = {r['id']: root / r['path'] for r in refs.authoritative(records)}
+            mockup = refs.plan_mockup(result.metadata['artifacts']) if profile == 'art-director' else None
+            if mockup:
+                wanted['plan-mockup'] = mockup
             absent = refs.vision_proof(profile, session, self._hermes_home(), wanted)
             if absent:
                 return ('Reference inspection rejected: the worker session shows no successful vision_analyze call on ' + ', '.join(
@@ -204,6 +209,22 @@ class ProjectController:
                 shots = {Path(a).name: a for a in result.metadata['artifacts'] if Path(a).suffix.lower() in refs.IMAGE_SUFFIXES}
                 if shots and len(refs.vision_proof(profile, session, self._hermes_home(), shots)) == len(shots):
                     return 'Reference inspection rejected: the worker session shows the reviewer never opened any of the rendered screenshots with vision_analyze.'
+            kind = refs.role_kind(profile, key)
+            images = [Path(a) for a in result.metadata['artifacts'] if Path(a).suffix.lower() in refs.IMAGE_SUFFIXES]
+            tasks = []
+            if kind == 'carry':
+                tasks = [t for t in retained_json(result.metadata['artifacts'], 'project-plan.json').get('tasks', []) if isinstance(t, dict) and isinstance(t.get('id'), str)]
+            elif kind == 'plan_check':
+                tasks = project.get('tasks', [])
+            try:
+                refs.validate_role_findings(inspection, records, kind, tasks, [p.name for p in images], result.metadata.get('findings', []), result.metadata.get('verdict'))
+            except ConfigurationError as exc:
+                return 'Reference inspection rejected: ' + str(exc)
+            if profile == 'art-director':
+                if not mockup:
+                    raise ConfigurationError('The art plan has no representative mockup: retain plan-mockup.png (a PNG of at least 640x360) next to PLAN.md; it stays subordinate to the approved reference')
+                plan_text = next((Path(a).read_text(errors='replace') for a in result.metadata['artifacts'] if Path(a).name == 'PLAN.md' or re.fullmatch(r'PLAN_[0-9]+\.md', Path(a).name)), '')
+                refs.validate_art_plan(plan_text)
             if profile in ('art-director', 'architect'):
                 plan = next((Path(a) for a in result.metadata['artifacts'] if Path(a).name == 'PLAN.md' or re.fullmatch(r'PLAN_[0-9]+\.md', Path(a).name)), None)
                 text = plan.read_text(errors='replace') if plan and plan.is_file() else ''
@@ -418,7 +439,7 @@ class ProjectController:
             if art and project.get('approvals', {}).get('art-director', {}).get('sha256') != art['sha256']:
                 # Visual direction is a human call: nothing is architected on an art plan nobody approved.
                 if project.get('awaiting', {}).get('sha256') != art['sha256']:
-                    project['awaiting'] = dict(profile='art-director', sha256=art['sha256'], path=art['path'], task_id=art['task_id'])
+                    project['awaiting'] = dict(profile='art-director', sha256=art['sha256'], path=art['path'], task_id=art['task_id'], **({'mockup': art['mockup']} if art.get('mockup') else {}))
                     self._state.event(conn, root['root_id'], 'project_awaiting_human', project['awaiting'])
                 return False
             gen, replan = project.get('gen', 0), project.get('replan')

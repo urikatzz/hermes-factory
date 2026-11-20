@@ -180,6 +180,28 @@ def vision_problem(profile, home):
     return profile + ' cannot inspect approved reference images: its toolsets lack "vision"'
 
 
+MIN_FINDING = 40
+
+
+def _region(region, label):
+    """A normalised [x, y, width, height] box on the image (0..1): where the thing described is."""
+    if not isinstance(region, list) or len(region) != 4 or any(type(v) not in (int, float) for v in region):
+        raise ConfigurationError(label + ' needs a "region": [x, y, width, height] as fractions of the image (0..1) showing where it is')
+    x, y, w, h = region
+    if not (0 <= x < 1 and 0 <= y < 1 and 0.03 <= w <= 1 and 0.03 <= h <= 1 and x + w <= 1.001 and y + h <= 1.001):
+        raise ConfigurationError(label + ' has an impossible region ' + str(region))
+    return tuple(round(v, 3) for v in region)
+
+
+def _grounded(regions, label):
+    """Observations must point at different parts of the image: distinct boxes that fall in several cells of a 3x3 grid."""
+    if len(set(regions)) != len(regions):
+        raise ConfigurationError(label + ' repeats an identical region; each observation must point at its own part of the image')
+    cells = {(min(2, int((x + w / 2) * 3)), min(2, int((y + h / 2) * 3))) for x, y, w, h in regions}
+    if len(cells) < min(3, len(regions)):
+        raise ConfigurationError(label + ' describes only ' + str(len(cells)) + ' area(s) of the image; observations must span at least ' + str(min(3, len(regions))) + ' cells of a 3x3 grid')
+
+
 def validate_inspection(record, references):
     """The stage proved, per approved reference, that it looked at the exact image and what it saw. Returns the record."""
     needed = authoritative(references)
@@ -201,7 +223,7 @@ def validate_inspection(record, references):
         observations = entry.get('observations')
         if not isinstance(observations, list):
             raise ConfigurationError('The inspection of ' + reference['id'] + ' needs observations')
-        topics, texts = set(), set()
+        topics, texts, regions = set(), set(), []
         for observation in observations:
             if not isinstance(observation, dict) or not isinstance(observation.get('topic'), str) or not isinstance(observation.get('observation'), str):
                 raise ConfigurationError('Each observation is {"topic":...,"observation":...}')
@@ -210,9 +232,11 @@ def validate_inspection(record, references):
                 raise ConfigurationError('Observation about ' + observation['topic'] + ' is empty, repeated or only names the file; describe what the image shows')
             texts.add(text.lower())
             topics.add(observation['topic'].lower())
+            regions.append(_region(observation.get('region'), 'Observation about ' + observation['topic']))
         missing = [t for t in reference['topics'] if t.lower() not in topics]
         if missing:
             raise ConfigurationError('The inspection of ' + reference['id'] + ' does not cover: ' + ', '.join(missing))
+        _grounded(regions, 'The inspection of ' + reference['id'])
         cited = entry.get('requirement_ids')
         wanted = {q['id'] for q in reference['requirements']}
         if not isinstance(cited, list) or not wanted <= set(cited):
@@ -434,3 +458,92 @@ def vision_proof(profile, session_id, home, wanted):
         return False
 
     return [label for label, path in wanted.items() if not any(same(seen, path) for seen in viewed)]
+
+
+# What each visual role must say after looking, beyond describing the image: findings that only someone who looked and did that role's job can write.
+ROLE_KINDS = {'art-director': 'achieve', 'architect': 'carry', 'plan-review': 'plan_check', 'art-reviewer': 'render_check'}
+ROLE_VERDICTS = {'plan_check': ('faithful', 'weakened', 'missing'), 'render_check': ('matches', 'differs')}
+APPROACHES = ('generated', 'procedural', 'hybrid')
+
+
+def role_kind(profile, key):
+    return ROLE_KINDS['plan-review' if key == PLAN_REVIEW_KEY else profile]
+
+
+def validate_role_findings(record, references, kind, tasks=(), screenshots=(), findings=(), verdict=None):
+    """Role-specific, image-grounded findings: one per demanded requirement, each tied to a region of the reference image.
+
+    achieve (art director): how the requirement is achieved and whether by `generated`, `procedural` or `hybrid` production.
+    carry (architect): the task (an id in project-plan.json whose `visual` list has the requirement) that delivers it.
+    plan_check (plan reviewer): faithful | weakened | missing against the image; weakened or missing needs a blocking finding naming the id.
+    render_check (art reviewer): matches | differs for a retained rendered screenshot; differs needs a blocking finding and CHANGES_REQUIRED."""
+    entries = record.get('role_findings')
+    if not isinstance(entries, list):
+        raise ConfigurationError('reference-inspection.json needs "role_findings": one entry of kind "' + kind + '" per approved requirement')
+    required = {r['id']: r for r in required_requirements(references)}
+    seen, regions, texts = {}, [], set()
+    task_ids = {t['id']: t for t in tasks}
+    for entry in entries:
+        if not isinstance(entry, dict) or entry.get('kind') != kind or entry.get('requirement_id') not in required or entry['requirement_id'] in seen:
+            raise ConfigurationError('Each role finding is {"kind":"' + kind + '","requirement_id":<one demanded id, once>,"finding":...,"subject":...,"region":[x,y,w,h]'
+                                     + (',"verdict":"' + '|'.join(ROLE_VERDICTS[kind]) + '"' if kind in ROLE_VERDICTS else '') + '}')
+        identifier = entry['requirement_id']
+        text = ' '.join(str(entry.get('finding', '')).split())
+        if len(text) < MIN_FINDING or text.lower() in texts or required[identifier]['text'].lower() in text.lower() or text.lower() in required[identifier]['text'].lower():
+            raise ConfigurationError('The ' + kind + ' finding for ' + identifier + ' is empty, repeated or just restates the requirement; say what you saw and what follows from it')
+        texts.add(text.lower())
+        regions.append(_region(entry.get('region'), 'The ' + kind + ' finding for ' + identifier))
+        subject = entry.get('subject')
+        if kind == 'achieve' and subject not in APPROACHES:
+            raise ConfigurationError('The achieve finding for ' + identifier + ' needs "subject": one of ' + ', '.join(APPROACHES) + ' (how its assets are produced)')
+        if kind == 'carry' and (subject not in task_ids or identifier not in task_ids[subject].get('visual', [])):
+            raise ConfigurationError('The carry finding for ' + identifier + ' must name in "subject" a task of project-plan.json whose "visual" list has ' + identifier)
+        if kind == 'render_check' and subject not in set(screenshots):
+            raise ConfigurationError('The render_check finding for ' + identifier + ' must name a retained rendered screenshot in "subject" (' + ', '.join(sorted(screenshots)) + ')')
+        if kind in ROLE_VERDICTS:
+            if entry.get('verdict') not in ROLE_VERDICTS[kind]:
+                raise ConfigurationError('The ' + kind + ' finding for ' + identifier + ' needs "verdict": ' + '|'.join(ROLE_VERDICTS[kind]))
+            if entry['verdict'] in ('weakened', 'missing', 'differs'):
+                blocking = [f for f in findings if identifier in f and f.split('|', 4)[1] in ('BLOCKER', 'HIGH')]
+                if not blocking or (kind == 'render_check' and verdict != 'CHANGES_REQUIRED'):
+                    raise ConfigurationError('A ' + entry['verdict'] + ' ' + identifier + ' needs a BLOCKER/HIGH finding naming it' + (' and the verdict CHANGES_REQUIRED' if kind == 'render_check' else ''))
+        seen[identifier] = entry
+    missing = sorted(set(required) - set(seen))
+    if missing:
+        raise ConfigurationError('Missing ' + kind + ' findings for approved requirement(s): ' + ', '.join(missing))
+    _grounded(regions, 'The ' + kind + ' findings')
+    return entries
+
+
+ART_PLAN_SECTIONS = (
+    ('how the approved direction is achieved', r'achiev'),
+    ('production assets to create', r'production assets?|assets? (?:to|that must)'),
+    ('image generation versus procedural implementation', r'procedural'),
+    ('articulation and animation of characters or subjects', r'articulat|animat'),
+    ('environment composition, lighting and HUD implementation', r'environment|lighting|\bhud\b|interface'),
+    ('comparison of the final rendered result with the approved reference', r'compar'),
+    ('requirements active at each milestone', r'milestone'),
+    ('representative mockup', r'mockup'),
+)
+MOCKUP_NAME = re.compile(r'plan-mockup(?:_[0-9]+)?\.png')
+
+
+def validate_art_plan(text):
+    """An art plan for a project with approved references must say how the look will be built and checked; the mockup is a separate artifact."""
+    headings = [line.lstrip('#').strip().lower() for line in str(text).splitlines() if line.startswith('#')]
+    missing = [name for name, pattern in ART_PLAN_SECTIONS if not any(re.search(pattern, h) for h in headings)]
+    if missing:
+        raise ConfigurationError('The art plan has no section (a markdown heading) for: ' + '; '.join(missing))
+
+
+def plan_mockup(artifacts):
+    """The representative mockup artifact (plan-mockup.png) if it is a real PNG of useful size, else None."""
+    for artifact in artifacts:
+        path = Path(artifact)
+        if MOCKUP_NAME.fullmatch(path.name) and path.is_file() and not path.is_symlink():
+            data = path.read_bytes()[:32]
+            if data[:8] == b'\x89PNG\r\n\x1a\n' and len(data) >= 24:
+                width, height = int.from_bytes(data[16:20], 'big'), int.from_bytes(data[20:24], 'big')
+                if width >= 640 and height >= 360 and path.stat().st_size >= 20000:
+                    return path
+    return None

@@ -27,13 +27,60 @@ def write_project(root, references, png=b'approved-reference-bytes', png_path='d
     return refs.load_references(root)
 
 
-def inspection(loaded, **change):
+REGIONS = [[0.0, 0.0, 0.3, 0.2], [0.35, 0.0, 0.3, 0.2], [0.7, 0.0, 0.3, 0.2], [0.0, 0.4, 0.3, 0.2], [0.35, 0.4, 0.3, 0.2], [0.7, 0.4, 0.3, 0.2],
+           [0.0, 0.7, 0.3, 0.2], [0.35, 0.7, 0.3, 0.2]]
+ART_PLAN_BLOCK = """
+## How the direction is achieved
+Assets are built to the approved image.
+## Production assets to create
+Sprites, panels and interface parts.
+## Generated versus procedural
+Painted parts are generated; layout is procedural.
+## Articulation and animation
+Jointed parts are rigged.
+## Environment, lighting and interface
+Composition, light and HUD are built in the engine.
+## Comparison with the reference
+Real renders are judged requirement by requirement and as a whole.
+## Requirements by milestone
+Demanded requirements are active now.
+## Representative mockup
+See plan-mockup.png; it is subordinate to the approved reference.
+"""
+
+
+def png(width=1280, height=720, size=24000):
+    import struct
+    return b'\x89PNG\r\n\x1a\n' + struct.pack('>I', 13) + b'IHDR' + struct.pack('>II', width, height) + b'\x08\x02\x00\x00\x00' + b'\0' * size
+
+
+def role_findings(loaded, kind, tasks=(), screenshots=(), **per_requirement):
+    """One valid, distinct, grounded finding per demanded requirement for the given role kind."""
+    result = []
+    for index, requirement in enumerate(refs.required_requirements(loaded['references'])):
+        identifier = requirement['id']
+        entry = dict(kind=kind, requirement_id=identifier, region=REGIONS[index % len(REGIONS)],
+                     finding=f'In the image the area shows detail number {index} for this requirement, which leads to a concrete consequence for the work')
+        if kind == 'achieve':
+            entry['subject'] = 'generated'
+        elif kind == 'carry':
+            entry['subject'] = next((t['id'] for t in tasks if identifier in t.get('visual', [])), 'none')
+        elif kind == 'plan_check':
+            entry['verdict'] = 'faithful'
+        elif kind == 'render_check':
+            entry.update(verdict='matches', subject=screenshots[0] if screenshots else 'missing.png')
+        entry.update(per_requirement.get(identifier, {}))
+        result.append(entry)
+    return result
+
+
+def inspection(loaded, kind='achieve', tasks=(), screenshots=(), per_requirement=None, **change):
     reference = refs.authoritative(loaded['references'])[0]
     entry = dict(id=reference['id'], path=reference['path'], sha256=reference['sha256'], tool='vision_analyze',
                  requirement_ids=[q['id'] for q in reference['requirements']],
-                 observations=[dict(topic=t, observation=f'Concrete description of the {t} that the reference image really shows') for t in reference['topics']])
+                 observations=[dict(topic=t, region=REGIONS[i % len(REGIONS)], observation=f'Concrete description of the {t} that the reference image really shows') for i, t in enumerate(reference['topics'])])
     entry.update(change)
-    return dict(schema=refs.INSPECTION_SCHEMA, references=[entry])
+    return dict(schema=refs.INSPECTION_SCHEMA, references=[entry], role_findings=role_findings(loaded, kind, tasks, screenshots, **(per_requirement or {})))
 
 
 def record_session(home, profile, session, viewed=(), succeeded=True):
@@ -120,11 +167,27 @@ class ReferenceFlow(unittest.TestCase):
     def reference_files(self):
         return [self.project / r['path'] for r in refs.authoritative(self.loaded['references'])]
 
-    def finish(self, stage, plan_text, inspected=True, viewed=True, succeeded=True, extra=(), **overrides):
-        """Complete a stage the way a worker would: PLAN.md, optional inspection JSON, optional real vision calls in its session log."""
-        artifacts = [self.write(stage, 'PLAN.md', plan_text)]
+    def finish(self, stage, plan_text, inspected=True, viewed=True, succeeded=True, extra=(), tasks=(), screenshots=(), per_requirement=None,
+               mockup=True, art_plan=True, document='PLAN.md', inspection_change=None, shots_viewed=None, **overrides):
+        """Complete a stage the way a worker would: its document, the inspection JSON with role findings, real vision calls in its session log.
+
+        An art-director stage also gets the art-plan headings and a representative mockup (both can be switched off)."""
+        director = stage['profile'] == 'art-director'
+        if director and art_plan:
+            plan_text += ART_PLAN_BLOCK
+        artifacts = [self.write(stage, document, plan_text)]
+        seen = list(self.reference_files()) if viewed else []
+        if director and mockup:
+            folder = Path(self.temp.name) / 'out' / f'{stage["stage_key"]}-{stage["cycle"]}-{stage["evidence_retry"]}'
+            (folder / 'plan-mockup.png').write_bytes(png())
+            artifacts.append(str(folder / 'plan-mockup.png'))
+            if viewed:
+                seen.append(folder / 'plan-mockup.png')
         if inspected:
-            artifacts.append(self.write(stage, 'reference-inspection.json', inspection(self.loaded)))
+            kind = refs.role_kind(stage['profile'], stage['stage_key'])
+            artifacts.append(self.write(stage, 'reference-inspection.json', inspection(self.loaded, kind, tasks, screenshots, per_requirement, **(inspection_change or {}))))
+        if shots_viewed:
+            seen.extend(shots_viewed)
         self.board.complete(stage, artifacts=[*artifacts, *extra], **overrides)
         self.sessions += 1
         session = f'session{self.sessions:04d}{stage["stage_key"].replace("-", "")}'
@@ -133,7 +196,7 @@ class ReferenceFlow(unittest.TestCase):
         metadata['worker_session_id'] = session
         self.conn.execute('UPDATE task_runs SET metadata=? WHERE id=?', (json.dumps(metadata), row[0]))
         self.conn.commit()
-        record_session(self.home, stage['profile'], session, self.reference_files() if viewed else [], succeeded)
+        record_session(self.home, stage['profile'], session, seen, succeeded)
         self.tick()
 
     def rejection(self, profile):
@@ -158,7 +221,7 @@ class ReferenceFlow(unittest.TestCase):
     def architect(self, tasks, plan_text=None, **kwargs):
         stage = self.only('architect')
         extra = self.write(stage, 'project-plan.json', dict(tasks=tasks))
-        self.finish(stage, plan_text or (self.required_ids() + ' carried by the tasks.'), extra=[extra], **kwargs)
+        self.finish(stage, plan_text or (self.required_ids() + ' carried by the tasks.'), extra=[extra], tasks=tasks, **kwargs)
 
     def visual_task(self, **change):
         ids = [r['id'] for r in refs.required_requirements(self.loaded['references'])]

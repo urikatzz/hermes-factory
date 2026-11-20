@@ -1,6 +1,6 @@
 # Known failing test suites
 
-Measured 2026-11-20 with `scripts/run_all_tests.py --baseline HEAD` (Hermes Python 3.11.16, PyYAML installed, so no suite is skipped): the same suites run on a clean checkout of the commit before the reference-authority change and on the working tree, and the failing test ids are compared. **New failures: none.** These six failures exist at the baseline and are unrelated to the reference-authority work; none was touched or hidden.
+Measured 2026-11-20 with `scripts/run_all_tests.py --baseline 7f32ddb` (the last commit before any reference-authority change) (Hermes Python 3.11.16, PyYAML installed, so no suite is skipped): the same suites run on a clean checkout of that commit and on the working tree, and the failing test ids are compared. **New failures: none.** These six failures exist at the baseline and are unrelated to the reference-authority work; none was touched or hidden.
 
 | Suite | Test | Observed failure |
 | --- | --- | --- |
@@ -16,7 +16,7 @@ The four `tests/ecc` failures all assert an exact number of workflow templates (
 ## Proving a change adds no failures
 
 ```sh
-~/.hermes/hermes-agent/venv/bin/python scripts/run_all_tests.py --baseline HEAD
+~/.hermes/hermes-agent/venv/bin/python scripts/run_all_tests.py --baseline 7f32ddb
 ```
 
 The script runs every suite, prints the failing ids as JSON, and exits non-zero only when `new_failures` is non-empty. `preexisting` lists the table above; `fixed` lists any baseline failure a change repairs.
@@ -31,6 +31,6 @@ Result for the reference-authority change:
 | factory_art_type | 34 | 1 | 34 | 1 |
 | production | 43 | 0 | 43 | 0 |
 | secrets | 12 | 0 | 12 | 0 |
-| workflow_v2 | 207 | 0 | 155 | 0 |
+| workflow_v2 | 229 | 0 | 155 | 0 |
 
-`workflow_v2` gained 52 tests (reference authority, inspection proof, holistic review, implicit deferral, derived sources, end-to-end regression, project-agnostic checks).
+`workflow_v2` gained 74 tests (reference authority, inspection proof, role-specific findings, art-plan gate and mockup, holistic review, art-reviewer controller flows, orchestrator exposure, implicit deferral, derived sources, end-to-end regression, project-agnostic checks).

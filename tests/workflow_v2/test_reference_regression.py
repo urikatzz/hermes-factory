@@ -51,7 +51,7 @@ class OriginalFailure(ReferenceFlow):
     def test_a_plan_that_never_carries_the_reference_into_a_task_is_sent_back(self):
         self.approved_director()
         self.architect([self.visual_task(visual=[], acceptance={'AC1': 'Room is playable with generic art'})])
-        self.assertIn('not traced into any task acceptance: V1', self.reasons())
+        self.assertIn('whose "visual" list has V1', self.reasons())
 
     def test_the_contradictory_bible_blocks_a_plan_that_does_not_amend_it(self):
         self.approved_director()
@@ -111,7 +111,8 @@ class NoProjectSpecificCode(unittest.TestCase):
     def test_the_authority_system_names_no_particular_game_engine_or_look(self):
         from factory_dashboard import project_cards
         source = Path(refs.__file__).read_text() + ''.join(
-            getattr(project_cards, name) for name in ('APPROVED_REFERENCES', 'INSPECTION', 'VISUAL_TRACE', 'REFERENCE_AUDIT', 'APPROVED_COMPARISON'))
+            getattr(project_cards, name) for name in ('APPROVED_REFERENCES', 'INSPECTION', 'VISUAL_TRACE', 'REFERENCE_AUDIT', 'APPROVED_COMPARISON', 'ART_PLAN')) + ''.join(
+            project_cards.ROLE_FINDINGS.values())
         for word in ('impact', 'unity', 'look d', 'room01', 'whitesquare', 'crash', 'dummy', 'hazard'):
             self.assertNotIn(word, source.lower(), word)
 

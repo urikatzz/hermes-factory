@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import re
 from .model_policy import ConfigurationError
+from . import project_references
 
 
 def retained_json(artifacts, name):
@@ -31,7 +32,11 @@ def plan_evidence(profile, task_id, metadata):
     plans = [Path(p) for p in metadata['artifacts'] if re.fullmatch(r'PLAN(?:_[0-9]+)?\.md', Path(p).name)]
     if len(plans) != 1 or plans[0].is_symlink() or not plans[0].is_file() or plans[0].stat().st_size > 262144:
         raise ConfigurationError('Preparation requires one retained PLAN.md')
-    return dict(profile=profile, task_id=task_id, path=str(plans[0]), sha256=hashlib.sha256(plans[0].read_bytes()).hexdigest())
+    evidence = dict(profile=profile, task_id=task_id, path=str(plans[0]), sha256=hashlib.sha256(plans[0].read_bytes()).hexdigest())
+    mockup = project_references.plan_mockup(metadata['artifacts']) if profile == 'art-director' else None
+    if mockup:
+        evidence['mockup'] = str(mockup)
+    return evidence
 
 
 SIMILARITY_THRESHOLD = 80
