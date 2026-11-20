@@ -116,6 +116,8 @@ class ProjectController:
                 instructions += '\n' + REFERENCE_AUDIT
         rows = self._controller._rows(conn, root, key, cycle)
         token = f'{key}:{cycle}'
+        if not key.startswith('project-retro'):
+            project['last_node'] = token  # the work stage being processed when a stop happens (the retro runs after it); a stage retry re-runs exactly this one
         if token not in project['active_keys']:
             project['active_keys'].append(token)
         retry_requested = token in project.get('retry_keys', [])
@@ -1146,9 +1148,21 @@ class ProjectController:
                 # Judge the evidence that already exists again under the current rules: no stage is retried or repeated.
                 project['retry_keys'] = []
             elif work['step'] in ('verifying', 'reviewing'):
-                work['step'] = 'verifying'
                 keys = [prefix + '-verify', *[prefix + '-' + p for p in self._panel([s['profile'] for s in root['definition']['reviewers']], task, work)]]
-                project['retry_keys'] = [f'{key}:{work["cycle"]}' for key in keys]
+                tokens = [f'{key}:{work["cycle"]}' for key in keys]
+                stalled = project.get('last_node') if decided['retry_stage'] else None
+                if decided['retry_stage'] and stalled not in tokens:
+                    # A stop recorded before last_node existed: the stalled stage is the only one of this cycle with a row that was never accepted.
+                    pending = [t for t in tokens if (rows := self._controller._rows(conn, root, *t.rsplit(':', 1)[:1], int(t.rsplit(':', 1)[1])))
+                               and rows[0]['accepted_run_id'] is None]
+                    stalled = pending[0] if len(pending) == 1 else None
+                if stalled in tokens:
+                    # An explicit stage retry re-runs only the stage that stopped; verification and reviews already accepted stay as they are.
+                    work['step'] = 'verifying' if stalled == tokens[0] else 'reviewing'
+                    project['retry_keys'] = [stalled]
+                else:
+                    work['step'] = 'verifying'
+                    project['retry_keys'] = tokens
             else:
                 profile = work['repairs'][0] if work['step'] == 'repairing' else task['owner']
                 key = prefix + ('-repair-' + profile if work['step'] == 'repairing' else '-implement')

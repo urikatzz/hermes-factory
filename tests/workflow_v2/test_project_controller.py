@@ -1088,6 +1088,42 @@ class ProjectControllerTests(unittest.TestCase):
         self.assertTrue(paths)
         self.assertIn('read exactly these absolute paths (copy them, never retype them): ' + '; '.join(paths), card)
 
+    def test_a_stage_retry_reruns_only_the_reviewer_that_stopped_and_keeps_accepted_verification_and_reviews(self):
+        self.plan(tasks=[dict(CODE, risk='high')])
+        self.board.complete(self.only('developer')); self.tick()
+        self.board.complete(self.only('verifier')); self.tick()
+        rows = {r['profile']: r for r in self.board.ready()}
+        self.assertEqual(set(rows), {'claude-reviewer', 'security-reviewer'})
+        self.board.complete(rows['security-reviewer'])
+        self.conn.execute("UPDATE tasks SET status='blocked' WHERE id=?", (rows['claude-reviewer']['task_id'],)); self.conn.commit()  # the worker blocked itself
+        self.tick(); self.board.complete(self.only('factory-retro')); self.tick()
+        self.assertEqual(self.state.read_root(self.conn, self.root)['phase'], 'blocked')
+        count = lambda: self.conn.execute('SELECT COUNT(*) FROM factory_workflow_stages').fetchone()[0]
+        before = count()
+        self.controller.resume(self.conn, self.root, 'The reviewer tool is back', dict(retry_stage=True))
+        self.tick()
+        fresh = self.only('claude-reviewer')  # nothing else is ready: no new verification, no second security review
+        self.assertEqual(fresh['evidence_retry'], rows['claude-reviewer']['evidence_retry'] + 1)
+        self.assertEqual(count(), before + 1)
+        self.assertEqual(self.project()['stage_retries'], {fresh['stage_key'] + ':0': 1})
+        self.board.complete(fresh); self.tick()
+        self.assertIn('code', [t['id'] for t in self.project()['completed']])  # the other reviewer's valid result was reused
+
+    def test_a_stage_retry_infers_the_stalled_reviewer_for_a_stop_recorded_without_last_node(self):
+        self.plan()
+        self.board.complete(self.only('developer')); self.tick()
+        self.board.complete(self.only('verifier')); self.tick()
+        rows = {r['profile']: r for r in self.board.ready()}
+        self.board.complete(rows['claude-reviewer'])
+        reviewer = rows['security-reviewer']  # the second reviewer stalls after the first was accepted, as in the live incident
+        self.conn.execute("UPDATE tasks SET status='blocked' WHERE id=?", (reviewer['task_id'],)); self.conn.commit()
+        self.tick(); self.board.complete(self.only('factory-retro')); self.tick()
+        project = self.project(); project.pop('last_node', None)  # as stored by a controller that did not record it
+        self.conn.execute('UPDATE factory_project_execution SET document=?', (json.dumps(project),)); self.conn.commit()
+        self.controller.resume(self.conn, self.root, 'The reviewer tool is back', dict(retry_stage=True)); self.tick()
+        fresh = self.only('security-reviewer')  # only the stalled reviewer: no second verification, no repeat of the accepted claude review
+        self.assertEqual(fresh['evidence_retry'], reviewer['evidence_retry'] + 1)
+
     # --- the independent plan review is off by default ---
     def review_off(self):
         from unittest import mock
