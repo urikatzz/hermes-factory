@@ -111,7 +111,7 @@ def validate_plan(document, scope, project_ac_ids):
                     or not isinstance(v, str) or not v.strip() or len(v) > 1000 for k, v in ac.items()):
                 too_long = [str(k) + ' (' + str(len(v)) + ' characters)' for k, v in (ac.items() if isinstance(ac, dict) else ()) if isinstance(v, str) and len(v) > 1000]
                 raise ConfigurationError('Task requires numbered acceptance criteria' + (': each criterion text is at most 1000 characters; shorten ' + ', '.join(too_long)
-                                         + ' or split it into more AC keys that the plan declares' if too_long else ' (keys AC1, AC2.., each a non-empty string)'))
+                                         + ' to one short observable check that still names its V ids; put the detail in PLAN.md and cite its section' if too_long else ' (keys AC1, AC2.., each a non-empty string)'))
             if not set(ac) <= set(project_ac_ids):
                 raise ConfigurationError('Task acceptance is outside the architecture plan')
             covered.update(ac)
