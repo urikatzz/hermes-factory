@@ -119,6 +119,22 @@ class ReferenceModuleTests(unittest.TestCase):
             (root / 'profiles' / profile / 'config.yaml').write_text('platform_toolsets:\n  cli:\n  - kanban\n  - vision\n')
         self.assertIsNone(refs.vision_problem('art-director', refs.hermes_root({'HERMES_HOME': str(inside)}, '/nowhere')))
 
+    def test_a_deleted_scratch_file_counts_only_where_the_worker_made_it_itself(self):
+        home = Path(self.temp.name) / 'home'
+        gone = Path(self.temp.name) / 'scratch' / 'plan-mockup.png'
+        record_session(home, 'architect', 'sessionSSSS', [gone])
+        retained = Path(self.temp.name) / 'retained' / 'plan-mockup.png'
+        retained.parent.mkdir()
+        retained.write_bytes(b'png')
+        self.assertEqual(refs.vision_proof('architect', 'sessionSSSS', home, {'plan-mockup': retained}), ['plan-mockup'])
+        self.assertEqual(refs.vision_proof('architect', 'sessionSSSS', home, {'plan-mockup': retained}, scratch_ok={'plan-mockup'}), [])
+        other = Path(self.temp.name) / 'retained' / 'other.png'
+        other.write_bytes(b'x')
+        self.assertEqual(refs.vision_proof('architect', 'sessionSSSS', home, {'plan-mockup': other}, scratch_ok={'plan-mockup'}), ['plan-mockup'])
+        gone_ref = Path(self.temp.name) / 'ref-copy' / 'reference.png'
+        record_session(home, 'architect', 'sessionTTTT', [gone_ref])
+        self.assertEqual(refs.vision_proof('architect', 'sessionTTTT', home, {'lookd': Path(self.temp.name) / 'docs/look/reference.png'}), ['lookd'])  # references stay strict
+
     def test_the_plain_contradiction_that_started_this_is_found_in_the_bible_and_in_plans(self):
         rule = 'S9 (blocking) Deferred look: no hazard stripes, crosshair corner marks or painted art (GDD milestone 6).'
         found = refs.find_contradictions(self.records, {'art/style/STYLE.md': 'S1 Palette is charcoal.\n' + rule})

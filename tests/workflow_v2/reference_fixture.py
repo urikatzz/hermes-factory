@@ -182,7 +182,7 @@ class ReferenceFlow(unittest.TestCase):
             (folder / 'plan-mockup.png').write_bytes(png())
             artifacts.append(str(folder / 'plan-mockup.png'))
             if viewed:
-                seen.append(folder / 'plan-mockup.png')
+                seen.append(Path(self.temp.name) / 'gone-scratch' / 'plan-mockup.png')  # the director opened its scratch copy, deleted by the time it is checked
         if inspected:
             kind = refs.role_kind(stage['profile'], stage['stage_key'])
             artifacts.append(self.write(stage, 'reference-inspection.json', inspection(self.loaded, kind, tasks, screenshots, per_requirement, **(inspection_change or {}))))

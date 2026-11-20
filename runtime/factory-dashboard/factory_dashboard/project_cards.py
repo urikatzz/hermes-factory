@@ -59,7 +59,7 @@ INSPECTION = '''Mandatory reference inspection: before you plan, decide or judge
 vision_analyze (a path or a hash is not an inspection). Retain reference-inspection.json: {"schema":"factory-reference-inspection/v1","references":[{"id":"<ref id>",
 "path":"<path>","sha256":"<the sha256 in approved_references>","tool":"vision_analyze","requirement_ids":["V1",...every id of that reference],
 "observations":[{"topic":"<each of the reference's inspect_topics>","observation":"what the image actually shows, at least one concrete sentence per topic","region":[x,y,w,h]}]}],
-"role_findings":[...]} where region is the part of the image the observation is about, as fractions 0..1; observations must point at different parts (at least three cells of a
+"role_findings":[...]} (role_findings is a TOP-LEVEL key of the JSON object, a sibling of "references", not inside it; a file without it is rejected) where region is the part of the image the observation is about, as fractions 0..1; observations must point at different parts (at least three cells of a
 3x3 grid) and no two share a region. Your role also writes role_findings (below), one per approved requirement, each with its own region.
 Attach it as a completion artifact. The controller verifies your session log: a successful vision_analyze call on each exact reference file must exist, so a
 correctly formatted JSON file without the tool calls is rejected. If you cannot open images, finish BLOCKED with blocked_reason naming the missing vision capability; never guess.'''

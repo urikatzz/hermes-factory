@@ -420,11 +420,12 @@ def validate_reference_comparison(record, references):
     return record
 
 
-def vision_proof(profile, session_id, home, wanted):
+def vision_proof(profile, session_id, home, wanted, scratch_ok=()):
     """Which of the wanted images the stage really opened with vision_analyze: {label: path} -> list of labels with no successful call.
 
     Reads the worker's own session log (the profile's state.db). A correctly shaped JSON file is not evidence; a successful tool call on that
-    exact file (same path or same bytes) is."""
+    exact file (same path or same bytes) is. Labels in scratch_ok are files the worker itself made in its scratch workspace, which is gone by the time
+    the stage is checked: for those a call on a missing file with the same name counts (the call itself is still required and must have succeeded)."""
     if not isinstance(session_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]{6,64}', session_id):
         raise ConfigurationError('The stage reported no worker session, so its image inspection cannot be verified')
     database = Path(home) / 'profiles' / profile / 'state.db'
@@ -451,8 +452,10 @@ def vision_proof(profile, session_id, home, wanted):
                 viewed.append(str(requested[call_id]))
     digests = {}
 
-    def same(seen, wanted_path):
+    def same(seen, wanted_path, scratch):
         try:
+            if scratch and not Path(seen).exists() and Path(seen).name == Path(wanted_path).name:
+                return True
             if Path(seen).resolve() == Path(wanted_path).resolve():
                 return True
             if Path(seen).is_file():
@@ -463,7 +466,7 @@ def vision_proof(profile, session_id, home, wanted):
             return False
         return False
 
-    return [label for label, path in wanted.items() if not any(same(seen, path) for seen in viewed)]
+    return [label for label, path in wanted.items() if not any(same(seen, path, label in scratch_ok) for seen in viewed)]
 
 
 # What each visual role must say after looking, beyond describing the image: findings that only someone who looked and did that role's job can write.

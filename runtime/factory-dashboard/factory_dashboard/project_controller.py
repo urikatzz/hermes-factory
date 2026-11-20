@@ -201,13 +201,13 @@ class ProjectController:
             mockup = refs.plan_mockup(result.metadata['artifacts']) if profile == 'art-director' else None
             if mockup:
                 wanted['plan-mockup'] = mockup
-            absent = refs.vision_proof(profile, session, self._hermes_home(), wanted)
+            absent = refs.vision_proof(profile, session, self._hermes_home(), wanted, scratch_ok={'plan-mockup'})
             if absent:
                 return ('Reference inspection rejected: the worker session shows no successful vision_analyze call on ' + ', '.join(
                     f"{i} ({wanted[i]})" for i in absent) + '. Open each approved image with vision_analyze before describing it.')
             if profile == 'art-reviewer':
                 shots = {Path(a).name: a for a in result.metadata['artifacts'] if Path(a).suffix.lower() in refs.IMAGE_SUFFIXES}
-                if shots and len(refs.vision_proof(profile, session, self._hermes_home(), shots)) == len(shots):
+                if shots and len(refs.vision_proof(profile, session, self._hermes_home(), shots, scratch_ok=set(shots))) == len(shots):
                     return 'Reference inspection rejected: the worker session shows the reviewer never opened any of the rendered screenshots with vision_analyze.'
             kind = refs.role_kind(profile, key)
             images = [Path(a) for a in result.metadata['artifacts'] if Path(a).suffix.lower() in refs.IMAGE_SUFFIXES]
