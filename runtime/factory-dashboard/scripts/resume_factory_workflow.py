@@ -17,6 +17,7 @@ def main():
     parser.add_argument('--root',required=True)
     parser.add_argument('--note',required=True)
     parser.add_argument('--reevaluate',action='store_true',help='re-judge the existing stage evidence under the current rules instead of retrying stages (also resumes a human_review stop)')
+    parser.add_argument('--retry-stage',action='store_true',help='re-run only the stage the project stopped on (also resumes a human_review stop); earlier results stay as history, bounded per stage')
     parser.add_argument('--decision-file',type=Path,help='JSON human decision: {"waivers":[{"ac","path","source"?,"reason"}],"constraints":[{"preserve":[paths],"reason"}]}')
     args=parser.parse_args()
     sys.path.insert(0,str(args.hermes_source.resolve()))
@@ -43,6 +44,8 @@ def main():
     controller=controller_type(kanban_db,state_type(),args.new_project_root)
     with closing(kanban_db_connect.connect(args.board_db,board=args.board)) as conn:
         decisions=json.loads(args.decision_file.read_text()) if args.decision_file else None
+        if args.retry_stage:
+            decisions={**(decisions or {}),'retry_stage':True}
         state=controller.resume(conn,args.root,args.note,decisions,args.reevaluate)
     print(f"{args.root}: {state['phase']}")
 

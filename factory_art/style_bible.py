@@ -19,7 +19,8 @@ CHECKS = {
     'model': {'unsupported', 'import', 'triangles', 'materials', 'texture_size', 'height', 'origin'},
     'text': {'unsupported', 'unreadable', 'max_chars', 'forbidden'},
 }
-RULE_LINE = re.compile(r'^[\s#>*-]*\**([ST]\d+)\b\**\s*(\(blocking\))?', re.M)
+RULE_LINE = re.compile(r'^[\s#>*-]*\**([SLT]\d+)\b\**\s*(?:\(([^)\n]*)\))?', re.M)
+BLOCKING = re.compile(r'\bblocking\b', re.I)
 
 
 class BibleError(ValueError):
@@ -31,7 +32,7 @@ def parse_rules(text):
     for match in RULE_LINE.finditer(text):
         if match.group(1) in rules:
             raise BibleError(f'STYLE.md: rule {match.group(1)} is defined twice')
-        rules[match.group(1)] = bool(match.group(2))
+        rules[match.group(1)] = bool(match.group(2) and BLOCKING.search(match.group(2)))  # "(blocking)" and "(blocking, V1)" both block
     return rules
 
 

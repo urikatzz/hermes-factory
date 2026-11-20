@@ -43,22 +43,20 @@ class ProjectPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ConfigurationError, 'depend'):
             validate_plan(bad, scope, ['AC1', 'AC2'])
 
-    def test_an_over_long_acceptance_criterion_is_named_with_its_length_and_the_limit(self):
+    def test_long_criteria_pass_and_malformed_keys_are_rejected(self):
         from factory_dashboard.project_policy import validate_plan
         scope = dict(art=False, audio=False, ui=False, ux=False)
         plan = dict(tasks=[dict(id='code', title='Wire', owner='developer', dependencies=[], acceptance={'AC1': 'x' * 1237}, needs=scope)])
-        with self.assertRaisesRegex(ConfigurationError, r'1000 characters.*AC1 \(1237 characters\)'):
-            validate_plan(plan, scope, ['AC1'])
+        validate_plan(plan, scope, ['AC1'])
         plan['tasks'][0]['acceptance'] = {'one': 'text'}
         with self.assertRaisesRegex(ConfigurationError, 'numbered acceptance criteria'):
             validate_plan(plan, scope, ['AC1'])
 
-    def test_an_uncovered_project_ac_is_named(self):
+    def test_an_uncovered_project_ac_is_not_a_validation_error(self):
         from factory_dashboard.project_policy import validate_plan
         scope = dict(art=False, audio=False, ui=False, ux=False)
         plan = dict(tasks=[dict(id='code', title='Wire', owner='developer', dependencies=[], acceptance={'AC1': 'ok'}, needs=scope)])
-        with self.assertRaisesRegex(ConfigurationError, 'no task states AC2, AC3'):
-            validate_plan(plan, scope, ['AC1', 'AC2', 'AC3'])
+        self.assertEqual(len(validate_plan(plan, scope, ['AC1', 'AC2', 'AC3'])), 1)  # final integration covers the rest
 
     def test_plan_ignores_extra_top_level_keys_but_requires_tasks(self):
         from factory_dashboard.project_policy import validate_plan
@@ -141,3 +139,15 @@ class ProjectPolicyTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class UncoveredAcTests(unittest.TestCase):
+    def test_uncovered_acs_and_their_plan_text(self):
+        from factory_dashboard.project_policy import describe_acs, uncovered_acs
+        tasks = [dict(acceptance={'AC1': 'x'}), dict(acceptance={'AC3': 'y'})]
+        self.assertEqual(uncovered_acs(tasks, ['AC1', 'AC2', 'AC3', 'AC4']), ['AC2', 'AC4'])
+        text = '## Criteria\nAC2: Pickup drops\n| AC4 | Score is shown |\n'
+        found = describe_acs(text, ['AC2', 'AC4', 'AC9'])
+        self.assertEqual(found['AC2'], 'Pickup drops')
+        self.assertIn('Score is shown', found['AC4'])
+        self.assertNotIn('AC9', describe_acs(text, ['AC9']))

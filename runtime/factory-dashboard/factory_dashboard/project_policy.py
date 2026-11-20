@@ -108,12 +108,8 @@ def validate_plan(document, scope, project_ac_ids):
                     raise ConfigurationError('Asset task must declare its specialist domain')
             ac = task['acceptance']
             if not isinstance(ac, dict) or not ac or any(not isinstance(k, str) or not re.fullmatch(r'AC(?:[0-9]+|-GATE)', k)
-                    or not isinstance(v, str) or not v.strip() or len(v) > 1000 for k, v in ac.items()):
-                too_long = [str(k) + ' (' + str(len(v)) + ' characters)' for k, v in (ac.items() if isinstance(ac, dict) else ()) if isinstance(v, str) and len(v) > 1000]
-                raise ConfigurationError('Task requires numbered acceptance criteria' + (': each criterion text is at most 1000 characters; shorten ' + ', '.join(too_long)
-                                         + ' to one short observable check that still names its V ids; put the detail in PLAN.md and cite its section' if too_long else ' (keys AC1, AC2.., each a non-empty string)'))
-            if not set(ac) <= set(project_ac_ids):
-                raise ConfigurationError('Task acceptance is outside the architecture plan')
+                    or not isinstance(v, str) or not v.strip() for k, v in ac.items()):
+                raise ConfigurationError('Task requires numbered acceptance criteria (keys AC1, AC2.., each a non-empty string)')
             covered.update(ac)
             deps = task['dependencies']
             if not isinstance(deps, list) or any(not isinstance(d, str) for d in deps) or len(deps) != len(set(deps)):
@@ -124,8 +120,8 @@ def validate_plan(document, scope, project_ac_ids):
             errors.append(f'{label}: {error}')
     if errors:
         raise ConfigurationError('; '.join(errors))
-    if covered != set(project_ac_ids):
-        raise ConfigurationError('Task graph does not cover every project acceptance criterion; no task states ' + ', '.join(sorted(set(project_ac_ids) - covered)) + ' (each project AC must appear as a key in at least one task acceptance)')
+    # Advisory checks (every project AC covered, criterion length, ACs inside the architecture plan) are not enforced:
+    # the architect skill teaches them and the final integration cycle runs over every project AC.
     ordered, visiting, ancestors = [], set(), {}
 
     def visit(key):
@@ -156,6 +152,23 @@ def validate_plan(document, scope, project_ac_ids):
                 if produced and task['needs'][domain] and not any(by_id[d]['owner'] == owner for d in ancestors[task['id']]):
                     raise ConfigurationError('Code integration must depend on the required asset producer')
     return ordered
+
+
+def uncovered_acs(tasks, project_ac_ids):
+    """Project acceptance IDs that no task states, in plan order."""
+    stated = {ac for task in tasks for ac in task['acceptance']}
+    return [ac for ac in project_ac_ids if ac not in stated]
+
+
+def describe_acs(plan_text, acs, limit=600):
+    """The first PLAN.md line that defines each acceptance ID ("AC3: ...", "- **AC3** ...", "| AC3 | ..."), so integration work states what to build."""
+    found = {}
+    for ac in acs:
+        pattern = re.compile(r'^[\s#>*|-]*\**' + re.escape(ac) + r'\b\**\s*[:.|)-]*\s*(.+)$', re.M)
+        match = pattern.search(plan_text or '')
+        if match and match.group(1).strip():
+            found[ac] = match.group(1).strip()[:limit]
+    return found
 
 
 CODE_SUFFIXES = ('.cs', '.py', '.js', '.mjs', '.ts', '.tsx', '.jsx', '.go', '.rs', '.java', '.kt', '.swift', '.c', '.cc', '.cpp', '.h', '.hpp',

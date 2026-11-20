@@ -223,3 +223,14 @@ class PlanCorrectionPolicyTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class RetryStageDecisionTests(unittest.TestCase):
+    def test_retry_stage_needs_a_boolean_and_a_note(self):
+        from factory_dashboard.project_decisions import normalize_decisions
+        self.assertTrue(normalize_decisions(dict(retry_stage=True), 'Tooling corrected')['retry_stage'])
+        self.assertFalse(normalize_decisions(None, '')['retry_stage'])
+        with self.assertRaises(ConfigurationError):
+            normalize_decisions(dict(retry_stage='yes'), 'note')
+        with self.assertRaises(ConfigurationError):
+            normalize_decisions(dict(retry_stage=True), '  ')

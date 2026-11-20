@@ -986,6 +986,93 @@ class ProjectControllerTests(unittest.TestCase):
         self.only('architect')
         self.assertEqual(developers(), before)
 
+    # --- uncovered project ACs are surfaced, reviewed and made explicit integration work ---
+    def test_an_uncovered_project_ac_is_recorded_shown_to_the_plan_reviewer_and_is_not_an_error(self):
+        self.start_planning()
+        self.architect(ac_ids=['AC1', 'AC2'])
+        self.assertEqual(self.project()['uncovered_acs'], ['AC2'])
+        self.assertNotIn('1', self.project().get('plan_validation_retries', {}))  # accepted on the first submission, no correction round
+        review = self.board.cards[self.only('claude-reviewer')['task_id']]['body']
+        self.assertIn('UNCOVERED ACCEPTANCE CRITERIA: no task states AC2', review)
+        self.assertIn('BLOCKER finding that names its AC id', review)
+        self.assertTrue(self.conn.execute("SELECT 1 FROM factory_workflow_events WHERE kind='plan_uncovered_acs'").fetchone())
+        self.assertTrue(any(l['kind'] == 'plan_uncovered_acs' and l['acs'] == ['AC2'] for l in self.project()['orchestration_log']))
+
+    def test_a_fully_covered_plan_adds_no_uncovered_note(self):
+        self.start_planning(); self.architect()
+        self.assertEqual(self.project()['uncovered_acs'], [])
+        self.assertNotIn('UNCOVERED', self.board.cards[self.only('claude-reviewer')['task_id']]['body'])
+
+    def test_integration_states_each_uncovered_ac_with_its_plan_text(self):
+        from factory_dashboard.project_controller import ProjectController
+        plan = Path(self.temp.name) / 'PLAN.md'
+        plan.write_text('# Plan\n- **AC1** The room loads\n- **AC2**: Enemies drop a pickup when defeated\n')
+        project = dict(ac_ids=['AC1', 'AC2'], uncovered_acs=['AC2'], plans=[dict(profile='architect', path=str(plan))])
+        acceptance = ProjectController._integration_acceptance(project)
+        self.assertEqual(acceptance['AC1'], 'Project PLAN.md: AC1')
+        self.assertTrue(acceptance['AC2'].startswith('NOT STATED BY ANY PLANNED TASK: implement and verify it here. Enemies drop a pickup when defeated'))
+        project['plans'] = []  # an unreadable plan still yields an explicit criterion
+        self.assertIn('NOT STATED BY ANY PLANNED TASK', ProjectController._integration_acceptance(project)['AC2'])
+
+    # --- stage retry: re-run only the stopped stage, keep history ---
+    def stopped_on_a_plan_defect_after_the_replan_limit(self):
+        self.plan()
+        project = self.project(); project['replans'] = 2
+        self.conn.execute('UPDATE factory_project_execution SET document=?', (json.dumps(project),)); self.conn.commit()
+        self.board.complete(self.only('developer'), plan_defect='The linter cannot express the plan')
+        self.tick(); self.board.complete(self.only('factory-retro'))
+        self.assertEqual(self.tick()['phase'], 'human_review')
+
+    def developer_rows(self):
+        return [dict(r) for r in self.conn.execute("SELECT task_id,evidence_retry FROM factory_workflow_stages WHERE profile='developer' ORDER BY evidence_retry")]
+
+    def test_retry_stage_reruns_only_the_stopped_stage_and_keeps_its_history(self):
+        self.stopped_on_a_plan_defect_after_the_replan_limit()
+        before = self.developer_rows(); old_task = before[-1]['task_id']
+        project = self.project(); replans, history = project['replans'], len(project['history'])
+        self.controller.resume(self.conn, self.root, 'Tooling corrected', dict(retry_stage=True))
+        self.tick()
+        after = self.developer_rows()
+        self.assertEqual(len(after), len(before) + 1)
+        self.assertEqual(after[-1]['evidence_retry'], before[-1]['evidence_retry'] + 1)
+        self.assertEqual(after[0]['task_id'], before[0]['task_id'])  # the stopped row is history, not deleted
+        self.assertEqual(self.board.get_task(self.conn, old_task).status, 'done')
+        project = self.project()
+        self.assertNotIn('terminal', project)
+        self.assertEqual(project['replans'], replans)
+        self.assertGreaterEqual(len(project['history']), history)
+        self.assertEqual(project['stage_retries'], {'task-code-implement:0': 1})
+        self.assertEqual(project['orchestration_log'][-2]['kind'], 'human_stage_retry')
+        self.board.complete(self.only('developer')); self.tick()  # the fresh result carries no stale defect: the project goes on
+        self.only('verifier')
+
+    def test_retry_stage_is_bounded_per_stage(self):
+        self.stopped_on_a_plan_defect_after_the_replan_limit()
+        for attempt in range(2):
+            self.controller.resume(self.conn, self.root, 'Tooling corrected', dict(retry_stage=True)); self.tick()
+            self.board.complete(self.only('developer'), plan_defect='Still the same defect')
+            self.tick(); self.board.complete(self.only('factory-retro'))
+            self.assertEqual(self.tick()['phase'], 'human_review')
+        with self.assertRaisesRegex(ConfigurationError, 'human stage retries'):
+            self.controller.resume(self.conn, self.root, 'One more', dict(retry_stage=True))
+        self.assertEqual(self.project()['terminal']['phase'], 'human_review')  # an refused retry changes nothing
+
+    def test_retry_stage_is_refused_while_the_stage_is_running(self):
+        self.stopped_on_a_plan_defect_after_the_replan_limit()
+        self.controller.resume(self.conn, self.root, 'Tooling corrected', dict(retry_stage=True)); self.tick()
+        running = len(self.developer_rows())
+        project = self.project(); project['terminal'] = dict(phase='human_review', reason='stale'); project['mode'] = 'finished'
+        self.conn.execute('UPDATE factory_project_execution SET document=?', (json.dumps(project),))
+        self.conn.execute("UPDATE factory_workflow_roots SET phase='human_review'"); self.conn.commit()
+        with self.assertRaisesRegex(ConfigurationError, 'would run it twice'):
+            self.controller.resume(self.conn, self.root, 'Again', dict(retry_stage=True))
+        self.assertEqual(len(self.developer_rows()), running)
+
+    def test_retry_stage_cannot_be_combined_with_reevaluate(self):
+        self.stopped_on_a_plan_defect_after_the_replan_limit()
+        with self.assertRaisesRegex(ConfigurationError, 'Choose one'):
+            self.controller.resume(self.conn, self.root, 'Both', dict(retry_stage=True), True)
+
     # --- bounded plan_correction, separate from architectural replans ---
     BASELINE = 'deadbeefcafe1234'
     LOCAL = ['F1|MEDIUM|AC1|code|State that the waived check is reported as waived, never as pass']

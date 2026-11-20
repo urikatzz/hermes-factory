@@ -47,7 +47,7 @@ Record `{"path": <target>, "kind": "model", "route": "tripo" or "blockout", "con
 
 ## Style task
 
-Only when the plan is a style task: write `art/style/STYLE.md`, `art/style/style.json`, the palette file and the reference images exactly as the plan specifies (references with `IMAGE`, then `FIT` when the plan gives a size). Then run `python3 ${ART_REVIEW_DIR}/scripts/art_lint.py <PROJECT_DIR> --check-bible` and fix until it prints `"bible": "ok"`.
+Only when the plan is a style task: write `art/style/STYLE.md`, `art/style/style.json`, the palette file and the reference images exactly as the plan specifies (references with `IMAGE`, then `FIT` when the plan gives a size). Do not run a bible validator gate; make sure every rule ID the plan names is written in STYLE.md with its `(blocking)` mark.
 
 ## Completion
 

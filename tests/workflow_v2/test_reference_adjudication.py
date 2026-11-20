@@ -215,7 +215,7 @@ class AllErrorsAtOnceTests(AdjudicationFlow):
         stage, context = self.rejection('architect')
         reason = context['previous_handoff_rejected']['reason']
         self.assertEqual(stage['evidence_retry'], 1)
-        for part in ('Invalid or duplicate task ID', 'outside the architecture plan', 'lists V1, V2 in "visual" but no acceptance criterion states it'):
+        for part in ('Invalid or duplicate task ID', 'lists V1, V2 in "visual" but no acceptance criterion states it'):
             self.assertIn(part, reason)
         self.assertEqual(self.document()['plan_validation_retries'], {'0': 1})  # one round, not one per error
         schema = context['previous_handoff_rejected']['required_schema']

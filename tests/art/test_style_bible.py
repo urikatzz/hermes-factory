@@ -10,6 +10,10 @@ SPRITE = {'name': 'chars', 'kind': 'sprite', 'match': ['Assets/Characters/**/*.p
 
 
 class RuleTests(unittest.TestCase):
+    def test_look_rules_and_annotated_blocking_marks_are_parsed(self):
+        rules = parse_rules('L1 (blocking, V1) Dark lab.\nL2 (blocking) Dummies.\nL13 (V13; introduced_at milestone 2) Later.\nS1 Plain.\n')
+        self.assertEqual(rules, {'L1': True, 'L2': True, 'L13': False, 'S1': False})
+
     def test_parses_ids_and_blocking_marker(self):
         rules = parse_rules('# Style\n**S1** Silhouettes.\n## S2 (blocking) Light.\n- T1 Short copy.\nS is prose.\n')
         self.assertEqual(rules, {'S1': False, 'S2': True, 'T1': False})

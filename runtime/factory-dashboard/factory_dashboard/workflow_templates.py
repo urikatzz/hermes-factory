@@ -11,8 +11,8 @@ from .workflow_types import WorkflowDefinition, TASK_TYPES
 LINT = "art_lint.py from the art-review skill (the skill's LINT line gives its absolute path)"
 GAME_ART = {
     'description': 'Art Director plans, Artist produces (Codex concept, Tripo or Blender blockout, Blender cleanup), art-reviewer and claude-reviewer review, verifier runs the art lint gate.',
-    'prepare': ('Plan game art as the art-director SOUL says. First check the style bible: python3 <art_lint.py> <PROJECT_DIR> --check-bible, where art_lint.py is ' + LINT + '. '
-                'Style task (the request asks for a style bible, or none exists and the request is about style): specify STYLE.md rules with IDs and (blocking) marks, style.json classes, the palette and 2-3 reference images with prompts; ACs require that --check-bible prints "bible": "ok" and that the references exist. '
+    'prepare': ('Plan game art as the art-director SOUL says. First look for a style bible: art/style/STYLE.md and art/style/style.json under PROJECT_DIR (the art_lint.py bible validator is not a gate). '
+                'Style task (the request asks for a style bible, or none exists and the request is about style): specify STYLE.md rules with IDs and (blocking) marks, style.json classes, the palette and 2-3 reference images with prompts; ACs require that STYLE.md, style.json and the references exist and that the rules follow the approved references. '
                 'Asset task without a valid bible: complete VERDICT=BLOCKED with blocked_reason "no approved style bible: submit an Art task asking for a style bible". '
                 'Otherwise list every asset with target path (matching a style.json class), kind (sprite or model), concept prompt, class limits and STYLE rule IDs; one AC per asset plus "art_lint reports no BLOCKER or HIGH"; include list: art/style/, every target path and art/concepts/<name>.png for each model. '
                 'For an asset task run python3 <art_lint.py> <PROJECT_DIR> --style-hash and record its value in PLAN.md as style_sha256: <hex>.'),

@@ -9,13 +9,13 @@ import time
 from .model_policy import ConfigurationError
 from .project_cards import (ART_PLAN, ROLE_FINDINGS, APPROVED_COMPARISON, APPROVED_REFERENCES, INSPECTION, REFERENCE_AUDIT, VISUAL_TRACE, ARCHITECT, COMPARISON, CONFLICT_CHECK, SIMILARITY, DIRECTOR, PLAN_CORRECTION, PLAN_CORRECTION_REVIEW, PLAN_DEFECT,
                             PLAN_REVIEW, REPLAN, RETRO, SCOPE, SPEC_CONSTRAINTS, TOOL_INCIDENTS, project_card)
-from .project_decisions import (constraint_view, constraints_of, normalize_decisions, preserved_conflict, record_applied, relevant_constraints,
+from .project_decisions import (MAX_STAGE_RETRIES, constraint_view, constraints_of, normalize_decisions, preserved_conflict, record_applied, relevant_constraints,
                                 validate_plan_constraints, validate_spec_conflicts)
 from .project_evidence import dedupe_artifacts, plan_evidence, retained_json, validate_comparison, validate_similarity
 from . import project_references as refs
 from .project_policy import (MAX_ORCHESTRATION_RECOVERIES, MAX_PLAN_CORRECTIONS, MAX_REPLANS, blocking_findings, budget_used, finding_id,
                              missing_baseline_tokens, plan_architecture_diff, repair_origin, finding_ac, planning_profiles, route_findings, rereview_profiles,
-                             review_profiles, scope_additions, validate_plan, validate_scope)
+                             review_profiles, scope_additions, uncovered_acs, describe_acs, validate_plan, validate_scope)
 
 REPAIR_LIMIT = 'Captured repair limit reached'
 MAX_HANDOFF_RETRIES = 2
@@ -559,13 +559,18 @@ class ProjectController:
                 raise ConfigurationError('Replan changed a task that already passed')
             project['plans'] = [p for p in project['plans'] if p['profile'] != 'architect'] + [evidence]
             project.update(ac_ids=result.metadata['ac_ids'], tasks=tasks, plan_constraints=plan_constraints, mode='plan_review')
+            project['uncovered_acs'] = uncovered_acs(tasks, project['ac_ids'])
+            if project['uncovered_acs']:
+                # Not a formatting error: the plan reviewer judges it (a genuine gap blocks), and the final integration task states each one explicitly.
+                project.setdefault('orchestration_log', []).append(dict(kind='plan_uncovered_acs', generation=gen, acs=project['uncovered_acs'], at=int(time.time())))
+                self._state.event(conn, root['root_id'], 'plan_uncovered_acs', dict(generation=gen, acs=project['uncovered_acs']))
             self._state.event(conn, root['root_id'], 'project_plan_captured', dict(tasks=tasks, plans=project['plans'], generation=gen))
             return True
         if mode == 'plan_review':
             # The plan is the most expensive thing to get wrong, so it is reviewed before any task is written.
             gen = project.get('gen', 0)
             reviewer = next(s.profile for s in definition.reviewers if s.profile in ('claude-reviewer', 'codex-reviewer'))
-            node = self._node(conn, root, definition, context, project, 'project-plan-review', 'prepare', reviewer, PLAN_REVIEW,
+            node = self._node(conn, root, definition, context, project, 'project-plan-review', 'prepare', reviewer, PLAN_REVIEW + self._uncovered_note(project),
                               self._inputs(project), cycle=gen)
             if not node:
                 return False
@@ -612,7 +617,7 @@ class ProjectController:
             if task is None:
                 # A read-only verification is insufficient: the developer assembles the final project first.
                 project['integration'] = dict(id='integration', title='Final project integration', owner='developer',
-                    dependencies=[t['id'] for t in project['tasks']], acceptance={ac: 'Project PLAN.md: ' + ac for ac in project['ac_ids']}, needs=project['scope'])
+                    dependencies=[t['id'] for t in project['tasks']], acceptance=self._integration_acceptance(project), needs=project['scope'])
                 project['mode'] = 'integration'
                 return True
         else:
@@ -951,6 +956,54 @@ class ProjectController:
         rows = self._controller._rows(conn, root, prefix + '-repair-' + work['repairs'][0], work['cycle'])
         return bool(rows) and rows[0]['accepted_run_id'] is not None
 
+    @staticmethod
+    def _uncovered_note(project):
+        uncovered = project.get('uncovered_acs') or []
+        if not uncovered:
+            return ''
+        return ('\nUNCOVERED ACCEPTANCE CRITERIA: no task states ' + ', '.join(uncovered) + '. This is not a formatting error and is not waved through: '
+                'if one of them is a functional requirement that no planned task delivers, or an architectural gap, report it as a BLOCKER finding that names its AC id so the architect adds a task. '
+                'Report nothing only when the criterion is genuinely satisfied by the planned tasks together, or is a final integration check by nature; the final integration task will then state it explicitly.')
+
+    @staticmethod
+    def _integration_acceptance(project):
+        """One criterion per project AC. An AC no task states becomes explicit, actionable integration work instead of a bare pointer."""
+        uncovered = project.get('uncovered_acs') or []
+        text = {}
+        if uncovered:
+            plan = next((p for p in project.get('plans', []) if p['profile'] == 'architect'), None)
+            try:
+                text = describe_acs(Path(plan['path']).read_text(), uncovered) if plan else {}
+            except OSError:
+                text = {}
+        return {ac: ('NOT STATED BY ANY PLANNED TASK: implement and verify it here. ' + (text.get(ac) + ' ' if text.get(ac) else '') + 'Project PLAN.md: ' + ac)
+                if ac in uncovered else 'Project PLAN.md: ' + ac for ac in project['ac_ids']}
+
+    def _retry_stage(self, conn, root, project, note):
+        """Re-run only the stage the project stopped on: a new evidence_retry row supersedes the stopped one, which stays as history.
+
+        Bounded per stage and cycle, and refused while the stage is still running (no duplicate execution)."""
+        keys = project.get('retry_keys', [])
+        if not keys:
+            raise ConfigurationError('retry_stage found no stopped stage to retry')
+        superseded, budgets = [], project.setdefault('stage_retries', {})
+        for token in keys:
+            key, cycle = token.rsplit(':', 1)
+            rows = self._controller._rows(conn, root, key, int(cycle))
+            if not rows:
+                continue  # never created: the normal path creates it, nothing to supersede
+            task = self._board.get_task(conn, rows[0]['task_id'])
+            if task and task.status in ('triage', 'todo', 'ready', 'running'):
+                raise ConfigurationError('Stage ' + key + ' is still ' + task.status + ' (' + rows[0]['task_id'] + '); a retry would run it twice')
+            if budgets.get(token, 0) >= MAX_STAGE_RETRIES:
+                raise ConfigurationError('Stage ' + key + ' has used its ' + str(MAX_STAGE_RETRIES) + ' human stage retries; this needs a plan or tooling change, not another retry')
+            budgets[token] = budgets.get(token, 0) + 1
+            superseded.append(dict(key=token, task_id=rows[0]['task_id'], evidence_retry=rows[0]['evidence_retry'], attempt=budgets[token]))
+        if not superseded:
+            return
+        project.setdefault('orchestration_log', []).append(dict(kind='human_stage_retry', stages=superseded, reason=note.strip()[:500], at=int(time.time())))
+        self._state.event(conn, root['root_id'], 'human_stage_retry', dict(stages=superseded, note=note[:500], execution_version=2))
+
     def resume(self, conn, root, note, decisions=None, reevaluate=False):
         # Validate a human decision before anything changes; an invalid one leaves the project exactly as it was.
         decided = normalize_decisions(decisions, note)
@@ -992,7 +1045,9 @@ class ProjectController:
         exhausted_plan = {k: v for k, v in project.get('plan_validation_retries', {}).items() if v >= MAX_PLAN_VALIDATION_RETRIES}
         if decided['extra_handoff_retries'] and not (exhausted or exhausted_plan):
             raise ConfigurationError('extra_handoff_retries applies to a stage whose handoff or plan-correction retries are exhausted; none is')
-        stopped = ('blocked', 'human_review') if reevaluate or decided['extra_handoff_retries'] else ('blocked',)
+        if decided['retry_stage'] and reevaluate:
+            raise ConfigurationError('retry_stage re-runs the stopped stage; reevaluate judges its existing evidence. Choose one')
+        stopped = ('blocked', 'human_review') if reevaluate or decided['extra_handoff_retries'] or decided['retry_stage'] else ('blocked',)
         if root['phase'] not in stopped or project.get('terminal', {}).get('phase') not in stopped:
             raise ConfigurationError('Only an infrastructure-blocked project can resume; changed scope requires a new task')
         project.update(mode=project['resume_mode'], active_keys=[], recoveries=project.get('recoveries', 0)+1, recovery_note=note)
@@ -1071,6 +1126,8 @@ class ProjectController:
             project['retry_keys'] = [f"project-{p}:{project.get('director_gen', {}).get(p, 0)}" for p in missing] or [f'project-architect:{gen}']
         else:
             project['retry_keys'] = []
+        if decided['retry_stage']:
+            self._retry_stage(conn, root, project, note)
         if reevaluate:
             project['retry_keys'] = []  # whatever the stopped mode, judge the existing evidence instead of retrying a stage
         project.setdefault('orchestration_log', []).append(dict(kind='human_resume', reevaluate=bool(reevaluate), retry_keys=list(project.get('retry_keys', [])), at=int(time.time())))

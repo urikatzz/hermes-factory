@@ -17,6 +17,7 @@ The JSON document top level must be exactly {"tasks":[...]} with no other keys (
 Keep each task title under 120 characters; put detail in acceptance.
 risk is optional (default normal). Use high only for security-sensitive, concurrency, data-migration or cross-cutting changes: those tasks get the second selected code reviewer.
 If the work needs art, audio, UI or UX that PROJECT_CONTEXT scope marks false, set metadata.scope_additions to those domains, e.g. ["art"]. Added art/audio first runs the missing director, then this stage again with its plan; do not plan around a missing director.
+Before writing tasks, load the task-writing skill and follow it: the engine no longer rejects plans for coverage, wording or length, so you check those yourself.
 Every PLAN.md AC must be covered by at least one task; use the same AC IDs in task acceptance.
 Asset tasks precede code tasks that integrate their output: declare those dependencies explicitly.
 Plans must preserve the directors' asset paths, visual/audio criteria, and code integration contracts.
@@ -24,7 +25,7 @@ The engine also runs a final integration cycle over every project AC. No code or
 An independent reviewer checks this plan before any task starts.'''
 
 REPLAN = '''This is a revision of the earlier plan; PROJECT_CONTEXT.replan gives the reason, the failing task and its findings.
-Correct the plan defect: fix wrong or untestable acceptance criteria, split oversized tasks, add missing tasks or dependencies.
+Load the task-writing skill first. Correct the plan defect: fix wrong or untestable acceptance criteria, split oversized tasks, add missing tasks or dependencies.
 Tasks in PROJECT_CONTEXT.completed_tasks already passed: keep each of them in project-plan.json exactly as captured.
 Do not weaken an acceptance criterion merely so failing work passes; do not change director intent.
 A revision inherits nothing from the earlier round's files: write PLAN.md, project-plan.json and reference-inspection.json again in full, including the top-level "role_findings" of reference-inspection.json (one "carry" entry per approved requirement). Re-check that every task lists in its "visual" only ids that its own acceptance text names, that each criterion is at most 1000 characters, and that metadata.cycle is the cycle in your card header.'''

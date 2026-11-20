@@ -23,6 +23,9 @@ Extra repairs
     consumption and every use are recorded under ``replan_grants``.
     ``plan_correction`` lists the current plan-review finding ids a human classifies as localized corrections (wording, metadata,
     consistency); they go through the bounded plan-correction workflow instead of an architectural replan.
+    ``retry_stage: true`` re-runs only the stage the project stopped on (a stop at human_review or blocked) with a new evidence_retry row.
+    The earlier row, its result and every accepted stage stay as history; the new row supersedes it. It is bounded by MAX_STAGE_RETRIES per
+    stage and cycle, refused while that stage is still running, and recorded as ``human_stage_retry`` in the orchestration log.
     ``on_exhaustion: human_review`` makes that task stop for a human, instead of replanning, when the budget runs out again.
 """
 import fnmatch
@@ -41,6 +44,7 @@ MAX_EXTRA_REPAIRS = 2
 EXHAUSTION = ('replan', 'human_review')
 MAX_EXTRA_REPLANS = 1
 MAX_EXTRA_HANDOFF_RETRIES = 3
+MAX_STAGE_RETRIES = 2  # human stage retries per stage and cycle, over the whole run
 AUDIT_LIMIT = 50
 
 
@@ -114,11 +118,11 @@ def validate_plan_constraints(value):
 
 def normalize_decisions(decisions, note, now=None):
     """Validate a human decision document; return it ready to store."""
-    empty = dict(waivers=[], constraints=[], extra_repairs=0, extra_replans=0, extra_handoff_retries=0, on_exhaustion=None, plan_correction=[])
+    empty = dict(waivers=[], constraints=[], extra_repairs=0, extra_replans=0, extra_handoff_retries=0, on_exhaustion=None, plan_correction=[], retry_stage=False)
     if decisions in (None, {}):
         return empty
-    if not isinstance(decisions, dict) or set(decisions) - {'waivers', 'constraints', 'extra_repairs', 'extra_replans', 'extra_handoff_retries', 'on_exhaustion', 'plan_correction'}:
-        raise ConfigurationError('A decision may only contain waivers, constraints, extra_repairs, extra_replans, extra_handoff_retries, on_exhaustion and plan_correction')
+    if not isinstance(decisions, dict) or set(decisions) - {'waivers', 'constraints', 'extra_repairs', 'extra_replans', 'extra_handoff_retries', 'on_exhaustion', 'plan_correction', 'retry_stage'}:
+        raise ConfigurationError('A decision may only contain waivers, constraints, extra_repairs, extra_replans, extra_handoff_retries, on_exhaustion, plan_correction and retry_stage')
     stamp = int(time.time() if now is None else now)
     waivers = []
     for item in decisions.get('waivers') or []:
@@ -151,9 +155,12 @@ def normalize_decisions(decisions, note, now=None):
     correction = decisions.get('plan_correction') or []
     if not isinstance(correction, list) or len(correction) > 20 or any(not isinstance(i, str) or not re.fullmatch(r'F[0-9]{1,3}', i) for i in correction):
         raise ConfigurationError('plan_correction must list plan-review finding ids such as F1')
-    if (extra or extra_replans or extra_handoff or on_exhaustion or correction) and not note.strip():
+    retry_stage = decisions.get('retry_stage', False)
+    if type(retry_stage) is not bool:
+        raise ConfigurationError('retry_stage must be true or false')
+    if (extra or extra_replans or extra_handoff or on_exhaustion or correction or retry_stage) and not note.strip():
         raise ConfigurationError('Granting repairs or changing exhaustion handling requires a recorded note')
-    return dict(waivers=waivers, constraints=constraints, extra_repairs=extra, extra_replans=extra_replans, extra_handoff_retries=extra_handoff, on_exhaustion=on_exhaustion, plan_correction=sorted(set(correction)))
+    return dict(waivers=waivers, constraints=constraints, extra_repairs=extra, extra_replans=extra_replans, extra_handoff_retries=extra_handoff, on_exhaustion=on_exhaustion, plan_correction=sorted(set(correction)), retry_stage=retry_stage)
 
 
 def finding_file(finding):
