@@ -71,7 +71,8 @@ class ProjectController:
         self._state.mark_reconciled(conn, root['root_id'])
         if project.get('awaiting') and not project.get('terminal'):
             # A pause for a human decision, not a failure: no retro, nothing retired.
-            return self._controller._stop(conn, root, 'blocked', 'Awaiting human approval of the art-director plan: ' + project['awaiting']['path'] + (' (mockup: ' + project['awaiting']['mockup'] + ')' if project['awaiting'].get('mockup') else ''))
+            return self._controller._stop(conn, root, 'blocked', 'Awaiting human approval of the art-director plan: ' + project['awaiting']['path'] + (' (mockup: ' + project['awaiting']['mockup'] + ')' if project['awaiting'].get('mockup') else '')
+                                          + '. Approve with the note "' + self._approval_phrase(root['root_id'], project) + '" or reject with "REJECT: <feedback>"; no other note approves.')
         return self._state.read_root(conn, root['root_id'])
 
     def _save(self, conn, root, project):
@@ -172,6 +173,12 @@ class ProjectController:
             project['history'].append(history)
             self._state.event(conn, root['root_id'], 'project_stage_accepted', history)
         return row, result
+
+    @staticmethod
+    def _approval_phrase(root_id, project):
+        """The exact words that approve the awaiting plan: bound to this root, the plan's hash and the approved-references digest."""
+        awaiting = project['awaiting']
+        return f"APPROVE {root_id} {awaiting['sha256'][:12]} {(awaiting.get('references_digest') or project.get('references_digest') or 'none')[:12]}"
 
     @staticmethod
     def _hermes_home():
@@ -441,7 +448,8 @@ class ProjectController:
             if art and project.get('approvals', {}).get('art-director', {}).get('sha256') != art['sha256']:
                 # Visual direction is a human call: nothing is architected on an art plan nobody approved.
                 if project.get('awaiting', {}).get('sha256') != art['sha256']:
-                    project['awaiting'] = dict(profile='art-director', sha256=art['sha256'], path=art['path'], task_id=art['task_id'], **({'mockup': art['mockup']} if art.get('mockup') else {}))
+                    project['awaiting'] = dict(profile='art-director', sha256=art['sha256'], path=art['path'], task_id=art['task_id'], references_digest=project.get('references_digest', ''),
+                                           **({'mockup': art['mockup']} if art.get('mockup') else {}))
                     self._state.event(conn, root['root_id'], 'project_awaiting_human', project['awaiting'])
                 return False
             gen, replan = project.get('gen', 0), project.get('replan')
@@ -893,11 +901,17 @@ class ProjectController:
         if decisions and awaiting and not project.get('terminal'):
             raise ConfigurationError('Waivers and constraints apply to a blocked stage, not to plan approval')
         if root['phase'] == 'blocked' and awaiting and not project.get('terminal'):
-            # The note is the decision: 'REJECT: <feedback>' returns the plan to the director, anything else approves it.
+            # Approval is an explicit, bound decision. 'REJECT: <feedback>' returns the plan to the director; only the exact phrase
+            # "APPROVE <root> <plan sha12> <references digest12|none>" approves. Any other note (a recovery note, a retry reason) approves nothing.
             profile, text = awaiting['profile'], note.strip()
             rejected = text.upper().startswith('REJECT:')
             if rejected and not text[7:].strip():
                 raise ConfigurationError('A rejection requires feedback for the director')
+            if not rejected:
+                phrase = self._approval_phrase(root['root_id'], project)
+                if not (text == phrase or text.startswith(phrase + ' ')):
+                    raise ConfigurationError('This root awaits a human decision on the art-director plan. Approve with exactly "' + phrase + '" (optionally followed by a comment), '
+                                             'or reject with "REJECT: <feedback>". A recovery note never approves a plan.')
             del project['awaiting']
             if rejected:
                 project['plans'] = [p for p in project['plans'] if p['profile'] != profile]
@@ -915,7 +929,15 @@ class ProjectController:
         if root['phase'] not in stopped or project.get('terminal', {}).get('phase') not in stopped:
             raise ConfigurationError('Only an infrastructure-blocked project can resume; changed scope requires a new task')
         project.update(mode=project['resume_mode'], active_keys=[], recoveries=project.get('recoveries', 0)+1, recovery_note=note)
-        project.pop('references_digest', None)  # a human resuming re-approves the references as they now stand
+        if project.get('references_digest'):
+            task = self._board.get_task(conn, root['root_id'])
+            current = refs.load_references(self._controller._context(task)['project_dir'])['digest']
+            if current != project['references_digest']:
+                phrase = 'APPROVE-REFERENCES ' + current[:12]
+                if phrase not in note:
+                    raise ConfigurationError('The approved references changed since the run started. A human must re-approve them: include "' + phrase + '" in the resume note. '
+                                             'Recovery alone never re-approves references.')
+                project.pop('references_digest', None)
         project.pop('terminal', None);project.pop('retro', None)
         known = {w['id'] for w in project.setdefault('waivers', [])}
         project['waivers'].extend(w for w in decided['waivers'] if w['id'] not in known)

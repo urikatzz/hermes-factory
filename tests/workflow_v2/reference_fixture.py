@@ -224,7 +224,8 @@ class ReferenceFlow(unittest.TestCase):
         self.start()
         self.finish(self.only('art-director'), plan or ('Carry ' + self.required_ids() + ' into the bible and tasks.'))
         self.assertEqual(self.state.read_root(self.conn, self.root)['phase'], 'blocked')
-        self.controller.resume(self.conn, self.root, 'Approved')
+        awaiting = self.document()['awaiting']
+        self.controller.resume(self.conn, self.root, f"APPROVE {self.root} {awaiting['sha256'][:12]} {(awaiting.get('references_digest') or 'none')[:12]} Approved")
 
     def architect(self, tasks, plan_text=None, **kwargs):
         stage = self.only('architect')

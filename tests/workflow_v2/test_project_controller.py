@@ -68,9 +68,14 @@ class ProjectControllerTests(unittest.TestCase):
         self.board.complete(self.only('claude-reviewer'))
         self.tick()
 
+    def approval_phrase(self):
+        document = json.loads(self.conn.execute('SELECT document FROM factory_project_execution WHERE root_id=?', (self.root,)).fetchone()[0])
+        awaiting = document['awaiting']
+        return f"APPROVE {self.root} {awaiting['sha256'][:12]} {(awaiting.get('references_digest') or 'none')[:12]}"
+
     def approve(self, note='Approved: matches the intended look'):
         self.assertEqual(self.state.read_root(self.conn, self.root)['phase'], 'blocked')
-        self.controller.resume(self.conn, self.root, note)
+        self.controller.resume(self.conn, self.root, self.approval_phrase() + ' ' + note)
 
     def similarity(self, folder, score=92, status=None):
         path = Path(folder) / 'similarity.json'
@@ -367,6 +372,21 @@ class ProjectControllerTests(unittest.TestCase):
         self.board.complete(stage);self.tick()
         self.assertEqual(self.board.ready(),[])
         self.approve('Approved')
+        self.assertIn('human_approvals',self.board.cards[self.only('architect')['task_id']]['body'])
+
+    def test_only_the_exact_bound_phrase_approves_and_a_recovery_note_never_does(self):
+        self.tick()
+        self.board.complete(self.only('factory-orchestrator'),project_scope={**NEEDS,'art':True});self.tick()
+        self.board.complete(self.only('art-director'));self.tick()
+        phrase=self.approval_phrase()
+        self.assertIn(phrase,self.state.read_root(self.conn,self.root)['reason'])
+        for note in ('Approved','Retry: infrastructure recovered','approve','APPROVE '+self.root,phrase.replace(phrase.split()[2],'0'*12),
+                     phrase.replace(self.root,'t_other')):
+            with self.assertRaisesRegex(Exception,'awaits a human decision'):
+                self.controller.resume(self.conn,self.root,note)
+        self.assertEqual(self.board.ready(),[])
+        self.assertFalse(json.loads(self.conn.execute('SELECT document FROM factory_project_execution').fetchone()[0]).get('approvals'))
+        self.controller.resume(self.conn,self.root,phrase+' looks right')
         self.assertIn('human_approvals',self.board.cards[self.only('architect')['task_id']]['body'])
 
     def test_audio_only_project_needs_no_human_plan_approval(self):

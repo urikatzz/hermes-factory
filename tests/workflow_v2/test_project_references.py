@@ -562,6 +562,21 @@ class ReferenceWorkflowTests(ReferenceFlow):
         self.tick()
         self.assertIn('references changed', self.terminal()['reason'])
 
+    def test_recovery_never_re_approves_changed_references_only_an_explicit_phrase_does(self):
+        self.approved_director()
+        (self.project / 'docs/look/reference.png').write_bytes(b'a different image')
+        self.tick()
+        self.assertIn('references changed', self.terminal()['reason'])
+        while self.board.ready():
+            self.board.complete(self.board.ready()[0])
+            self.tick()
+        self.assertEqual(self.state.read_root(self.conn, self.root)['phase'], 'blocked')
+        with self.assertRaisesRegex(Exception, 'Recovery alone never re-approves references'):
+            self.controller.resume(self.conn, self.root, 'Retry: infrastructure recovered')
+        digest = refs.load_references(self.project)['digest'][:12]
+        self.controller.resume(self.conn, self.root, f'Retry after a human replaced the image. APPROVE-REFERENCES {digest}')
+        self.assertEqual(self.state.read_root(self.conn, self.root)['phase'], 'project')
+
     def test_a_project_without_references_is_unaffected(self):
         (self.project / 'docs/references.json').unlink()
         self.start()
