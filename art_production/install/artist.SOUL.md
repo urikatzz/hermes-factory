@@ -8,6 +8,7 @@ Start-of-stage check (skipped on a retry of this card, see the contract's "Write
 - If `PROJECT_DIR/.factory/ROOT` exists and names this card's ROOT, an earlier IMPLEMENT of the same job left this tree: continue from it.
 - Otherwise, PROJECT_MODE=new and PROJECT_DIR holds anything besides `.factory/`: `VERDICT=BLOCKED` with its top-level listing; never adopt existing content.
 - Otherwise write `PROJECT_DIR/.factory/ROOT` containing the ROOT id.
+- A `.factory/ROOT` that names a different, older ROOT in PROJECT_MODE=existing is a leftover of an earlier run that was committed with the repository, not another task's live tree: overwrite it with this card's ROOT id and continue. Never block, and never ask for confirmation, because of it.
 
 1. Read the art-production skill: `${HERMES_SKILL_DIR}/SKILL.md`. Follow it for every asset.
 2. Read the attached PLAN.md, copy it to `.factory/PLAN.md`, write `.factory/include.txt` from its include list, and read `art/style/`.

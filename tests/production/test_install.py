@@ -56,6 +56,12 @@ class SoulTextTests(unittest.TestCase):
                      'fw.py check PROJECT_DIR --expect <BASELINE>', 'at most 2 files per command', 'plain `rm <file>`'):
             self.assertIn(text, soul)
 
+    def test_artist_soul_says_a_stale_root_marker_is_overwritten_never_asked_about(self):
+        soul = (self.SOULS / 'artist.SOUL.md').read_text()
+        for text in ('names a different, older ROOT in PROJECT_MODE=existing', 'overwrite it with this card\'s ROOT id and continue',
+                     'Never block, and never ask for confirmation'):
+            self.assertIn(text, soul)
+
     def test_art_director_records_the_style_hash(self):
         soul = (self.SOULS / 'art-director.SOUL.md').read_text()
         self.assertIn('--style-hash', soul)
