@@ -487,7 +487,9 @@ def vision_proof(profile, session_id, home, wanted, scratch_ok=()):
     Reads the worker's own session log (the profile's state.db). A correctly shaped JSON file is not evidence; a successful tool call on that
     exact file (same path or same bytes) is. Labels in scratch_ok are files the worker itself made in its scratch workspace, which is gone by the time
     the stage is checked: for those a call on a missing file with the same name counts (the call itself is still required and must have succeeded)."""
-    if not isinstance(session_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]{6,64}', session_id):
+    # Only a sanity check on the shape (the id is a bound query parameter): Hermes ids are 22 characters in older versions and
+    # 'local-' plus 64 hex digits (70 characters) in current ones.
+    if not isinstance(session_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]{6,128}', session_id):
         raise ConfigurationError('The stage reported no worker session, so its image inspection cannot be verified')
     database = Path(home) / 'profiles' / profile / 'state.db'
     try:

@@ -107,6 +107,22 @@ class ReferenceModuleTests(unittest.TestCase):
         with self.assertRaisesRegex(ConfigurationError, 'unreadable'):
             refs.vision_proof('nobody', 'sessionAAAA', home, wanted)
 
+    def test_vision_proof_accepts_the_current_hermes_session_id_format_and_still_rejects_malformed_ids(self):
+        image = Path(self.temp.name) / 'docs/look/reference.png'
+        home = Path(self.temp.name) / 'home'
+        current = 'local-' + 'e73da9898541af5e35ee499d81e8c9fe7b40fed13dbbfde0b44c7a9437c1ac51'  # 70 characters, as Hermes issues them now
+        older = '20261120_201753_f9024d'
+        record_session(home, 'architect', current, [image])
+        record_session(home, 'architect', older, [image])
+        wanted = {'lookd': image}
+        self.assertEqual(len(current), 70)
+        self.assertEqual(refs.vision_proof('architect', current, home, wanted), [])
+        self.assertEqual(refs.vision_proof('architect', older, home, wanted), [])
+        for bad in ('', 'short', 'has space in it', "x'; DROP TABLE messages;--", 'a' * 129, 12345):
+            with self.subTest(bad=bad):
+                with self.assertRaisesRegex(ConfigurationError, 'no worker session'):
+                    refs.vision_proof('architect', bad, home, wanted)
+
     def test_a_controller_running_inside_a_profile_still_finds_the_hermes_root(self):
         root = Path(self.temp.name) / 'hermes'
         inside = root / 'profiles' / 'factory-orchestrator'
