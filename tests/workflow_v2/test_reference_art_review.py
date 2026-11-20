@@ -104,6 +104,12 @@ class ReferenceExposureTests(ArtReviewFlow):
             self.assertNotIn(phrase, body, phrase)
         self.assertIsNone(self.document().get('terminal'))
 
+    def test_the_scope_card_says_later_stage_work_is_not_the_orchestrators_and_never_a_reason_to_block(self):
+        self.tick()
+        body = self.board.cards[self.only('factory-orchestrator')['task_id']]['body']
+        self.assertIn('belong to later stages with their own tools', body)
+        self.assertIn('never finish BLOCKED because a later stage', body)
+
     def test_the_scope_stage_completes_and_planning_starts_with_the_references_intact(self):
         self.start()
         self.assertEqual(self.document()['references_source'], 'docs/references.json')
