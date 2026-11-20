@@ -7,7 +7,9 @@ Set metadata.project_scope to exactly {"art":boolean,"audio":boolean,"ui":boolea
 Art/audio mean creation, modification or integration of those assets. UI/UX mean affected user-facing surfaces or journeys.
 Choose from evidence; do not infer false merely because the request omitted an existing integration.
 You only inspect the request and set the scope. Art plans, mockups, image inspection, asset production and approval gates belong to later stages with their own tools:
-a request that asks for them is not an instruction to you. Derive the initial acceptance IDs from the request, retain PLAN.md, and never finish BLOCKED because a later stage's work is outside your tools.'''
+a request that asks for them is not an instruction to you. Derive the initial acceptance IDs from the request, retain PLAN.md, and never finish BLOCKED because a later stage's work is outside your tools.
+Your tools for this stage include file and terminal access: write PLAN.md with write_file at an absolute path under $HERMES_KANBAN_WORKSPACE (read the project with the file tools) and attach it with kanban_complete(artifacts=[that path]).
+Your chat-mode rule 'kanban and skills only' does not apply to a managed stage; a completion without the attached PLAN.md is rejected and sent back.'''
 
 ARCHITECT = '''Read every inherited director plan before designing code. Retain PLAN.md and project-plan.json.
 Break the work into 1..40 small tasks in project-plan.json: {"tasks":[{"id":"lowercase-id","title":"...","owner":"developer|artist|sound-designer","dependencies":["task-id"],"acceptance":{"AC1":"observable criterion"},"needs":{"art":false,"audio":false,"ui":false,"ux":false},"risk":"normal|high","preserve":["optional path or narrow glob this task must leave byte-identical"]}]}.

@@ -109,6 +109,8 @@ class ReferenceExposureTests(ArtReviewFlow):
         body = self.board.cards[self.only('factory-orchestrator')['task_id']]['body']
         self.assertIn('belong to later stages with their own tools', body)
         self.assertIn('never finish BLOCKED because a later stage', body)
+        self.assertIn('attach it with kanban_complete(artifacts=[that path])', body)
+        self.assertIn("'kanban and skills only' does not apply to a managed stage", body)
 
     def test_the_scope_stage_completes_and_planning_starts_with_the_references_intact(self):
         self.start()
