@@ -198,43 +198,44 @@ class ProjectControllerTests(unittest.TestCase):
         self.board.complete(self.only('developer'));self.tick()
         self.board.complete(self.only('verifier'),verdict='FAIL',ac_results={'AC1':'fail'});self.tick()
 
-    def test_repair_limit_returns_to_architect_then_escalates_without_delivering(self):
+    def test_the_repair_limit_stops_for_a_human_and_never_goes_back_to_the_architect(self):
         self.definition['max_repairs']=0
         self.conn.execute('UPDATE factory_workflow_roots SET definition=?',(json.dumps(self.definition),))
         self.plan()
-        for generation in (1, 2):
-            self.fail_first_task()
-            stage=self.only('architect')
-            self.assertEqual(stage['cycle'],generation)
-            card=self.board.cards[stage['task_id']]['body']
-            self.assertIn('Repairs did not converge',card)
-            self.assertIn('AC1: fail',card)
-            self.architect()
-            self.board.complete(self.only('claude-reviewer'));self.tick()
-            self.assertEqual(self.only('developer')['stage_key'],f'task-code.g{generation}-implement')
         self.fail_first_task()
+        terminal=self.project()['terminal']
+        self.assertEqual(terminal['phase'],'human_review')
+        self.assertIn('Repair limit reached for task code',terminal['reason'])
+        self.assertIn('AC1: fail',terminal['reason'])
+        self.assertIn('extra_repairs',terminal['reason']); self.assertIn('model_overrides',terminal['reason'])
+        self.assertFalse([r for r in self.board.ready() if r['profile']=='architect'])
         self.board.complete(self.only('factory-retro'))
         self.assertEqual(self.tick()['phase'],'human_review')
         self.assertEqual(self.board.get_task(self.conn,self.root).status,'blocked')
+        self.assertEqual(self.project().get('replans',0),0)
 
-    def test_declared_plan_defect_replans_instead_of_repairing(self):
+    def test_a_declared_plan_defect_changes_nothing_a_failed_verification_is_repaired_like_any_other(self):
         self.plan()
         self.board.complete(self.only('developer'));self.tick()
         self.board.complete(self.only('verifier'),verdict='FAIL',ac_results={'AC1':'fail'},plan_defect='AC1 contradicts the request')
         self.tick()
-        self.assertIn('AC1 contradicts the request',self.board.cards[self.only('architect')['task_id']]['body'])
-        self.assertFalse(self.conn.execute("SELECT 1 FROM factory_workflow_stages WHERE kind='repair'").fetchone())
+        self.assertFalse([r for r in self.board.ready() if r['profile']=='architect'])
+        self.assertTrue(self.conn.execute("SELECT 1 FROM factory_workflow_stages WHERE kind='repair'").fetchone())
 
     def test_replan_cannot_change_a_task_that_already_passed(self):
+        from factory_dashboard.project_controller import ProjectController
         second=dict(CODE,id='more',dependencies=['code'])
         self.plan(tasks=[CODE,second])
         self.board.complete(self.only('developer'));self.tick()
         self.board.complete(self.only('verifier'));self.tick()
         for row in self.board.ready():self.board.complete(row)
         self.tick()
-        self.board.complete(self.only('developer'));self.tick()
-        self.board.complete(self.only('verifier'),verdict='FAIL',ac_results={'AC1':'fail'},plan_defect='Task is too large')
-        self.tick()
+        # No worker or reviewer verdict sends a project back to the architect any more; the invariant is kept for the replans that remain.
+        self.board.complete(self.only('developer'))  # the second task's card is already out; the replan supersedes it
+        controller=ProjectController(self.controller)
+        root=self.state.read_root(self.conn,self.root); project=self.project()
+        self.assertTrue(controller._replan(self.conn,root,project,project['tasks'][1],'Task is too large',['F1|HIGH|AC1|more|too large'],[]))
+        controller._save(self.conn,root,project); self.conn.commit(); self.tick()
         self.architect([dict(CODE,title='Rewritten history'),second])
         self.only('factory-retro')
 
@@ -924,7 +925,9 @@ class ProjectControllerTests(unittest.TestCase):
         self.assertEqual(self.project()['work']['charges'][0]['kind'], 'product')
         self.board.complete(self.only('fixer')); self.tick()
         self.board.complete(self.only('verifier'), verdict='FAIL', ac_results={'AC1': 'fail'}); self.tick()
-        self.only('architect')  # the product budget really was spent: back to the architect
+        self.assertEqual(self.project()['terminal']['phase'], 'human_review')  # the product budget really was spent: a human decides
+        self.assertIn('Repair limit reached for task code after 1 product repair', self.project()['terminal']['reason'])
+        self.assertFalse([r for r in self.board.ready() if r['profile'] == 'architect'])
 
     def test_a_failed_check_alongside_a_harness_gap_is_still_a_product_defect(self):
         self.limit_repairs(2)
@@ -960,28 +963,29 @@ class ProjectControllerTests(unittest.TestCase):
         self.board.complete(self.only('fixer')); self.tick()
         self.board.complete(self.only('verifier'), verdict='FAIL', ac_results={'AC1': 'fail'}); self.tick()
         self.assertEqual(self.project()['terminal']['phase'], 'human_review')
-        self.assertIn('human review was requested', self.project()['terminal']['reason'])
+        self.assertIn('Repair limit reached for task code', self.project()['terminal']['reason'])
         self.assertFalse([r for r in self.board.ready() if r['profile'] in ('architect', 'fixer')])
 
-    def test_without_the_decision_exhaustion_still_replans(self):
+    def test_exhaustion_without_a_decision_stops_for_a_human_and_never_replans(self):
         self.limit_repairs(0)
         self.plan(); self.board.complete(self.only('developer')); self.tick()
         self.board.complete(self.only('verifier'), verdict='FAIL', ac_results={'AC1': 'fail'}); self.tick()
-        self.only('architect')
+        self.assertEqual(self.project()['terminal']['phase'], 'human_review')
+        self.assertFalse([r for r in self.board.ready() if r['profile'] == 'architect'])
 
     def test_a_decision_records_the_exhaustion_choice_on_the_task_in_progress(self):
         self.stalled_artist()
         self.controller.resume(self.conn, self.root, 'One more repair, then a human', dict(self.DECISION, extra_repairs=1, on_exhaustion='human_review'))
         self.assertEqual((self.project()['work']['extra_repairs'], self.project()['work']['on_exhaustion']), (1, 'human_review'))
 
-    def test_a_blocked_writer_that_declares_a_plan_defect_goes_to_the_architect_not_to_a_human(self):
+    def test_a_blocked_writer_that_declares_a_plan_defect_stops_for_a_human_and_is_not_replanned(self):
         self.plan()
         self.board.complete(self.only('developer'), verdict='BLOCKED', blocked_reason='Task acceptance conflict',
                             plan_defect='The acceptance criteria contradict each other; the architect must clarify them')
         self.tick()
-        stage = self.only('architect')
-        self.assertIn('contradict each other', self.board.cards[stage['task_id']]['body'])
-        self.assertNotIn('terminal', self.project())
+        self.assertEqual(self.project()['terminal']['phase'], 'blocked')
+        self.assertIn('Task acceptance conflict', self.project()['terminal']['reason'])
+        self.assertFalse([r for r in self.board.ready() if r['profile'] == 'architect'])
 
     def test_a_blocked_writer_without_a_plan_defect_still_stops_for_a_human(self):
         self.plan()
@@ -990,19 +994,53 @@ class ProjectControllerTests(unittest.TestCase):
         self.assertEqual(self.project()['terminal']['phase'], 'blocked')
         self.assertIn('Stage blocked', self.project()['terminal']['reason'])
 
-    def test_reevaluating_a_stop_caused_by_a_blocked_plan_defect_replans_without_rerunning_the_writer(self):
+    def test_reevaluating_a_blocked_writer_stop_keeps_it_blocked_and_does_not_rerun_the_writer(self):
         self.plan()
         self.board.complete(self.only('developer'), verdict='BLOCKED', blocked_reason='Task acceptance conflict', plan_defect='Contradictory criteria need clarification')
-        # Reproduce the stop an older controller produced: the writer's BLOCKED result was never accepted and the project stopped for a human.
-        project = self.project(); project['terminal'] = dict(phase='blocked', reason='Stage blocked: Task acceptance conflict'); project['resume_mode'] = 'tasks'
-        project['mode'] = 'finished'; project['active_keys'] = []
-        self.conn.execute('UPDATE factory_project_execution SET document=?', (json.dumps(project),))
-        self.conn.execute("UPDATE factory_workflow_roots SET phase='blocked'"); self.conn.commit()
         developers = lambda: self.conn.execute("SELECT COUNT(*) FROM factory_workflow_stages WHERE profile='developer'").fetchone()[0]
+        self.tick()
+        self.assertEqual(self.project()['terminal']['phase'], 'blocked')
         before = developers()
-        self.controller.resume(self.conn, self.root, 'Re-judge under the corrected controller', None, True)
-        self.only('architect')
+        self.tick(); self.board.complete(self.only('factory-retro')); self.tick()
+        self.controller.resume(self.conn, self.root, 'Re-judge under the current rules', None, True)
+        self.tick()
+        self.assertEqual(self.project()['terminal']['phase'], 'blocked')
+        self.assertFalse([r for r in self.board.ready() if r['profile'] == 'architect'])
         self.assertEqual(developers(), before)
+
+    # --- a repair-limit stop is resumed by a human, optionally with a stronger model ---
+    def stopped_at_the_repair_limit(self):
+        self.definition['max_repairs'] = 0
+        self.conn.execute('UPDATE factory_workflow_roots SET definition=?', (json.dumps(self.definition),))
+        self.plan(); self.fail_first_task()
+        self.board.complete(self.only('factory-retro'))
+        self.assertEqual(self.tick()['phase'], 'human_review')
+
+    def test_a_repair_limit_stop_resumes_with_extra_repairs_and_a_recorded_model_override(self):
+        self.stopped_at_the_repair_limit()
+        override = dict(fixer=dict(provider='openai-codex', model='gpt-5', effort='high'))
+        self.controller.resume(self.conn, self.root, 'A stronger model for the fixer, one more repair', dict(extra_repairs=1, model_overrides=override))
+        project = self.project()
+        self.assertNotIn('terminal', project)
+        self.assertEqual(project['work']['extra_repairs'], 1)
+        self.assertEqual(project['model_overrides']['fixer']['model'], 'gpt-5')
+        entry = next(e for e in project['orchestration_log'] if e['kind'] == 'human_model_override')
+        self.assertEqual(entry['models'], {'fixer': 'openai-codex/gpt-5'})
+        self.tick(); self.board.complete(self.only('verifier'), verdict='FAIL', ac_results={'AC1': 'fail'}); self.tick()
+        self.only('fixer')  # the granted repair runs; the project did not go to the architect
+        self.assertEqual(self.project().get('replans', 0), 0)
+
+    def test_a_repair_limit_stop_without_a_decision_cannot_be_resumed(self):
+        self.stopped_at_the_repair_limit()
+        with self.assertRaisesRegex(ConfigurationError, 'Only an infrastructure-blocked project can resume'):
+            self.controller.resume(self.conn, self.root, 'Just try again', None)
+
+    def test_a_malformed_model_override_changes_nothing(self):
+        self.stopped_at_the_repair_limit()
+        with self.assertRaises(ConfigurationError):
+            self.controller.resume(self.conn, self.root, 'Bad', dict(extra_repairs=1, model_overrides=dict(fixer=dict(provider='x'))))
+        self.assertEqual(self.project()['terminal']['phase'], 'human_review')
+        self.assertNotIn('model_overrides', self.project())
 
     # --- the independent plan review is off by default ---
     def review_off(self):
@@ -1065,21 +1103,19 @@ class ProjectControllerTests(unittest.TestCase):
         self.assertIn('NOT STATED BY ANY PLANNED TASK', ProjectController._integration_acceptance(project)['AC2'])
 
     # --- stage retry: re-run only the stopped stage, keep history ---
-    def stopped_on_a_plan_defect_after_the_replan_limit(self):
+    def stopped_on_a_blocked_writer(self):
         self.plan()
-        project = self.project(); project['replans'] = 2
-        self.conn.execute('UPDATE factory_project_execution SET document=?', (json.dumps(project),)); self.conn.commit()
-        self.board.complete(self.only('developer'), plan_defect='The linter cannot express the plan')
+        self.board.complete(self.only('developer'), verdict='BLOCKED', blocked_reason='The linter cannot express the plan')
         self.tick(); self.board.complete(self.only('factory-retro'))
-        self.assertEqual(self.tick()['phase'], 'human_review')
+        self.assertEqual(self.tick()['phase'], 'blocked')
 
     def developer_rows(self):
         return [dict(r) for r in self.conn.execute("SELECT task_id,evidence_retry FROM factory_workflow_stages WHERE profile='developer' ORDER BY evidence_retry")]
 
     def test_retry_stage_reruns_only_the_stopped_stage_and_keeps_its_history(self):
-        self.stopped_on_a_plan_defect_after_the_replan_limit()
+        self.stopped_on_a_blocked_writer()
         before = self.developer_rows(); old_task = before[-1]['task_id']
-        project = self.project(); replans, history = project['replans'], len(project['history'])
+        project = self.project(); replans, history = project.get('replans', 0), len(project['history'])
         self.controller.resume(self.conn, self.root, 'Tooling corrected', dict(retry_stage=True))
         self.tick()
         after = self.developer_rows()
@@ -1089,7 +1125,7 @@ class ProjectControllerTests(unittest.TestCase):
         self.assertEqual(self.board.get_task(self.conn, old_task).status, 'done')
         project = self.project()
         self.assertNotIn('terminal', project)
-        self.assertEqual(project['replans'], replans)
+        self.assertEqual(project.get('replans', 0), replans)
         self.assertGreaterEqual(len(project['history']), history)
         self.assertEqual(project['stage_retries'], {'task-code-implement:0': 1})
         card = self.board.cards[self.only('developer')['task_id']]['body']
@@ -1100,18 +1136,18 @@ class ProjectControllerTests(unittest.TestCase):
         self.only('verifier')
 
     def test_retry_stage_is_bounded_per_stage(self):
-        self.stopped_on_a_plan_defect_after_the_replan_limit()
+        self.stopped_on_a_blocked_writer()
         for attempt in range(2):
             self.controller.resume(self.conn, self.root, 'Tooling corrected', dict(retry_stage=True)); self.tick()
-            self.board.complete(self.only('developer'), plan_defect='Still the same defect')
+            self.board.complete(self.only('developer'), verdict='BLOCKED', blocked_reason='Still blocked')
             self.tick(); self.board.complete(self.only('factory-retro'))
-            self.assertEqual(self.tick()['phase'], 'human_review')
+            self.assertEqual(self.tick()['phase'], 'blocked')
         with self.assertRaisesRegex(ConfigurationError, 'human stage retries'):
             self.controller.resume(self.conn, self.root, 'One more', dict(retry_stage=True))
-        self.assertEqual(self.project()['terminal']['phase'], 'human_review')  # an refused retry changes nothing
+        self.assertEqual(self.project()['terminal']['phase'], 'blocked')  # a refused retry changes nothing
 
     def test_retry_stage_is_refused_while_the_stage_is_running(self):
-        self.stopped_on_a_plan_defect_after_the_replan_limit()
+        self.stopped_on_a_blocked_writer()
         self.controller.resume(self.conn, self.root, 'Tooling corrected', dict(retry_stage=True)); self.tick()
         running = len(self.developer_rows())
         project = self.project(); project['terminal'] = dict(phase='human_review', reason='stale'); project['mode'] = 'finished'
@@ -1122,7 +1158,7 @@ class ProjectControllerTests(unittest.TestCase):
         self.assertEqual(len(self.developer_rows()), running)
 
     def test_retry_stage_cannot_be_combined_with_reevaluate(self):
-        self.stopped_on_a_plan_defect_after_the_replan_limit()
+        self.stopped_on_a_blocked_writer()
         with self.assertRaisesRegex(ConfigurationError, 'Choose one'):
             self.controller.resume(self.conn, self.root, 'Both', dict(retry_stage=True), True)
 

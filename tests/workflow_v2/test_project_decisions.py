@@ -234,3 +234,28 @@ class RetryStageDecisionTests(unittest.TestCase):
             normalize_decisions(dict(retry_stage='yes'), 'note')
         with self.assertRaises(ConfigurationError):
             normalize_decisions(dict(retry_stage=True), '  ')
+
+
+class ModelOverrideDecisionTests(unittest.TestCase):
+    def test_a_model_override_is_normalised_and_needs_a_note(self):
+        from factory_dashboard.project_decisions import normalize_decisions
+        got = normalize_decisions(dict(model_overrides=dict(fixer=dict(provider='openai-codex', model='gpt-5'))), 'Stronger model')
+        self.assertEqual(got['model_overrides'], dict(fixer=dict(provider='openai-codex', model='gpt-5', effort='high')))
+        self.assertEqual(normalize_decisions(None, '')['model_overrides'], {})
+        with self.assertRaises(ConfigurationError):
+            normalize_decisions(dict(model_overrides=dict(fixer=dict(provider='openai-codex', model='gpt-5'))), ' ')
+
+    def test_malformed_overrides_are_rejected(self):
+        from factory_dashboard.project_decisions import normalize_decisions
+        for bad in (dict(fixer=dict(provider='x')), dict(fixer='gpt-5'), dict(Fixer=dict(provider='a', model='b')),
+                    dict(fixer=dict(provider='a', model='b', effort='warp')), dict(fixer=dict(provider='a', model='b', extra=1)),
+                    {f'p{i}': dict(provider='a', model='b') for i in range(5)}):
+            with self.subTest(bad=bad):
+                with self.assertRaises(ConfigurationError):
+                    normalize_decisions(dict(model_overrides=bad), 'note')
+
+    def test_only_human_review_is_an_exhaustion_choice(self):
+        from factory_dashboard.project_decisions import normalize_decisions
+        self.assertEqual(normalize_decisions(dict(on_exhaustion='human_review'), 'n')['on_exhaustion'], 'human_review')
+        with self.assertRaises(ConfigurationError):
+            normalize_decisions(dict(on_exhaustion='replan'), 'n')

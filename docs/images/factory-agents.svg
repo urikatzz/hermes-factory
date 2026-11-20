@@ -54,8 +54,6 @@
 <text x="268" y="806" class="body">Consume the relevant director plans, then design the code and integration.</text>
 <text x="268" y="829" class="body">Break the project into small tasks with dependencies and acceptance criteria.</text>
 <path d="M600 854 V892" class="line"/>
-<path d="M1152 1236 H1176 V800 H952" class="back"/>
-<text x="1170" y="788" class="label" fill="#ffc773" text-anchor="end">REPLAN PATH · MAX 2</text>
 <g transform="translate(0,-130)">
 <rect x="48" y="1022" width="1104" height="236" rx="14" fill="#101b2d" stroke="#25344e"/>
 <text x="72" y="1053" class="label" fill="#93a9cd">CAPTURED TASK GRAPH / EXAMPLE: ONE FEATURE, MANY SMALL TASKS</text>
@@ -98,7 +96,7 @@
 <path d="M600 1258 V1296" class="line"/>
 <rect x="48" y="1296" width="1104" height="572" rx="14" fill="#101b2d" stroke="#365077"/>
 <text x="72" y="1331" class="label" fill="#90aaff">EVERY SMALL TASK GETS ITS OWN FACTORY CYCLE</text>
-<text x="1128" y="1331" class="label" fill="#ffc773" text-anchor="end">REPAIR LIMIT HIT OR PLAN DEFECT → BACK TO ARCHITECT</text>
+<text x="1128" y="1331" class="label" fill="#ff8fb1" text-anchor="end">REPAIR LIMIT HIT → BLOCKED FOR A HUMAN</text>
 <text x="72" y="1359" class="body">Only the agents needed by this task participate. Dependencies must finish their full cycle first.</text>
 <rect x="80" y="1388" width="328" height="108" rx="14" fill="#152137" stroke="#2b3b55"/>
 <rect x="80" y="1404" width="3" height="76" rx="1.5" fill="#90aaff"/>
@@ -137,7 +135,7 @@
 <path d="M480 1702 H432 V1725 H408" class="line"/>
 <text x="490" y="1784" class="body">Any repair → fresh verifier → only the affected reviews.</text>
 <text x="490" y="1812" class="small" style="fill:#ff8fb1">Missing render tools → human recovery; no approval.</text>
-<text x="490" y="1838" class="small">Repair limit or plan defect → architect replans (max 2 per project), then <tspan fill="#ff8fb1">human review</tspan>.</text>
+<text x="490" y="1838" class="small">Repair limit → blocked for a <tspan fill="#ff8fb1">human</tspan>, who grants repairs or picks a stronger model. No replan.</text>
 <path d="M600 1868 V1906" class="line"/>
 <rect x="248" y="1906" width="704" height="131" rx="14" fill="#152137" stroke="#2b3b55"/>
 <rect x="248" y="1922" width="3" height="99" rx="1.5" fill="#80d8a0"/>
@@ -163,7 +161,7 @@
 <rect x="640" y="2245" width="480" height="131" rx="14" fill="#2a1622" stroke="#6b3550"/>
 <rect x="640" y="2261" width="3" height="99" rx="1.5" fill="#ff8fb1"/>
 <text x="660" y="2276" class="name">Human review or recovery</text>
-<text x="660" y="2305" class="body">Review: repairs and replans exhausted, or evidence conflicts.</text>
+<text x="660" y="2305" class="body">Review: repair limit hit; grant repairs or a stronger model.</text>
 <text x="660" y="2328" class="body">Recovery: fix missing tools, then resume with a written note.</text>
 <text x="660" y="2351" class="body">A note cannot waive a defect or change scope.</text>
 <text x="48" y="2414" class="small">Publishing, when separately invoked: pr-writer drafts the description; the publisher opens a draft PR.</text>

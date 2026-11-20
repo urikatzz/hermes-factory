@@ -26,7 +26,9 @@ Extra repairs
     ``retry_stage: true`` re-runs only the stage the project stopped on (a stop at human_review or blocked) with a new evidence_retry row.
     The earlier row, its result and every accepted stage stay as history; the new row supersedes it. It is bounded by MAX_STAGE_RETRIES per
     stage and cycle, refused while that stage is still running, and recorded as ``human_stage_retry`` in the orchestration log.
-    ``on_exhaustion: human_review`` makes that task stop for a human, instead of replanning, when the budget runs out again.
+    An exhausted repair budget always stops the task for a human (never back to the architect); ``on_exhaustion`` is accepted for old files.
+    ``model_overrides`` ({profile: {provider, model, effort}}) makes later stages of that profile use another model for this project; it is
+    validated against the model catalog when used and recorded under ``orchestration_log`` as ``human_model_override``.
 """
 import fnmatch
 import hashlib
@@ -35,13 +37,15 @@ import re
 import time
 
 from .model_policy import ConfigurationError
+from .task_settings import RoleSettings
 
 AC_ID = re.compile(r'AC(?:[0-9]+|-GATE)')
 HEX_COLOR = re.compile(r'#[0-9A-Fa-f]{6}')
 CATCH_ALL = {'*', '**', '**/*', '*/*', '/', '.', './', '/*'}
 KINDS = ('immutable', 'palette', 'layout', 'architecture', 'behavior', 'acceptance')
 MAX_EXTRA_REPAIRS = 2
-EXHAUSTION = ('replan', 'human_review')
+EXHAUSTION = ('human_review',)  # an exhausted repair budget always stops for a human; the key is kept so old decision files still load
+MAX_MODEL_OVERRIDES = 4
 MAX_EXTRA_REPLANS = 1
 MAX_EXTRA_HANDOFF_RETRIES = 3
 MAX_STAGE_RETRIES = 2  # human stage retries per stage and cycle, over the whole run
@@ -118,11 +122,11 @@ def validate_plan_constraints(value):
 
 def normalize_decisions(decisions, note, now=None):
     """Validate a human decision document; return it ready to store."""
-    empty = dict(waivers=[], constraints=[], extra_repairs=0, extra_replans=0, extra_handoff_retries=0, on_exhaustion=None, plan_correction=[], retry_stage=False)
+    empty = dict(waivers=[], constraints=[], extra_repairs=0, extra_replans=0, extra_handoff_retries=0, on_exhaustion=None, plan_correction=[], retry_stage=False, model_overrides={})
     if decisions in (None, {}):
         return empty
-    if not isinstance(decisions, dict) or set(decisions) - {'waivers', 'constraints', 'extra_repairs', 'extra_replans', 'extra_handoff_retries', 'on_exhaustion', 'plan_correction', 'retry_stage'}:
-        raise ConfigurationError('A decision may only contain waivers, constraints, extra_repairs, extra_replans, extra_handoff_retries, on_exhaustion, plan_correction and retry_stage')
+    if not isinstance(decisions, dict) or set(decisions) - {'waivers', 'constraints', 'extra_repairs', 'extra_replans', 'extra_handoff_retries', 'on_exhaustion', 'plan_correction', 'retry_stage', 'model_overrides'}:
+        raise ConfigurationError('A decision may only contain waivers, constraints, extra_repairs, extra_replans, extra_handoff_retries, on_exhaustion, plan_correction, retry_stage and model_overrides')
     stamp = int(time.time() if now is None else now)
     waivers = []
     for item in decisions.get('waivers') or []:
@@ -155,12 +159,22 @@ def normalize_decisions(decisions, note, now=None):
     correction = decisions.get('plan_correction') or []
     if not isinstance(correction, list) or len(correction) > 20 or any(not isinstance(i, str) or not re.fullmatch(r'F[0-9]{1,3}', i) for i in correction):
         raise ConfigurationError('plan_correction must list plan-review finding ids such as F1')
+    overrides = decisions.get('model_overrides') or {}
+    if not isinstance(overrides, dict) or len(overrides) > MAX_MODEL_OVERRIDES:
+        raise ConfigurationError(f'model_overrides maps at most {MAX_MODEL_OVERRIDES} profiles to {{"provider","model","effort"}}')
+    model_overrides = {}
+    for profile, spec in overrides.items():
+        if not isinstance(profile, str) or not re.fullmatch(r'[a-z][a-z-]*', profile) or not isinstance(spec, dict) \
+                or set(spec) - {'provider', 'model', 'effort'} or not {'provider', 'model'} <= set(spec):
+            raise ConfigurationError('Each model override is {"provider": ..., "model": ..., "effort": optional} for one profile name')
+        chosen = RoleSettings(spec['provider'], spec['model'], spec.get('effort', 'high'))  # shape check; the catalog validates it when it is used
+        model_overrides[profile] = dict(provider=chosen.provider, model=chosen.model, effort=chosen.effort)
     retry_stage = decisions.get('retry_stage', False)
     if type(retry_stage) is not bool:
         raise ConfigurationError('retry_stage must be true or false')
-    if (extra or extra_replans or extra_handoff or on_exhaustion or correction or retry_stage) and not note.strip():
+    if (extra or extra_replans or extra_handoff or on_exhaustion or correction or retry_stage or model_overrides) and not note.strip():
         raise ConfigurationError('Granting repairs or changing exhaustion handling requires a recorded note')
-    return dict(waivers=waivers, constraints=constraints, extra_repairs=extra, extra_replans=extra_replans, extra_handoff_retries=extra_handoff, on_exhaustion=on_exhaustion, plan_correction=sorted(set(correction)), retry_stage=retry_stage)
+    return dict(waivers=waivers, constraints=constraints, extra_repairs=extra, extra_replans=extra_replans, extra_handoff_retries=extra_handoff, on_exhaustion=on_exhaustion, plan_correction=sorted(set(correction)), retry_stage=retry_stage, model_overrides=model_overrides)
 
 
 def finding_file(finding):

@@ -18,8 +18,8 @@ Verifier must explicitly pass before reviewers are created. Any repaired impleme
 For perceptual review, obey the card's retained comparison.json contract. Final art review requires actual in-engine
 rendering. Missing perception is unavailable evidence, not a NIT, a waiver or an approval.
 Asset mismatch findings route to artist/sound-designer, code findings to fixer. Never redefine director intent to pass.
-A plan reviewer retains PLAN-REVIEW.md and reports plan defects as findings; it writes no plan of its own.
-If a failure comes from a wrong task plan or acceptance criterion, set metadata.plan_defect instead of forcing a repair.
+A plan reviewer (when that stage is enabled) retains PLAN-REVIEW.md and reports defects as findings; it writes no plan of its own.
+If a task plan or acceptance criterion is wrong or untestable, finish VERDICT=BLOCKED with blocked_reason naming it; the project stops for a human. Never work around it or weaken the criterion, and nothing is sent back to the architect.
 The architect sets metadata.scope_additions when the captured scope omits art, audio, UI or UX the work needs.
 factory-retro proposes improvements only; changing Factory behavior requires a separate approved implementation task.
 In a managed stage the file and terminal toolsets of your profile are enabled for your scratch workspace, whatever your role text says about chat mode.

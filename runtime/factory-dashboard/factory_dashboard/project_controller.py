@@ -7,7 +7,7 @@ import re
 import time
 
 from .model_policy import ConfigurationError
-from .project_cards import (ART_PLAN, ROLE_FINDINGS, APPROVED_COMPARISON, APPROVED_REFERENCES, INSPECTION, REFERENCE_AUDIT, VISUAL_TRACE, ARCHITECT, COMPARISON, CONFLICT_CHECK, SIMILARITY, DIRECTOR, PLAN_CORRECTION, PLAN_CORRECTION_REVIEW, PLAN_DEFECT, SUPERSEDED,
+from .project_cards import (ART_PLAN, ROLE_FINDINGS, APPROVED_COMPARISON, APPROVED_REFERENCES, INSPECTION, REFERENCE_AUDIT, VISUAL_TRACE, ARCHITECT, COMPARISON, CONFLICT_CHECK, SIMILARITY, DIRECTOR, PLAN_CORRECTION, PLAN_CORRECTION_REVIEW, PLAN_BLOCKED, PLAN_FINDING, SUPERSEDED,
                             PLAN_REVIEW, REPLAN, RETRO, SCOPE, SPEC_CONSTRAINTS, TOOL_INCIDENTS, project_card)
 from .project_decisions import (MAX_STAGE_RETRIES, constraint_view, constraints_of, normalize_decisions, preserved_conflict, record_applied, relevant_constraints,
                                 validate_plan_constraints, validate_spec_conflicts)
@@ -163,8 +163,8 @@ class ProjectController:
             project.setdefault('retry_keys', []).append(token)
             self._state.event(conn, root['root_id'], 'handoff_rejected', dict(key=key, task_id=row['task_id'], reason=reason, attempt=tries + 1))
             return self._node(conn, root, definition, context, project, key, kind, profile, original, [*inputs, row['task_id']], task=task, cycle=cycle)
-        if result.metadata['verdict'] == 'BLOCKED' and not self._defect([result]):
-            # A BLOCKED stage that declares a plan defect is not blocked work: it goes on to the architect (bounded replans).
+        if result.metadata['verdict'] == 'BLOCKED':
+            # A BLOCKED stage stops the project for a human. A declared plan_defect is informational only: nothing routes on it.
             blocked = dict(key=key, profile=profile, task_id=row['task_id'], run_id=result.run_id, cycle=cycle,
                            verdict='BLOCKED', artifacts=result.metadata.get('artifacts', []), reason=result.metadata.get('blocked_reason', key))
             if not any(h.get('task_id') == row['task_id'] and h.get('run_id') == result.run_id for h in project['history']):
@@ -670,17 +670,12 @@ class ProjectController:
                              'VERDICT=BLOCKED; use BLOCKED only for a missing tool or capability you cannot provide. '
                              'The approved plan paths named in your card are your plan: read them there, and if you need the plan under '
                              'PROJECT_DIR/.factory copy it yourself. A plan attachment that looks missing is never a reason for BLOCKED.')
-            instructions += '\n' + SPEC_CONSTRAINTS + '\n' + PLAN_DEFECT
+            instructions += '\n' + SPEC_CONSTRAINTS + '\n' + PLAN_BLOCKED
             node = self._node(conn, root, definition, context, project, key, 'repair' if repair else 'implement', profile,
                               instructions, work['writer_inputs'], task=task, cycle=cycle)
             if not node:
                 return False
             row, result = node
-            defect = self._defect([result])
-            if defect:
-                if not self._replan(conn, root, project, task, 'Plan defect: ' + defect, work['blocking'], [row['task_id']]):
-                    raise ConfigurationError('Plan defect reported after the replan limit: ' + defect)
-                return True
             reported, expected = set(result.metadata['ac_ids']), set(task['acceptance'])
             # An implement writer reports every task AC. A repair writer may report fewer (the findings it repaired) or may also
             # name other known project ACs (task text often says "ac_status covers AC1..ACn"); an unknown ID or no task AC at all
@@ -705,7 +700,7 @@ class ProjectController:
                           'Verify only TASK acceptance IDs against the exact cumulative manifest. Run tests, integration checks, asset lint gates and release audit. '
                           'Record repair_domains (code/art/audio) for failed asset or integration checks. Missing tools are environment gaps, never passes. '
                           'Never use inline interpreter flags such as python -c or node -e (the safety guard blocks them): read files with the file tools or run a script file. '
-                          + TOOL_INCIDENTS + '\n' + SPEC_CONSTRAINTS + '\n' + PLAN_DEFECT,
+                          + TOOL_INCIDENTS + '\n' + SPEC_CONSTRAINTS + '\n' + PLAN_FINDING,
                           inputs, task=task, cycle=cycle)
         if not node:
             return False
@@ -726,7 +721,7 @@ class ProjectController:
         profiles = self._panel([s.profile for s in definition.reviewers], task, work)
         readers, rows, waiting = [verifier], [verifier_row], False
         for profile in profiles:
-            instructions = 'Review only your discipline against TASK acceptance and the inherited plans; report actionable findings.\n' + TOOL_INCIDENTS + '\n' + SPEC_CONSTRAINTS + '\n' + PLAN_DEFECT
+            instructions = 'Review only your discipline against TASK acceptance and the inherited plans; report actionable findings.\n' + TOOL_INCIDENTS + '\n' + SPEC_CONSTRAINTS + '\n' + PLAN_FINDING
             human_approved = bool(refs.authoritative(project.get('reference_records', [])))
             if profile == 'art-reviewer':
                 instructions += '\n' + COMPARISON + ('\n' + APPROVED_COMPARISON if human_approved else '')
@@ -836,17 +831,10 @@ class ProjectController:
             else:
                 del project['work']
             return True
-        defect = self._defect(readers)
-        exhausted = decision.decision == 'human_review' and decision.reason == REPAIR_LIMIT
-        if exhausted or (defect and decision.decision == 'repair'):
-            # Patching symptoms of a wrong plan never converges: escalate to the architect before a human.
-            if exhausted and work.get('on_exhaustion') == 'human_review':
-                # A human chose, in a recorded decision, to review this task instead of replanning or granting another repair.
-                self._terminal(conn, root, project, 'human_review', 'Repair budget exhausted after a granted extra repair; human review was requested instead of a replan or another repair')
-                return True
-            reason = 'Plan defect: ' + defect if defect else 'Repairs did not converge within the captured limit'
-            if not self._replan(conn, root, project, task, reason, decision.blocking, [work['writer_task'], *[r['task_id'] for r in rows]]):
-                self._terminal(conn, root, project, 'human_review', decision.reason if exhausted else reason + ' (replan limit reached)')
+        if decision.decision == 'human_review' and decision.reason == REPAIR_LIMIT:
+            # The repair limit stops the task for a human; it never goes back to the architect. A human reads the findings and resumes with
+            # extra_repairs, optionally with model_overrides (a stronger model for a profile), or changes the plan and starts a new task.
+            self._terminal(conn, root, project, 'human_review', self._repair_limit_reason(task, work, decision))
             return True
         if decision.decision == 'repair':
             # Only readers that reported a failure ask for repair domains; a passing verifier's leftover domain must not summon an agent.
@@ -997,6 +985,13 @@ class ProjectController:
         return {ac: ('NOT STATED BY ANY PLANNED TASK: implement and verify it here. ' + (text.get(ac) + ' ' if text.get(ac) else '') + 'Project PLAN.md: ' + ac)
                 if ac in uncovered else 'Project PLAN.md: ' + ac for ac in project['ac_ids']}
 
+    @staticmethod
+    def _repair_limit_reason(task, work, decision):
+        findings = '; '.join(f[:160] for f in decision.blocking[:5]) or 'no findings recorded'
+        return ('Repair limit reached for task ' + task['id'] + ' after ' + str(budget_used(work)[0]) + ' product repair(s). Unresolved: ' + findings
+                + '. A human decides: resume with {"extra_repairs": 1-2} and, to try a stronger model, {"model_overrides": {"<profile>": {"provider": "...", '
+                '"model": "...", "effort": "high"}}}; or amend the plan in a new task. It does not go back to the architect.')
+
     def _retry_stage(self, conn, root, project, note):
         """Re-run only the stage the project stopped on: a new evidence_retry row supersedes the stopped one, which stays as history.
 
@@ -1065,7 +1060,8 @@ class ProjectController:
             raise ConfigurationError('extra_handoff_retries applies to a stage whose handoff or plan-correction retries are exhausted; none is')
         if decided['retry_stage'] and reevaluate:
             raise ConfigurationError('retry_stage re-runs the stopped stage; reevaluate judges its existing evidence. Choose one')
-        stopped = ('blocked', 'human_review') if reevaluate or decided['extra_handoff_retries'] or decided['retry_stage'] else ('blocked',)
+        stopped = ('blocked', 'human_review') if reevaluate or decided['extra_handoff_retries'] or decided['retry_stage'] \
+            or decided['extra_repairs'] or decided['model_overrides'] else ('blocked',)
         if root['phase'] not in stopped or project.get('terminal', {}).get('phase') not in stopped:
             raise ConfigurationError('Only an infrastructure-blocked project can resume; changed scope requires a new task')
         project.update(mode=project['resume_mode'], active_keys=[], recoveries=project.get('recoveries', 0)+1, recovery_note=note)
@@ -1077,6 +1073,15 @@ class ProjectController:
             for key in exhausted_plan:
                 project['plan_validation_retries'][key] = max(0, MAX_PLAN_VALIDATION_RETRIES - grant)
             project.setdefault('orchestration_log', []).append(dict(kind='human_handoff_grant', amount=grant, budgets=sorted([*exhausted, *('plan:' + k for k in exhausted_plan)]),
+                                                                   reason=note.strip()[:500], at=int(time.time())))
+        if decided['model_overrides']:
+            # A human chose another model for these profiles in this project: later stages of the profile use it (the resolver validates it
+            # against the model catalog). Recorded, never silent.
+            kept = project.setdefault('model_overrides', {})
+            for profile, spec in decided['model_overrides'].items():
+                kept[profile] = dict(spec, note=note.strip()[:300], at=int(time.time()))
+            project.setdefault('orchestration_log', []).append(dict(kind='human_model_override', profiles=sorted(decided['model_overrides']),
+                                                                   models={p: s['provider'] + '/' + s['model'] for p, s in decided['model_overrides'].items()},
                                                                    reason=note.strip()[:500], at=int(time.time())))
         project.setdefault('scan_resolved', []).extend(i for i in re.findall(r'SCAN-BENIGN ([0-9a-f]{8})', note) if i not in project.get('scan_resolved', []))
         if project.get('references_digest'):

@@ -115,8 +115,11 @@ inherited project ac_ids.'''
 
 SUPERSEDED = '''Earlier attempts of this stage ({ids}) are superseded. Their verdicts and MANIFEST values do not describe the current state, and the "Recent work" list in your context may still show them as DONE. Only the BASELINE and MANIFEST fields in this card's header apply: BASELINE none means there is no baseline to check, so never run fw.py check --expect with a manifest taken from an earlier attempt or from a "Recent work" entry. Work from the files as they are now.'''
 
-PLAN_DEFECT = '''If the failure comes from a wrong, contradictory or untestable task plan or acceptance criterion rather than from the
-implementation, set metadata.plan_defect to a one-sentence reason. The engine then returns the project to the architect instead of repairing.'''
+PLAN_BLOCKED = '''If the task plan or an acceptance criterion is wrong, contradictory or untestable, or the available tools cannot express it, do not work around it and do not weaken the criterion:
+finish VERDICT=BLOCKED with blocked_reason naming the criterion and why. The project then stops for a human, who decides. Nothing is sent back to the architect.'''
+
+PLAN_FINDING = '''If a criterion itself is wrong or untestable rather than the implementation, say so in a finding that names the criterion. Repairs are bounded; when the limit is
+reached the project stops for a human, who decides. Nothing is sent back to the architect.'''
 
 PREPARE_OUTPUT = 'Create PLAN.md with numbered AC1..ACn and a Manifest include list. Attach PLAN.md; do not modify PROJECT_DIR.'
 
