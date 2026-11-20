@@ -7,6 +7,23 @@ from .model_policy import ConfigurationError
 from . import project_references
 
 
+def dedupe_artifacts(artifacts):
+    """Collapse attachments Kanban stored twice. kanban_complete attaches a file once per mention (the artifacts argument and metadata.artifacts), which
+    yields PLAN.md and PLAN_1.md with the same bytes. A numbered copy is dropped only when an earlier file of the base name has identical content;
+    differing numbered files stay and stay ambiguous."""
+    kept = []
+    for artifact in artifacts:
+        path = Path(artifact)
+        match = re.fullmatch(r'(.+?)_([0-9]+)(\.[^.]+)?', path.name)
+        if match and path.is_file():
+            base = match.group(1) + (match.group(3) or '')
+            original = next((Path(k) for k in kept if Path(k).name == base and Path(k).parent == path.parent and Path(k).is_file()), None)
+            if original and not path.is_symlink() and hashlib.sha256(original.read_bytes()).digest() == hashlib.sha256(path.read_bytes()).digest():
+                continue
+        kept.append(artifact)
+    return kept
+
+
 def retained_json(artifacts, name):
     paths = [Path(p) for p in artifacts if re.fullmatch(re.escape(name.removesuffix('.json')) + r'(?:_[0-9]+)?\.json', Path(p).name)]
     if len(paths) != 1:

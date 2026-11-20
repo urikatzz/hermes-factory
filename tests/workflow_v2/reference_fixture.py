@@ -168,7 +168,7 @@ class ReferenceFlow(unittest.TestCase):
         return [self.project / r['path'] for r in refs.authoritative(self.loaded['references'])]
 
     def finish(self, stage, plan_text, inspected=True, viewed=True, succeeded=True, extra=(), tasks=(), screenshots=(), per_requirement=None,
-               mockup=True, art_plan=True, document='PLAN.md', inspection_change=None, shots_viewed=None, **overrides):
+               mockup=True, art_plan=True, document='PLAN.md', inspection_change=None, shots_viewed=None, duplicates=False, **overrides):
         """Complete a stage the way a worker would: its document, the inspection JSON with role findings, real vision calls in its session log.
 
         An art-director stage also gets the art-plan headings and a representative mockup (both can be switched off)."""
@@ -188,7 +188,15 @@ class ReferenceFlow(unittest.TestCase):
             artifacts.append(self.write(stage, 'reference-inspection.json', inspection(self.loaded, kind, tasks, screenshots, per_requirement, **(inspection_change or {}))))
         if shots_viewed:
             seen.extend(shots_viewed)
-        self.board.complete(stage, artifacts=[*artifacts, *extra], **overrides)
+        listed = [*artifacts, *extra]
+        if duplicates:
+            # Kanban attaches a file once per mention (artifacts argument and metadata.artifacts): numbered copies with the same bytes.
+            for path in list(listed):
+                source = Path(path)
+                copy = source.with_name(source.stem + '_1' + source.suffix)
+                copy.write_bytes(source.read_bytes() if duplicates is True else (source.read_bytes() + b' ' if source.suffix == '.json' else source.read_bytes()))
+                listed.append(str(copy))
+        self.board.complete(stage, artifacts=listed, **overrides)
         self.sessions += 1
         session = f'session{self.sessions:04d}{stage["stage_key"].replace("-", "")}'
         row = self.conn.execute('SELECT id,metadata FROM task_runs WHERE task_id=? ORDER BY id DESC', (stage['task_id'],)).fetchone()

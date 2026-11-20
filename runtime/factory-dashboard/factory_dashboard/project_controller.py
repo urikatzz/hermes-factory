@@ -11,7 +11,7 @@ from .project_cards import (ART_PLAN, ROLE_FINDINGS, APPROVED_COMPARISON, APPROV
                             PLAN_REVIEW, REPLAN, RETRO, SCOPE, SPEC_CONSTRAINTS, TOOL_INCIDENTS, project_card)
 from .project_decisions import (constraint_view, constraints_of, normalize_decisions, preserved_conflict, record_applied, relevant_constraints,
                                 validate_plan_constraints, validate_spec_conflicts)
-from .project_evidence import plan_evidence, retained_json, validate_comparison, validate_similarity
+from .project_evidence import dedupe_artifacts, plan_evidence, retained_json, validate_comparison, validate_similarity
 from . import project_references as refs
 from .project_policy import (MAX_ORCHESTRATION_RECOVERIES, MAX_PLAN_CORRECTIONS, MAX_REPLANS, blocking_findings, budget_used, finding_id,
                              missing_baseline_tokens, plan_architecture_diff, repair_origin, finding_ac, planning_profiles, route_findings, rereview_profiles,
@@ -136,6 +136,8 @@ class ProjectController:
             if not task_row or task_row.status in ('blocked', 'triage', 'archived'):
                 raise ProjectBlocked('Project stage requires intervention: ' + key)
             return None
+        if result.valid and isinstance(result.metadata.get('artifacts'), list):
+            result.metadata['artifacts'] = dedupe_artifacts(result.metadata['artifacts'])
         reason = None if not result.valid else self._inspection_problem(conn, project, profile, key, result, context)
         if not result.valid or reason:
             reason = reason or result.reason

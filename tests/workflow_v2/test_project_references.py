@@ -152,6 +152,7 @@ class ReferenceModuleTests(unittest.TestCase):
                 '4. Procedural only (no image generation): HUD health segments drawn as slanted parallelograms (V2), divider, frame counter text, corner marks, message text in amber stencil.',
                 'REQUEST: No grey-box presentation, placeholder artwork or simplified geometry stands in for the approved direction. Painted sprites are produced with the art skill.',
                 'No placeholder art and no simplified geometry: V1 hazard stripes and V2 slanted segments are built as shown.',
+                'The current palette.txt has no steel grey and no hazard stripe colour, so the bible must be amended before V1 hazard stripes can be checked.',
                 'T1 amends STYLE.md to remove the superseded greybox-only rules and add painted classes that carry V1 hazard stripes and V2 slanted segments.',
                 'SUPERSEDED (rewrite, do not preserve): AC10 grey-box assertions for V1 hazard stripes; greybox-only assertions replaced by V2 slanted segment checks.'):
             self.assertEqual(refs.find_contradictions(faithful, {'PLAN.md': sentence}), [], sentence)
@@ -174,6 +175,7 @@ class ReferenceModuleTests(unittest.TestCase):
         self.assertEqual(refs.find_contradictions(self.records, {'PLAN.md': 'No cloth physics, the hazard stripe trim is drawn on the door frame.'}), [])
         self.assertEqual(refs.find_contradictions(self.records, {'PLAN.md': 'No time is lost (hazard stripe trim is built first).'}), [])
         self.assertNotEqual(refs.find_contradictions(self.records, {'PLAN.md': 'Never include hazard stripe trim on the door.'}), [])
+        self.assertNotEqual(refs.find_contradictions(self.records, {'STYLE.md': 'S9 Look: no hazard stripe colour.'}), [])
 
     def test_a_conforming_rule_that_merely_contains_a_negation_elsewhere_is_not_flagged(self):
         rule = 'S9 Room 1 presents hazard stripes and a HUD that does not exist yet for weapons. S1 slanted segments; do not count blockout squares.'
@@ -464,6 +466,17 @@ class ReferenceWorkflowTests(ReferenceFlow):
         self.finish(self.only('art-director'), 'Only V1 is planned.')
         _, context = self.rejection('art-director')
         self.assertIn('does not carry approved visual requirement(s): V2', context['previous_handoff_rejected']['reason'])
+
+    def test_attachments_stored_twice_with_the_same_bytes_are_one_artifact(self):
+        self.start()
+        self.finish(self.only('art-director'), 'V1 V2 carried.', duplicates=True)
+        self.assertEqual(self.state.read_root(self.conn, self.root)['phase'], 'blocked')  # reached the human approval gate, not 'expected one retained'
+        self.assertTrue(self.document()['awaiting']['mockup'].endswith('plan-mockup.png'))
+
+    def test_numbered_copies_that_differ_stay_ambiguous(self):
+        self.start()
+        self.finish(self.only('art-director'), 'V1 V2 carried.', duplicates='different')
+        self.assertIn('Expected one retained reference-inspection.json', self.rejection('art-director')[1]['previous_handoff_rejected']['reason'])
 
     def test_a_requirement_a_human_scoped_to_a_later_milestone_is_not_demanded_now(self):
         self.start()

@@ -278,8 +278,15 @@ def _keyword(keyword):
     return re.compile(r'(?<![\w])' + re.escape(keyword) + r'(?:e?s)?(?![\w-])', re.I)
 
 
+_ABSENCE = re.compile(r"\b(?:has|have|had|contains?|lacks?|lacking|missing)\s+no\b", re.I)
+
+
 def _governs(clause, start):
-    """True when a prohibition word before position `start` governs it: same clause, a short list of nouns in between, no new idea."""
+    """True when a prohibition word before position `start` governs it: same clause, a short list of nouns in between, no new idea.
+
+    "X has no steel grey and no ball-joint colour" reports an absence in something that exists; it is not a prohibition."""
+    if _ABSENCE.search(clause):
+        return False
     for match in _PREFIX.finditer(clause):
         if match.end() > start:
             break
