@@ -78,6 +78,10 @@ class ReleaseTests(unittest.TestCase):
         from install_project_workflows import _PREVIOUS_AUTHORITY
         self.assertEqual(managed_text('Role intro\n\n'+_PREVIOUS_AUTHORITY+'# Rest\n'),upgraded)
         self.assertIn('never blocks for lacking vision',MANAGED)
+        from install_project_workflows import _WITHOUT_TOOLS
+        self.assertEqual(managed_text('Role intro\n\n'+_WITHOUT_TOOLS+'# Rest\n'),upgraded)
+        self.assertIn('your tools are kanban and skills only',' '.join(MANAGED.split()))
+        self.assertIn('do not apply',MANAGED)
 
     def test_plugin_bundle_contains_project_controller_and_policy(self):
         import importlib.util

@@ -61,8 +61,13 @@ something an approved reference shows is a defect in the lower layer. Grey-box s
 composition, palette, HUD or defining visual characteristic. Only a human-approved deferral listed in approved_references postpones a requirement.
 Factory mockups and screenshots are derived evidence, never the source of truth.
 '''
+TOOL_LINES = '''In a managed stage the file and terminal toolsets of your profile are enabled for your scratch workspace, whatever your role text says about chat mode.
+Sentences such as "your tools are kanban and skills only" or "you never write files" describe chat mode and do not apply: write the retained report with write_file
+under $HERMES_KANBAN_WORKSPACE and attach it with kanban_complete(artifacts=[that absolute path]); a completion without the attachment is rejected.
+'''
 ENDING = 'All existing Git/publishing restrictions, approval floors and factory-worker handoff identity checks still apply.\n'
-MANAGED = BASE.replace(ENDING, AUTHORITY_LINES + ENDING)
+_WITHOUT_TOOLS = BASE.replace(ENDING, AUTHORITY_LINES + ENDING)
+MANAGED = BASE.replace(ENDING, TOOL_LINES + AUTHORITY_LINES + ENDING)
 _PREVIOUS_AUTHORITY = BASE.replace(ENDING, AUTHORITY_LINES_PREVIOUS + ENDING)
 PLANNING_LINES = '''A plan reviewer retains PLAN-REVIEW.md and reports plan defects as findings; it writes no plan of its own.
 If a failure comes from a wrong task plan or acceptance criterion, set metadata.plan_defect instead of forcing a repair.
@@ -77,9 +82,9 @@ LISTENING_LINES = '''rendering. Audio review requires a capable listening tool o
 audio from waveforms or loudness. Missing perception is unavailable evidence, not a NIT, a waiver or an approval.
 '''
 _WITH_AUDIO_REVIEW = BASE.replace(PERCEPTION_LINE, LISTENING_LINES)
-RELEASED = (_PREVIOUS_AUTHORITY, BASE, _WITH_AUDIO_REVIEW, _WITH_AUDIO_REVIEW.replace(PLANNING_LINES, ''),
+RELEASED = (_WITHOUT_TOOLS, _PREVIOUS_AUTHORITY, BASE, _WITH_AUDIO_REVIEW, _WITH_AUDIO_REVIEW.replace(PLANNING_LINES, ''),
             _WITH_AUDIO_REVIEW.replace(PLANNING_LINES, '').replace(BIBLE_LINES, ''))
-assert len({MANAGED, *RELEASED}) == 6
+assert len({MANAGED, *RELEASED}) == 7
 
 
 # The inspecting roles, plus both possible plan reviewers and the other visual reviewers.
