@@ -15,11 +15,11 @@ RUNTIME = REPO / 'runtime'
 DASH = RUNTIME / 'factory-dashboard'
 HOME = Path(os.environ.get('HERMES_HOME') or Path.home() / '.hermes')
 
-PLUGIN_MODULES = ['board_registry.py', 'run_boards.py', 'factory_creation.py', 'task_settings_store.py']
+PLUGIN_MODULES = ['board_registry.py', 'run_boards.py', 'factory_creation.py', 'task_settings_store.py', 'hermes_compat.py']
 DASH_MODULES = PLUGIN_MODULES + ['runs_service.py', 'runs_http.py', 'http_server.py']
 DASH_ASSETS = ['live.html', 'runs.html', 'runs.js']
 DASH_SCRIPTS = ['factory_boards.py', 'resume_factory_workflow.py', 'serve_factory_dashboard.py', 'bundle_factory_plugin.py']
-CRON = ['factory_lib.py', 'factory_intake.py', 'factory_alerts.py', 'factory_publish.py', 'factory_watchdog.py', 'factory_resume_rate_limit.py', 'factory_status.py']
+CRON = ['factory_lib.py', 'factory_intake.py', 'factory_alerts.py', 'factory_publish.py', 'factory_watchdog.py', 'factory_resume_rate_limit.py', 'factory_status.py', 'factory_patch_check.py']
 CRON_TESTS = ['sandbox.py', 'test_boards.py']
 
 

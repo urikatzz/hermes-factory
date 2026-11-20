@@ -659,6 +659,10 @@ class ProjectController:
                             'Do not change the approved plan to make a mismatch pass. ' if repair else '')
             instructions += 'Read every inherited plan and TASK acceptance criteria. Use the relevant production skill for assets. '
             instructions += 'Integrate required art and audio outputs; run applicable checks and rebuild the cumulative project manifest.'
+            instructions += (' This is the final integration: build the manifest with `fw.py manifest PROJECT_DIR --final`, so every path on the include list must exist.'
+                             if task['id'] == 'integration' else
+                             ' Build the manifest with `fw.py manifest PROJECT_DIR`: an include path that a later task will create (and no earlier manifest delivered) is deferred, not an error; '
+                             'a path an earlier manifest delivered must still exist.')
             instructions += ('\nIf a test, build or gate fails, including tests you just wrote, diagnose it and fix the test or the code, '
                              'then re-run, repeating until every gate you can run passes. A failure you can fix is never a reason for '
                              'VERDICT=BLOCKED; use BLOCKED only for a missing tool or capability you cannot provide. '

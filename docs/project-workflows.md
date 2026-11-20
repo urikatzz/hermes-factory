@@ -101,6 +101,14 @@ Integration failures have an owner. A failing acceptance criterion is attributed
 
 `factory-retro` runs after a successful or unsuccessful project outcome. It writes retained `RETRO.md` with evidence, root causes, prioritized improvements, tradeoffs and validation steps. It has a scratch workspace and cannot apply improvements, modify Factory configuration, change outcomes, or publish. A missing retro report cannot silently become success.
 
+## Hermes patches and updates
+
+The Factory depends on local patches to the Hermes source (`runtime/hermes-patches`: version-controlled git patches, a manifest, and `hermes_patches.py status|apply|export`). A Hermes update resets the source tree and removes them, so the plugin checks for them when it loads (`hermes_compat.py`) and withholds its run-board support claim if they are missing. The `factory_patch_check.py` cron job records `state/factory/hermes-patches.json`, alerts once per change, pauses new intake while patches are missing, and with `--repair` reapplies clean patches (never during an update, never over a conflict, never restarting the gateway). See `runtime/hermes-patches/README.md`.
+
+## Manifest include list
+
+`PROJECT_DIR/.factory/include.txt` may mark a line `!path` (must exist now) or `?path` (a planned output of a later task). A missing path that no earlier manifest delivered is deferred and reported as `deferred_missing`, so an early task is not blocked by a later task's output; a path an earlier manifest delivered that has vanished, a `!` path, and excluded or unsafe paths still fail. The final integration card tells the writer to build the manifest with `fw.py manifest PROJECT_DIR --final`, where every listed path must exist.
+
 ## Installation
 
 Use the Hermes Python environment (Python 3.11+ with PyYAML):

@@ -27,6 +27,9 @@ The engine only checks that project-plan.json is well formed: valid ids, owners,
 - Set needs.art/audio/ui/ux only for domains the task really touches and the captured scope allows.
 - Mark risk high only for security-sensitive, concurrency, data-migration or cross-cutting work.
 
+## Manifest include list
+- In PLAN.md's include list, mark each path a later task will create with `?` (for example `?Assets/Art/Room01/`) and any path that must already exist with `!`. Unmarked paths that do not exist yet are deferred until they are delivered; the final integration requires every listed path to exist.
+
 ## Approved references
 - Every approved requirement id (V1, V2, ...) appears in the "visual" list of a task whose own acceptance text names that id. Never write a criterion that defers or weakens something an approved reference shows.
 

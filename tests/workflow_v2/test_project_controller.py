@@ -153,6 +153,23 @@ class ProjectControllerTests(unittest.TestCase):
         self.assertEqual(result['phase'], 'delivered')
         self.assertEqual(self.board.get_task(self.conn,self.root).status,'done')
 
+    def test_only_the_final_integration_card_demands_every_planned_manifest_path(self):
+        self.plan()
+        task_card = self.board.cards[self.only('developer')['task_id']]['body']
+        self.assertIn('fw.py manifest PROJECT_DIR`: an include path that a later task will create', task_card)
+        self.assertNotIn('--final', task_card)
+        for _ in range(2):
+            self.board.complete(self.only('developer')); self.tick()
+            self.board.complete(self.only('verifier')); self.tick()
+            for row in self.board.ready():
+                if row['profile'] != 'developer': self.board.complete(row)
+            self.tick()
+            ready = [r for r in self.board.ready() if r['profile'] == 'developer']
+            if ready and 'integration' in ready[0]['stage_key']:
+                self.assertIn('fw.py manifest PROJECT_DIR --final', self.board.cards[ready[0]['task_id']]['body'])
+                return
+        self.fail('the final integration card was never created')
+
     def test_director_plans_reach_architect_and_dependent_code_waits_for_asset_review(self):
         tasks = [
             dict(id='sprites', title='Make sprites', owner='artist', dependencies=[], acceptance={'AC1':'Sprite'},

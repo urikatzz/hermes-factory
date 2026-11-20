@@ -102,9 +102,9 @@ def main():
                 if kb.get_task(conn,root).status=='done':break
             assert kb.get_task(conn,root).status=='done',WorkflowState().read_root(conn,root)
             assert any(r[0]=='factory-retro' for r in conn.execute('SELECT profile FROM factory_workflow_stages'))
-            assert conn.execute("SELECT 1 FROM factory_workflow_stages WHERE stage_key='project-plan-review'").fetchone()
+            assert not conn.execute("SELECT 1 FROM factory_workflow_stages WHERE stage_key='project-plan-review'").fetchone()  # plan review is off by default
             print(json.dumps(dict(native_board=True,root_guard=True,v2_scope_card=True,stage_claim_guard=True,
-                                  plan_review=True,full_task_cycle=True,final_integration=True,retro=True,synthetic_stages=completed,model_calls=0)))
+                                  plan_review_stage=False,full_task_cycle=True,final_integration=True,retro=True,synthetic_stages=completed,model_calls=0)))
         conn.close()
 
 

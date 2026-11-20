@@ -15,6 +15,10 @@ def register(ctx):
     from .factory_dashboard.board_registry import build_resolver, DEFAULT_BOARD
 
     log = logging.getLogger('factory-models')
+    from .factory_dashboard.hermes_compat import compat_report
+    compat = compat_report()
+    if not compat['ok']:
+        log.error('Hermes lacks patches the Factory needs (%s). Stage creation and the workflow guards will not work: %s.', compat['message'], compat['remedy'])
 
     def settings():
         keys = ('board_path', 'board_id', 'snapshot_path', 'registry_path', 'boards_root')
@@ -144,4 +148,5 @@ def register(ctx):
     ctx.register_hook('before_kanban_task_mutation', before_mutation)
     ctx.register_hook('resolve_kanban_worker_model', resolve)
     ctx.register_hook('before_kanban_task_create', before_create)
-    announce()  # last: only a fully registered plugin may claim run-board support
+    if compat['ok']:
+        announce()  # last: only a fully registered plugin on a fully patched Hermes may claim run-board support

@@ -1,0 +1,630 @@
+diff --git a/hermes_cli/kanban_db.py b/hermes_cli/kanban_db.py
+index 4e61aeece34..296c9350f4d 100644
+--- a/hermes_cli/kanban_db.py
++++ b/hermes_cli/kanban_db.py
+@@ -1222,16 +1222,10 @@ def create_task(
+     parents = tuple(p for p in parents if p)
+     skills_list = _normalize_task_skills(skills)
+ 
+-    # Idempotency check BEFORE the write txn (no lock held); a concurrent-create
+-    # race may insert twice, the next lookup stabilises on the newest.
+-    if idempotency_key:
+-        row = conn.execute(
+-            "SELECT id FROM tasks WHERE idempotency_key = ? "
+-            "AND status != 'archived' "
+-            "ORDER BY created_at DESC LIMIT 1", (idempotency_key,),
+-        ).fetchone()
+-        if row:
+-            return row["id"]
++    from hermes_cli.kanban_db_task_creation import existing_task, prepare_creation
++    existing = existing_task(conn, idempotency_key)
++    if existing:
++        return existing
+ 
+     now = int(time.time())
+ 
+@@ -1250,6 +1244,9 @@ def create_task(
+             # commit so the dispatcher never sees a half-built graph.
+             with write_txn(conn, allow_nested=True):
+                 task_status, tenant = initial_task_state(conn, parents, initial_status, triage, tenant)
++                existing = prepare_creation(conn, locals())
++                if existing:
++                    return existing
+                 # Project worktree: fresh dir under the repo + deterministic
+                 # branch, instead of the random ``wt/<id>`` worker fallback.
+                 if project_obj is not None and workspace_kind == "worktree":
+@@ -1321,6 +1318,7 @@ def create_task(
+                             {"reason": "parent_not_done", "parent": gating[0]},
+                         )
+                 # ACK-edge: the originating channel hears a child BLOCK, not just the fan-in.
++                _guard_mutation(conn, 'created', task_id, {'board': board})
+                 inherit_creator_origin(conn, task_id, creator_task_id, created_at=now)
+                 _inherit_notify_subs(conn, task_id, parents, created_at=now)
+             return task_id
+@@ -1344,6 +1342,7 @@ def _project_branch_name(project_obj: Any, task_id: str, title: Optional[str]) -
+ 
+ 
+ def _link(conn: sqlite3.Connection, parent_id: str, child_id: str) -> None:
++    _guard_mutation(conn, 'link_tasks', child_id, {'parent_id': parent_id})
+     conn.execute(
+         "INSERT OR IGNORE INTO task_links (parent_id, child_id) VALUES (?, ?)",
+         (parent_id, child_id),
+@@ -1456,6 +1455,7 @@ def assign_task(conn: sqlite3.Connection, task_id: str, profile: Optional[str])
+     """Assign/reassign; raises RuntimeError while the task is running under a claim."""
+     profile = _canonical_assignee(profile)
+     with write_txn(conn):
++        _guard_mutation(conn, 'assign_task', task_id, locals())
+         row = conn.execute(
+             "SELECT status, claim_lock, assignee FROM tasks WHERE id = ?", (task_id,)
+         ).fetchone()
+@@ -1506,6 +1506,7 @@ def _set_task_override(
+     """Per-task override write: refuse archived tasks, record ``event_kind``,
+     then fire the task-updated observer AFTER commit (RFC #58548)."""
+     with write_txn(conn):
++        _guard_mutation(conn, '_set_task_override', task_id, locals())
+         status = _task_status(conn, task_id)
+         if status is None:
+             return False
+@@ -1529,6 +1530,9 @@ def set_reasoning_effort(conn: sqlite3.Connection, task_id: str, effort: Optiona
+     )
+ 
+ 
++from hermes_cli.kanban_db_mutation_guard import guard_mutation as _guard_mutation
++
++
+ # --- Links ---
+ 
+ def link_tasks(
+@@ -1551,6 +1555,7 @@ def link_tasks(
+         raise ValueError("a task cannot depend on itself")
+     gated = False
+     with write_txn(conn):
++        _guard_mutation(conn, 'link_tasks', child_id, locals())
+         missing = _missing_task_ids(conn, [parent_id, child_id])
+         if missing:
+             raise ValueError(f"unknown task(s): {', '.join(missing)}")
+@@ -1562,6 +1567,7 @@ def link_tasks(
+             or child["current_run_id"] != expected_child_run_id
+         ):
+             raise ValueError(f"cannot link {parent_id} -> {child_id}: child is already running")
++        from hermes_cli.kanban_db_graph import _would_cycle
+         if _would_cycle(conn, parent_id, child_id):
+             raise ValueError(f"linking {parent_id} -> {child_id} would create a cycle")
+         _link(conn, parent_id, child_id)
+@@ -1590,26 +1596,11 @@ def link_tasks(
+     return gated
+ 
+ 
+-def _would_cycle(conn: sqlite3.Connection, parent_id: str, child_id: str) -> bool:
+-    """True iff ``parent_id`` is already a descendant of ``child_id``."""
+-    seen = set()
+-    stack = [child_id]
+-    while stack:
+-        node = stack.pop()
+-        if node == parent_id:
+-            return True
+-        if node in seen:
+-            continue
+-        seen.add(node)
+-        rows = conn.execute(
+-            "SELECT child_id FROM task_links WHERE parent_id = ?", (node,)
+-        ).fetchall()
+-        stack.extend(r["child_id"] for r in rows)
+-    return False
+ 
+ 
+ def unlink_tasks(conn: sqlite3.Connection, parent_id: str, child_id: str) -> bool:
+     with write_txn(conn):
++        _guard_mutation(conn, 'unlink_tasks', child_id, locals())
+         cur = conn.execute(
+             "DELETE FROM task_links WHERE parent_id = ? AND child_id = ?", (parent_id, child_id),
+         )
+@@ -2097,30 +2088,6 @@ def recompute_ready(conn: sqlite3.Connection, failure_limit: int | None = None)
+ 
+ # --- Claim / complete / block ---
+ 
+-def _parents_satisfied(conn: sqlite3.Connection, task_id: str) -> bool:
+-    """Return whether every direct parent is terminal for dependency gating."""
+-    return conn.execute(
+-        "SELECT 1 FROM task_links l "
+-        "JOIN tasks p ON p.id = l.parent_id "
+-        "WHERE l.child_id = ? "
+-        "AND p.status NOT IN ('done', 'archived') LIMIT 1", (task_id,),
+-    ).fetchone() is None
+-
+-
+-def unsatisfied_parents(conn: sqlite3.Connection, task_id: str) -> list[tuple[str, str]]:
+-    """``(parent_id, status)`` for every direct parent :func:`_parents_satisfied`
+-    still counts as open (``done`` / ``archived`` release the child), in id
+-    order, so a refusal or a board view can name the blockers instead of the
+-    caller guessing. Read-only."""
+-    rows = conn.execute(
+-        "SELECT p.id, p.status FROM task_links l "
+-        "JOIN tasks p ON p.id = l.parent_id "
+-        "WHERE l.child_id = ? AND p.status NOT IN ('done', 'archived') "
+-        "ORDER BY p.id", (task_id,),
+-    ).fetchall()
+-    return [(row["id"], row["status"]) for row in rows]
+-
+-
+ def _claim_and_open_run(
+     conn: sqlite3.Connection, task_id: str, source_status: str, lock: str, expires: int, now: int,
+     *, event_extra: Optional[dict] = None, expect_assignee: Optional[str] = None,
+@@ -2161,6 +2128,7 @@ def _claim_and_open_run(
+     )
+     run_id = run_cur.lastrowid
+     conn.execute("UPDATE tasks SET current_run_id = ? WHERE id = ?", (run_id, task_id))
++    _guard_mutation(conn, "claimed", task_id, {"run_id": run_id})
+     _append_event(
+         conn, task_id, "claimed",
+         {"lock": lock, "expires": expires, "run_id": run_id, **(event_extra or {})}, run_id=run_id,
+@@ -2184,6 +2152,7 @@ def claim_task(
+         # Single enforcement point: never ready -> running with an undone
+         # parent, whichever writer set 'ready'. Demote to 'todo';
+         # recompute_ready re-promotes when the parents finish.
++        _guard_mutation(conn, 'claim_task', task_id, locals())
+         if not _parents_satisfied(conn, task_id):
+             conn.execute(
+                 "UPDATE tasks SET status = 'todo' "
+@@ -2214,6 +2183,7 @@ def claim_review_task(
+     lock = claimer or _claimer_id()
+     expires = now + _resolve_claim_ttl_seconds(ttl_seconds)
+     with write_txn(conn):
++        _guard_mutation(conn, 'claim_review_task', task_id, locals())
+         if not _parents_satisfied(conn, task_id):
+             demoted = conn.execute(
+                 "UPDATE tasks SET status = 'todo' "
+@@ -2489,6 +2459,7 @@ def reclaim_task(
+     termination = _terminate_reclaimed_worker(
+         row["worker_pid"], prev_lock, signal_fn=signal_fn, started_at=row["worker_started_at"])
+     with write_txn(conn):
++        _guard_mutation(conn, 'reclaim_task', task_id, locals())
+         retry_status = _retry_status_for_run(conn, task_id)
+         cur = conn.execute(
+             "UPDATE tasks SET status = ?, claim_lock = NULL, "
+@@ -2677,6 +2648,7 @@ def complete_task(
+     with write_txn(conn):
+         # Hard invariant even for human review approval: a parent may have
+         # reopened while this task waited.
++        _guard_mutation(conn, 'complete_task', task_id, locals())
+         if not _parents_satisfied(conn, task_id):
+             return False
+         if acceptance is not None and not record_acceptance(conn, task_id, acceptance):
+@@ -3057,6 +3029,7 @@ def edit_task(
+         if value is not None
+     ]
+     with write_txn(conn):
++        _guard_mutation(conn, 'edit_task', task_id, locals())
+         status = _task_status(conn, task_id)
+         if status is None or (result is not None and status != "done"):
+             return False
+@@ -3143,6 +3116,7 @@ def block_task(
+     if kind is not None and kind not in VALID_BLOCK_KINDS:
+         raise ValueError(f"block kind must be one of {sorted(VALID_BLOCK_KINDS)} or None")
+     with write_txn(conn):
++        _guard_mutation(conn, 'block_task', task_id, locals())
+         cur_row = conn.execute(
+             "SELECT status, block_kind, block_recurrences FROM tasks WHERE id = ?", (task_id,),
+         ).fetchone()
+@@ -3294,6 +3268,7 @@ def request_review(
+     staged_copies: list[Path] = []
+     try:
+         with write_txn(conn):
++            _guard_mutation(conn, 'request_review', task_id, locals())
+             if not _parents_satisfied(conn, task_id):
+                 return _ret(False, "parent dependencies are not satisfied")
+             trow = conn.execute(
+@@ -3416,6 +3391,7 @@ def request_changes(
+         return False, "reason is required"
+ 
+     with write_txn(conn):
++        _guard_mutation(conn, 'request_changes', task_id, locals())
+         task_row = conn.execute(
+             "SELECT status, assignee, current_run_id FROM tasks WHERE id = ?", (task_id,),
+         ).fetchone()
+@@ -3513,6 +3489,7 @@ def promote_task(
+         return True, None
+ 
+     with write_txn(conn):
++        _guard_mutation(conn, 'promote_task', task_id, locals())
+         upd = conn.execute(
+             "UPDATE tasks SET status = 'ready' "
+             "WHERE id = ? AND status IN ('todo', 'blocked')", (task_id,),
+@@ -3559,6 +3536,7 @@ def unblock_task(conn: sqlite3.Connection, task_id: str) -> bool:
+     when that is where it left off), closing any leaked run first."""
+     now = int(time.time())
+     with write_txn(conn):
++        _guard_mutation(conn, 'unblock_task', task_id, locals())
+         resume_status = (
+             _resume_status_from_events(conn, task_id)
+             if _task_status(conn, task_id) == "blocked"
+@@ -3605,6 +3583,7 @@ def reopen_review_task(conn: sqlite3.Connection, task_id: str) -> bool:
+     not a block; only :func:`complete_task` clears them)."""
+     now = int(time.time())
+     with write_txn(conn):
++        _guard_mutation(conn, 'reopen_review_task', task_id, locals())
+         _reclaim_dangling_run(
+             conn, task_id, statuses=("review",), now=now,
+             note="invariant recovery on review reopen",
+@@ -3675,6 +3654,7 @@ def invalidate_descendants_for_parent_reopen(
+             (task_id,),
+         ).fetchall()
+         for row in rows:
++            _guard_mutation(conn, "invalidate", row["id"], {"parent_id": task_id})
+             previous_status = row["status"]
+             if previous_status not in {"ready", "review", "running", "done"}:
+                 continue
+@@ -3741,6 +3721,7 @@ def specify_triage_task(
+         raise ValueError("title cannot be blank")
+     assignee = _canonical_assignee(assignee)
+     with write_txn(conn):
++        _guard_mutation(conn, 'specify_triage_task', task_id, locals())
+         existing = conn.execute(
+             "SELECT title, body, assignee FROM tasks WHERE id = ? AND status = 'triage'",
+             (task_id,),
+@@ -3801,6 +3782,7 @@ def archive_task(conn: sqlite3.Connection, task_id: str, *, signal_fn=None) -> b
+     the ``archived`` event stays atomic with the status flip.
+     """
+     with write_txn(conn):
++        _guard_mutation(conn, 'archive_task', task_id, locals())
+         row = conn.execute(
+             "SELECT status, claim_lock, worker_pid, worker_started_at FROM tasks WHERE id = ?",
+             (task_id,),
+@@ -3844,6 +3826,7 @@ def delete_archived_task(conn: sqlite3.Connection, task_id: str) -> bool:
+     """Hard-delete an ARCHIVED task (+ related rows); anything else must be
+     archived first so data loss takes two deliberate actions."""
+     with write_txn(conn):
++        _guard_mutation(conn, 'delete_archived_task', task_id, locals())
+         if _task_status(conn, task_id) != "archived":
+             return False
+         _delete_task_relations(conn, task_id)
+@@ -3854,6 +3837,7 @@ def delete_archived_task(conn: sqlite3.Connection, task_id: str) -> bool:
+ def delete_task(conn: sqlite3.Connection, task_id: str) -> bool:
+     """Hard-delete a task and its related rows in one txn; False when not found."""
+     with write_txn(conn):
++        _guard_mutation(conn, 'delete_task', task_id, locals())
+         cur = conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+         if cur.rowcount != 1:
+             return False
+@@ -3869,6 +3853,7 @@ def schedule_task(
+     """Park in ``scheduled`` (waiting on time, not a human; not dispatchable)
+     until ``unblock_task`` re-gates it."""
+     with write_txn(conn):
++        _guard_mutation(conn, 'schedule_task', task_id, locals())
+         params: list[Any] = [task_id]
+         sql = """
+             UPDATE tasks
+@@ -4229,3 +4214,5 @@ from hermes_cli.kanban_db_dispatch import (
+     _worker_survived_termination,
+     _worker_terminal_timeout_env,
+ )
++
++from hermes_cli.kanban_db_graph import _parents_satisfied, unsatisfied_parents
+diff --git a/hermes_cli/kanban_db_dispatch.py b/hermes_cli/kanban_db_dispatch.py
+index dc3eab65e99..b24f07c49bd 100644
+--- a/hermes_cli/kanban_db_dispatch.py
++++ b/hermes_cli/kanban_db_dispatch.py
+@@ -2036,19 +2036,6 @@ def dispatch_once(
+     return result
+ 
+ 
+-def _call_spawn_fn(spawn_fn, task: Task, workspace: str, board: Optional[str]) -> Optional[int]:
+-    """Back-compat: older spawn_fn signatures (and test stubs) accept only
+-    ``(task, workspace)``; pass ``board`` only when the callable supports it."""
+-    import inspect
+-    try:
+-        sig = inspect.signature(spawn_fn)
+-        if "board" in sig.parameters:
+-            return spawn_fn(task, workspace, board=board)
+-        return spawn_fn(task, workspace)
+-    except (TypeError, ValueError):
+-        return spawn_fn(task, workspace)
+-
+-
+ def _dispatch_lane_task(
+     conn: sqlite3.Connection,
+     row: sqlite3.Row,
+@@ -2148,7 +2135,9 @@ def _dispatch_lane_task(
+         # worker's system prompt via KANBAN_GUIDANCE.
+         claimed.skills = list(dict.fromkeys([*(claimed.skills or []), "sdlc-review"]))
+     try:
+-        pid = _call_spawn_fn(spawn_fn if spawn_fn is not None else _default_spawn, claimed, str(workspace), board)
++        from hermes_cli.kanban_db_worker_model import spawn_worker_with_model
++
++        pid = spawn_worker_with_model(conn, spawn_fn if spawn_fn is not None else _default_spawn, claimed, str(workspace), board)
+         if pid:
+             _set_worker_pid(conn, claimed.id, int(pid), run_id=claimed.current_run_id, claim_lock=claimed.claim_lock)
+         # Fires AFTER the PID (when reported) is durably persisted. Best-effort.
+diff --git a/hermes_cli/kanban_db_graph.py b/hermes_cli/kanban_db_graph.py
+index e3a1f306c46..af62b22d496 100644
+--- a/hermes_cli/kanban_db_graph.py
++++ b/hermes_cli/kanban_db_graph.py
+@@ -114,6 +114,8 @@ def decompose_triage_task(
+     # (create_task, link_tasks, add_comment) must not be called in here.
+     now = int(time.time())
+     with write_txn(conn):
++        from hermes_cli.kanban_db_mutation_guard import guard_mutation
++        guard_mutation(conn, 'decompose', task_id, {})
+         root_row = conn.execute(
+             "SELECT id, status, tenant, workspace_kind, workspace_path "
+             "FROM tasks WHERE id = ?", (task_id,),
+@@ -212,3 +214,46 @@ def _insert_decomposed_child(
+     )
+     inherit_creator_origin(conn, new_id, root_id, created_at=now)
+     return new_id
++
++
++def _would_cycle(conn: sqlite3.Connection, parent_id: str, child_id: str) -> bool:
++    """True iff ``parent_id`` is already a descendant of ``child_id``."""
++    seen = set()
++    stack = [child_id]
++    while stack:
++        node = stack.pop()
++        if node == parent_id:
++            return True
++        if node in seen:
++            continue
++        seen.add(node)
++        rows = conn.execute(
++            "SELECT child_id FROM task_links WHERE parent_id = ?", (node,)
++        ).fetchall()
++        stack.extend(r["child_id"] for r in rows)
++    return False
++
++
++
++def _parents_satisfied(conn: sqlite3.Connection, task_id: str) -> bool:
++    """Return whether every direct parent is terminal for dependency gating."""
++    return conn.execute(
++        "SELECT 1 FROM task_links l "
++        "JOIN tasks p ON p.id = l.parent_id "
++        "WHERE l.child_id = ? "
++        "AND p.status NOT IN ('done', 'archived') LIMIT 1", (task_id,),
++    ).fetchone() is None
++
++
++def unsatisfied_parents(conn: sqlite3.Connection, task_id: str) -> list[tuple[str, str]]:
++    """``(parent_id, status)`` for every direct parent :func:`_parents_satisfied`
++    still counts as open (``done`` / ``archived`` release the child), in id
++    order, so a refusal or a board view can name the blockers instead of the
++    caller guessing. Read-only."""
++    rows = conn.execute(
++        "SELECT p.id, p.status FROM task_links l "
++        "JOIN tasks p ON p.id = l.parent_id "
++        "WHERE l.child_id = ? AND p.status NOT IN ('done', 'archived') "
++        "ORDER BY p.id", (task_id,),
++    ).fetchall()
++    return [(row["id"], row["status"]) for row in rows]
+diff --git a/hermes_cli/kanban_db_mutation_guard.py b/hermes_cli/kanban_db_mutation_guard.py
+new file mode 100644
+index 00000000000..0e80388e0ba
+--- /dev/null
++++ b/hermes_cli/kanban_db_mutation_guard.py
+@@ -0,0 +1,39 @@
++"""Synchronous plugin vetoes inside the owning board write transaction."""
++import inspect
++
++GUARD_VERSION = 1
++
++
++def register_policy(conn, task_id, policy):
++    conn.execute("CREATE TABLE IF NOT EXISTS kanban_task_policies(task_id TEXT NOT NULL, policy TEXT NOT NULL, PRIMARY KEY(task_id,policy))")
++    conn.execute("INSERT OR IGNORE INTO kanban_task_policies VALUES(?,?)", (task_id,policy))
++
++
++def guard_mutation(conn, operation, task_id, proposed):
++    from hermes_cli.plugins import iter_hook_callbacks
++    from hermes_cli.kanban_db import get_current_board
++
++    path = next(row[2] for row in conn.execute('PRAGMA database_list') if row[1] == 'main')
++    payload = dict(conn=conn, operation=operation, task_id=task_id,
++                   proposed=proposed, board=proposed.get('board') or get_current_board(), board_path=path)
++    acknowledged = set()
++    for callback in iter_hook_callbacks('before_kanban_task_mutation'):
++        signature = inspect.signature(callback)
++        kwargs = payload if any(p.kind == p.VAR_KEYWORD for p in signature.parameters.values()) else {
++            key: value for key, value in payload.items() if key in signature.parameters}
++        result = callback(**kwargs)
++        if isinstance(result,str):
++            acknowledged.add(result)
++        if inspect.isawaitable(result):
++            if inspect.iscoroutine(result):
++                result.close()
++            raise ValueError('Task mutation hooks must be synchronous')
++
++    if conn.execute("SELECT 1 FROM sqlite_master WHERE name='kanban_task_policies'").fetchone():
++        ids = [task_id, '*'] if operation == 'created' else [task_id]
++        if proposed.get('parent_id'):
++            ids.append(proposed['parent_id'])
++        placeholders = ','.join('?' for _ in ids)
++        required = {row[0] for row in conn.execute(f'SELECT policy FROM kanban_task_policies WHERE task_id IN ({placeholders})', ids)}
++        if required - acknowledged:
++            raise ValueError('Required task policy consumer is unavailable; restore enforcement before modifying this task')
+diff --git a/hermes_cli/kanban_db_task_creation.py b/hermes_cli/kanban_db_task_creation.py
+new file mode 100644
+index 00000000000..e1807da96b1
+--- /dev/null
++++ b/hermes_cli/kanban_db_task_creation.py
+@@ -0,0 +1,34 @@
++"""Synchronous creation observers before a task becomes eligible to dispatch."""
++import inspect
++
++
++def existing_task(conn, key):
++    if not key:
++        return None
++    row = conn.execute("SELECT id FROM tasks WHERE idempotency_key=? AND (status != 'archived' OR ? LIKE 'factory-submit-%' OR ? LIKE 'intake-%') ORDER BY created_at DESC LIMIT 1", (key, key, key)).fetchone()
++    return row['id'] if row else None
++
++
++def prepare_creation(conn, fields):
++    from hermes_cli.plugins import has_hook, iter_hook_callbacks
++
++    existing = existing_task(conn, fields['idempotency_key'])
++    if existing:
++        return existing
++    if not has_hook('before_kanban_task_create'):
++        return None
++    task = {key: fields.get(key) for key in ('title', 'body', 'assignee', 'created_by', 'idempotency_key',
++            'model_override', 'provider_override', 'reasoning_effort', 'creator_task_id')}
++    task.update(id=fields['task_id'], skills=fields['skills_list'], status=fields['task_status'])
++    path = next(row[2] for row in conn.execute('PRAGMA database_list') if row[1] == 'main')
++    payload = dict(conn=conn, task=task, board_path=path, board=fields.get('board'))
++    for callback in iter_hook_callbacks('before_kanban_task_create'):
++        signature = inspect.signature(callback)
++        kwargs = payload if any(p.kind == p.VAR_KEYWORD for p in signature.parameters.values()) else {
++            key: value for key, value in payload.items() if key in signature.parameters}
++        result = callback(**kwargs)
++        if inspect.isawaitable(result):
++            if inspect.iscoroutine(result):
++                result.close()
++            raise ValueError('Task creation hooks must be synchronous')
++    return None
+diff --git a/hermes_cli/kanban_db_worker_model.py b/hermes_cli/kanban_db_worker_model.py
+new file mode 100644
+index 00000000000..37242c7f2a9
+--- /dev/null
++++ b/hermes_cli/kanban_db_worker_model.py
+@@ -0,0 +1,102 @@
++"""Resolve a worker model once per attempt before any process is launched."""
++from dataclasses import asdict, replace
++from typing import Optional
++
++from hermes_cli.kanban_db import Task
++import inspect
++import json
++
++
++def _validate(selection):
++    if not isinstance(selection, dict):
++        raise ValueError('Worker model resolver must return a mapping or None')
++    for key in ('provider', 'model', 'source', 'root_id'):
++        value = selection.get(key)
++        if not isinstance(value, str) or not value.strip() or value != value.strip() or value.startswith('-') or any(ord(c) < 32 for c in value):
++            raise ValueError(f'Invalid worker model selection: {key}')
++    if type(selection.get('revision')) is not int or selection['revision'] < 0:
++        raise ValueError('Invalid worker model selection revision')
++    result = {key: selection[key] for key in ('provider', 'model', 'source', 'root_id', 'revision')}
++    if 'effort' in selection:
++        if selection['effort'] not in ('none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'):
++            raise ValueError('Invalid worker reasoning effort')
++        result['effort'] = selection['effort']
++    if 'snapshot_id' in selection:
++        value = selection['snapshot_id']
++        if not isinstance(value, str) or not value.strip() or any(ord(c) < 32 for c in value):
++            raise ValueError('Invalid worker snapshot identity')
++        if 'effort' not in result:
++            raise ValueError('Snapshot selection requires reasoning effort')
++        result['snapshot_id'] = value
++    return result
++
++
++def _resolve(task, workspace, board, board_path):
++    from hermes_cli.plugins import has_hook, iter_hook_callbacks
++
++    if not has_hook('resolve_kanban_worker_model'):
++        return None
++    payload = dict(task=asdict(task), workspace=workspace, board=board, board_path=board_path)
++    resolved = []
++    for callback in iter_hook_callbacks('resolve_kanban_worker_model'):
++        signature = inspect.signature(callback)
++        kwargs = payload if any(p.kind == p.VAR_KEYWORD for p in signature.parameters.values()) else {
++            key: value for key, value in payload.items() if key in signature.parameters
++        }
++        result = callback(**kwargs)
++        if inspect.isawaitable(result):
++            if inspect.iscoroutine(result):
++                result.close()
++            raise ValueError('Worker model resolvers must be synchronous')
++        if result is not None:
++            resolved.append(_validate(result))
++    if len(resolved) > 1:
++        raise ValueError('Multiple worker model resolvers claimed this task')
++    return resolved[0] if resolved else None
++
++
++def prepare_worker_model(conn, task, workspace, board):
++    from hermes_cli import kanban_db as kb
++
++    row = conn.execute('SELECT metadata,status FROM task_runs WHERE id=? AND task_id=?',
++                       (task.current_run_id, task.id)).fetchone()
++    if row is None or row['status'] != 'running':
++        raise ValueError('Worker model resolution requires a current running attempt')
++    metadata = json.loads(row['metadata'] or '{}')
++    captured = metadata.get('worker_model_selection')
++    if captured is None:
++        board_path = next(row[2] for row in conn.execute('PRAGMA database_list') if row[1] == 'main')
++        captured = _resolve(task, workspace, board, board_path)
++        if captured is None:
++            return task
++        with kb.write_txn(conn):
++            # Merge against the latest metadata so session-link writers are preserved.
++            current = conn.execute('SELECT metadata FROM task_runs WHERE id=? AND task_id=? AND status=?',
++                                   (task.current_run_id, task.id, 'running')).fetchone()
++            if current is None:
++                raise ValueError('Worker attempt ended before model capture')
++            metadata = json.loads(current['metadata'] or '{}')
++            captured = metadata.setdefault('worker_model_selection', captured)
++            conn.execute('UPDATE task_runs SET metadata=? WHERE id=?',
++                         (json.dumps(metadata), task.current_run_id))
++    captured = _validate(captured)
++    return replace(task, model_override=captured['model'], provider_override=captured['provider'],
++                   reasoning_effort=captured.get('effort', task.reasoning_effort))
++
++
++def _call_spawn_fn(spawn_fn, task: Task, workspace: str, board: Optional[str]) -> Optional[int]:
++    """Back-compat: older spawn_fn signatures (and test stubs) accept only
++    ``(task, workspace)``; pass ``board`` only when the callable supports it."""
++    import inspect
++    try:
++        sig = inspect.signature(spawn_fn)
++        if "board" in sig.parameters:
++            return spawn_fn(task, workspace, board=board)
++        return spawn_fn(task, workspace)
++    except (TypeError, ValueError):
++        return spawn_fn(task, workspace)
++
++
++def spawn_worker_with_model(conn, spawn_fn, task, workspace, board):
++    worker = prepare_worker_model(conn, task, workspace, board)
++    return _call_spawn_fn(spawn_fn, worker, workspace, board)
+diff --git a/hermes_cli/kanban_swarm.py b/hermes_cli/kanban_swarm.py
+index 1a807f17c84..db4888ed48d 100644
+--- a/hermes_cli/kanban_swarm.py
++++ b/hermes_cli/kanban_swarm.py
+@@ -81,6 +81,8 @@ def _activate_root_inline(
+     would run while the outer txn can still roll back). The caller runs
+     ``recompute_ready`` after the outer commit.
+     """
++    from hermes_cli.kanban_db_mutation_guard import guard_mutation
++    guard_mutation(conn, 'swarm_activate', root_id, {})
+     cur = conn.execute(
+         """
+         UPDATE tasks
+diff --git a/hermes_cli/kanban_transfer.py b/hermes_cli/kanban_transfer.py
+index cd1dca4c138..7e7693e31bd 100644
+--- a/hermes_cli/kanban_transfer.py
++++ b/hermes_cli/kanban_transfer.py
+@@ -71,6 +71,9 @@ def _scrub_local_state(conn: sqlite3.Connection) -> None:
+     """Strip machine-local runtime state (claims, PIDs, and above all the
+     gateway chat ids subscribed to task events). Caller owns the transaction.
+     Run on export and again on import (an archive is untrusted input)."""
++    # Required consumers may own sidecar state that the board archive cannot carry.
++    if conn.execute("SELECT 1 FROM sqlite_master WHERE name='kanban_task_policies'").fetchone() and conn.execute("SELECT 1 FROM kanban_task_policies LIMIT 1").fetchone():
++        raise ValueError('Boards with required mutation policies cannot be transferred without their policy state')
+     conn.execute("DELETE FROM kanban_notify_subs")
+     conn.execute(
+         """
+diff --git a/hermes_cli/plugins.py b/hermes_cli/plugins.py
+index ca0e2623d03..0822d95fdaf 100644
+--- a/hermes_cli/plugins.py
++++ b/hermes_cli/plugins.py
+@@ -137,6 +137,8 @@ VALID_HOOKS: set[str] = {
+     "on_session_finalize", "on_session_reset", "on_session_delete",
+     # on_session_open: local session created/opened, before its first turn. Kwargs: session_id, platform, reason.
+     "on_session_open",
++    # Factory kanban hooks (local patch set): worker model resolution and task create/mutation guards.
++    "resolve_kanban_worker_model", "before_kanban_task_create", "before_kanban_task_mutation",
+     # on_skill_lifecycle: successful skill lifecycle facts (local skill name visible to plugins).
+     "on_skill_lifecycle", "subagent_start", "subagent_stop",
+     # pre_gateway_dispatch: once per incoming MessageEvent, after the internal-event guard, BEFORE

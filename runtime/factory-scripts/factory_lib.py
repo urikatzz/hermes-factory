@@ -155,6 +155,18 @@ def gateway_supports_boards():
         return False
 
 
+def hermes_patches_ok(max_age=3600):
+    """False only when a recent patch-guard result says the Factory's Hermes patches are missing or conflicting. No result (the guard never
+    ran) or a stale one does not block: the guard is a safety net, not a dependency."""
+    try:
+        with open(os.path.join(STATE_DIR, "hermes-patches.json")) as f:
+            state = json.load(f)
+        import time
+        return bool(state.get("ok")) or time.time() - state.get("checked_at", 0) > max_age
+    except (OSError, ValueError, AttributeError):
+        return True
+
+
 def record_activation(state, detail=""):
     """Persist whether dedicated boards are live (visible to operators); writes only on change."""
     path = os.path.join(STATE_DIR, "board-activation.json")

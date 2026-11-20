@@ -140,7 +140,7 @@ python3 -m unittest discover -s tests/art -p 'test_*.py' -v
 python3 -m unittest discover -s tests/audio -p 'test_*.py' -v
 ```
 
-Additional suites are in `tests/production`, `tests/factory_art_type`, and `tests/factory_audio_type`; run them with the same discovery command and the corresponding directory. Some checks depend on external tools or an installed runtime. The live grader check described in the benchmark guide additionally requires Docker and the Factory runtime image.
+Additional suites are in `tests/production`, `tests/factory_art_type`, `tests/factory_audio_type`, `tests/factory_worker` (the manifest helper) and `tests/hermes_patches` (the Hermes patch tool); run them with the same discovery command and the corresponding directory. Some checks depend on external tools or an installed runtime. The live grader check described in the benchmark guide additionally requires Docker and the Factory runtime image.
 
 ## Further reading
 

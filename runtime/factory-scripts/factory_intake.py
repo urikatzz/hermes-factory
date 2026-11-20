@@ -8,7 +8,7 @@ created HERE, before the root exists, so parallel jobs on one repo never share a
 the root just gets an ordinary PROJECT_DIR. Prints a line per action; empty output = nothing happened (silent).
 Usage: factory_intake.py [--board SLUG] [--dry-run] [--assignee PROFILE]"""
 import argparse, json, os, re, subprocess, sys
-from factory_lib import (HOME, STATE_DIR, capacity_roots, gateway_supports_boards, git, hermes, kanban_list, kanban_show, load_config,
+from factory_lib import (HOME, STATE_DIR, capacity_roots, gateway_supports_boards, git, hermes, hermes_patches_ok, kanban_list, kanban_show, load_config,
                          parse_ticket, record_activation, reserved_run, resolve_project, run_boards, RegistryUnreadable, slugify)
 
 BOARDS_CLI = os.path.join(HOME, "factory-dashboard", "scripts", "factory_boards.py")
@@ -29,6 +29,8 @@ ap.add_argument("--board", default=None)
 ap.add_argument("--dry-run", action="store_true")
 ap.add_argument("--assignee", default=None, help="override root assignee (tests only)")
 args = ap.parse_args()
+if not hermes_patches_ok():
+    sys.exit(0)  # the patch guard job reports it; new roots on an unpatched Hermes would fail at their first stage
 cfg = load_config()
 assignee = args.assignee or cfg["root_assignee"]
 out = []

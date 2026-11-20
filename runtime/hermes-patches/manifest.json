@@ -1,0 +1,86 @@
+{
+ "format": 1,
+ "verified_with": [
+  "caafe5389ae585ef77387a962aee05b1bcf17029"
+ ],
+ "patches": [
+  {
+   "id": "0001-factory-kanban-core",
+   "pathspecs": [
+    "hermes_cli"
+   ],
+   "files": [
+    {
+     "path": "hermes_cli/kanban_db.py",
+     "new": false,
+     "sha256": "85684af55b441ff0da9c53909e0fc088dab88049588932bd7e17c5a68970ccee"
+    },
+    {
+     "path": "hermes_cli/kanban_db_dispatch.py",
+     "new": false,
+     "sha256": "bf508282a9325281848b56cd687e6935a3f383d16c015fe0da97ec38f3923068"
+    },
+    {
+     "path": "hermes_cli/kanban_db_graph.py",
+     "new": false,
+     "sha256": "b58fcfedc8f91084268b1ca823229aa5c439ed599a055e002d512cab35c57af5"
+    },
+    {
+     "path": "hermes_cli/kanban_db_mutation_guard.py",
+     "new": true,
+     "sha256": "91e04a3ede76334050bf938929b5de09d8a947df5cea697b53acd18f67814b49"
+    },
+    {
+     "path": "hermes_cli/kanban_db_task_creation.py",
+     "new": true,
+     "sha256": "5cd6f2d1660302c58633d6f0925e8ec096d17898b04e6e9c2a46e4ed1ee0ee01"
+    },
+    {
+     "path": "hermes_cli/kanban_db_worker_model.py",
+     "new": true,
+     "sha256": "1c2af09ba4199e2b402ef670221f1f0802d4cb298d18b1064165ed33f7c29dc9"
+    },
+    {
+     "path": "hermes_cli/kanban_swarm.py",
+     "new": false,
+     "sha256": "9f6e19c5e813f543d8ccb0e418e8e6007491beee952a07c647d11e349799e0ef"
+    },
+    {
+     "path": "hermes_cli/kanban_transfer.py",
+     "new": false,
+     "sha256": "ea612f9da2f180d68d57c0f19b87e44e80f575ec82c6a60165d196de2731085f"
+    },
+    {
+     "path": "hermes_cli/plugins.py",
+     "new": false,
+     "sha256": "9f04cc4b20976040c0ddf027debdd69729dce5320ef81b0b7d8c9137f59ceadf"
+    }
+   ],
+   "description": "Kanban mutation guard, task-creation and worker-model hooks, dispatch/graph/swarm/transfer wiring, and the hook names the Factory plugin registers"
+  },
+  {
+   "id": "0002-kanban-dashboard-plugin",
+   "pathspecs": [
+    "plugins/kanban/dashboard"
+   ],
+   "files": [
+    {
+     "path": "plugins/kanban/dashboard/dist/index.js",
+     "new": false,
+     "sha256": "6eafd850d7c8c0c0a5a305c9132ca00bd1dbf4ad6c554a85ec604390ca0c084a"
+    },
+    {
+     "path": "plugins/kanban/dashboard/dist/style.css",
+     "new": false,
+     "sha256": "1fa6f1bb425e23a134b77889a6c1841406bf818ce82a625525d4ebc20b4fdc69"
+    },
+    {
+     "path": "plugins/kanban/dashboard/plugin_api.py",
+     "new": false,
+     "sha256": "efa91cf575e89cc7d9ef618f596bce62b687051bd43ce6d164468a2c95ecd796"
+    }
+   ],
+   "description": "Kanban dashboard: awaiting-approval column and run-board aware API"
+  }
+ ]
+}

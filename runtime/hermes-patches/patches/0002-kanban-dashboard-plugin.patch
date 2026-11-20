@@ -1,0 +1,201 @@
+diff --git a/plugins/kanban/dashboard/dist/index.js b/plugins/kanban/dashboard/dist/index.js
+index 658ae11c5b9..42604d17bb9 100644
+--- a/plugins/kanban/dashboard/dist/index.js
++++ b/plugins/kanban/dashboard/dist/index.js
+@@ -87,7 +87,7 @@
+   }
+ 
+   // Board column display order; any backend status not listed here renders after these.
+-  const COLUMN_ORDER = ["triage", "todo", "ready", "running", "blocked", "review", "done"];
++  const COLUMN_ORDER = ["triage", "todo", "ready", "running", "blocked", "awaiting_approval", "review", "done"];
+   // English fallback dictionaries — used when the i18n catalog is missing
+   // a key, and as defaults for the get*() helpers below so callers running
+   // outside any React component (where there's no `t`) still get sane text.
+@@ -97,6 +97,7 @@
+     ready: "Ready",
+     running: "In Progress",
+     blocked: "Blocked",
++    awaiting_approval: "Awaiting approval",
+     review: "Review",
+     done: "Done",
+     archived: "Archived",
+@@ -107,6 +108,7 @@
+     ready: "Dependencies satisfied; assign a profile to dispatch",
+     running: "Claimed by a worker — in-flight",
+     blocked: "Worker asked for human input",
++    awaiting_approval: "Waiting for a human to approve or decide",
+     review: "Implementation complete — awaiting review",
+     done: "Completed",
+     archived: "Archived",
+@@ -175,6 +177,7 @@
+     ready: "hermes-kanban-dot-ready",
+     running: "hermes-kanban-dot-running",
+     blocked: "hermes-kanban-dot-blocked",
++    awaiting_approval: "hermes-kanban-dot-awaiting-approval",
+     review: "hermes-kanban-dot-review",
+     done: "hermes-kanban-dot-done",
+     archived: "hermes-kanban-dot-archived",
+@@ -2165,9 +2168,9 @@
+               title: "Boards are independent work streams. Each board has its own tasks, tenants, and assignees.",
+             }, selectChangeHandler(function (v) { if (v) props.onSwitch(v); })),
+               list.map(function (b) {
+-                const label = b.total > 0
++                const label = (b.total > 0
+                   ? `${b.name || b.slug} · ${b.total}`
+-                  : (b.name || b.slug);
++                  : (b.name || b.slug)) + (b.awaiting > 0 ? ` · ⚑ ${b.awaiting} awaiting approval` : "");
+                 return h(SelectOption, { key: b.slug, value: b.slug }, label);
+               }),
+             ),
+@@ -2773,6 +2776,7 @@
+       setDragOver(false);
+       const taskId = e.dataTransfer.getData(MIME_TASK);
+       if (!taskId) return;
++      if (props.column.name === "awaiting_approval") return; // display-only column: approval is a human decision, not a drop
+       if (props.selectedIds && props.selectedIds.has(taskId) && props.selectedIds.size > 1) {
+         // Delegate to the bulk-delete path on the parent so we use a
+         // single in-app confirmation modal. Falling back to the per-id
+@@ -2959,7 +2963,7 @@
+       if (!colRef.current) return undefined;
+       const el = colRef.current;
+       function onTouchDrop(e) {
+-        if (e.detail && e.detail.status === props.column.name) {
++        if (e.detail && e.detail.status === props.column.name && props.column.name !== "awaiting_approval") {
+           const taskId = e.detail.taskId;
+           if (props.selectedIds && props.selectedIds.has(taskId) && props.selectedIds.size > 1 && props.onMoveSelected) {
+             props.onMoveSelected(props.column.name);
+@@ -3034,7 +3038,7 @@
+         h("span", { className: "hermes-kanban-column-count",
+                     title: `${props.column.tasks.length} task${props.column.tasks.length === 1 ? "" : "s"} in this column` },
+           props.column.tasks.length),
+-        h("button", {
++        props.column.name === "awaiting_approval" ? null : h("button", {
+           type: "button",
+           className: "hermes-kanban-column-add",
+           title: tx(t, "createTask", "Create task in this column"),
+diff --git a/plugins/kanban/dashboard/dist/style.css b/plugins/kanban/dashboard/dist/style.css
+index 6c182c5169b..1ca24829491 100644
+--- a/plugins/kanban/dashboard/dist/style.css
++++ b/plugins/kanban/dashboard/dist/style.css
+@@ -175,6 +175,7 @@
+ .hermes-kanban-dot-ready    { background: #d4b348; }  /* amber */
+ .hermes-kanban-dot-running  { background: #3fb97d; }  /* green */
+ .hermes-kanban-dot-blocked  { background: var(--color-destructive, #d14a4a); }
++.hermes-kanban-dot-awaiting-approval { background: var(--color-warning, #d9a441); }
+ .hermes-kanban-dot-review   { background: #48b0c4; }  /* cyan — awaiting review */
+ .hermes-kanban-dot-done     { background: #4a8cd1; }  /* blue */
+ .hermes-kanban-dot-archived { background: var(--color-border); }
+diff --git a/plugins/kanban/dashboard/plugin_api.py b/plugins/kanban/dashboard/plugin_api.py
+index a572f7c06c6..9e436ddae29 100644
+--- a/plugins/kanban/dashboard/plugin_api.py
++++ b/plugins/kanban/dashboard/plugin_api.py
+@@ -175,6 +175,30 @@ BOARD_COLUMNS: list[str] = list(kanban_workflow.DEFAULT_WORKFLOW.keys())
+ 
+ _CARD_SUMMARY_PREVIEW_CHARS = 200
+ 
++AWAITING_APPROVAL_COLUMN = "awaiting_approval"
++
++
++def _awaiting_human_task_ids(conn: sqlite3.Connection) -> set[str]:
++    """Ids of blocked factory workflow roots that wait for a human decision rather than failed.
++
++    Two cases: a project paused for plan approval (``awaiting`` set, no ``terminal`` outcome) and a
++    workflow stopped in ``human_review``. Boards without the factory tables return an empty set.
++    """
++    ids: set[str] = set()
++    try:
++        for row in conn.execute("SELECT root_id FROM factory_workflow_roots WHERE phase = 'human_review'"):
++            ids.add(row[0])
++        for row in conn.execute("SELECT root_id, document FROM factory_project_execution"):
++            try:
++                doc = json.loads(row[1])
++            except (TypeError, ValueError):
++                continue
++            if isinstance(doc, dict) and doc.get("awaiting") and not doc.get("terminal"):
++                ids.add(row[0])
++    except sqlite3.Error:
++        return set()
++    return ids
++
+ 
+ def _task_dict(task: kanban_db.Task, *, latest_summary: Optional[str] = None,
+                current_run_started_at: Optional[int] = None) -> dict[str, Any]:
+@@ -312,7 +336,14 @@ def get_board(
+             p["done"] += row["cstatus"] == "done"
+         diagnostics_per_task = _compute_task_diagnostics(conn, task_ids=None)
+         latest_event_id = conn.execute("SELECT COALESCE(MAX(id), 0) AS m FROM task_events").fetchone()["m"]
+-        columns: dict[str, list[dict]] = {c: [] for c in BOARD_COLUMNS}
++        # Display-only column: blocked cards that wait on a human decision (not a failure) live
++        # here, right after "blocked". Their stored status stays "blocked".
++        columns: dict[str, list[dict]] = {}
++        for c in BOARD_COLUMNS:
++            columns[c] = []
++            if c == "blocked":
++                columns[AWAITING_APPROVAL_COLUMN] = []
++        awaiting_ids = _awaiting_human_task_ids(conn)
+         if include_archived:
+             columns["archived"] = []
+         # One window-function query for latest summaries (avoids N+1); cards get a
+@@ -329,7 +360,11 @@ def get_board(
+             d["comment_count"] = comment_counts.get(t.id, 0)
+             d["progress"] = progress.get(t.id)  # None when the task has no children
+             _attach_diagnostics(d, diagnostics_per_task.get(t.id))
+-            columns[t.status if t.status in columns else "todo"].append(d)
++            if t.status == "blocked" and t.id in awaiting_ids:
++                d["awaiting_human"] = True
++                columns[AWAITING_APPROVAL_COLUMN].append(d)
++            else:
++                columns[t.status if t.status in columns and t.status != AWAITING_APPROVAL_COLUMN else "todo"].append(d)
+ 
+         # Queue lanes keep the list_tasks dispatch order; the done column is
+         # history, so order it newest-completed-first. Two stable sorts compose
+@@ -669,6 +704,8 @@ def _patch_title_body(conn, task_id: str, payload: UpdateTaskBody, board: Option
+     """PATCH title/body phase: one UPDATE + ``edited`` event, then the post-commit observer
+     (field names only — values never leave the DB via this payload)."""
+     with kanban_db.write_txn(conn):
++        from hermes_cli.kanban_db_mutation_guard import guard_mutation
++        guard_mutation(conn, 'edit_task', task_id, {'body': payload.body, 'title': payload.title, 'board': board})
+         sets, vals = [], []
+         if payload.title is not None:
+             if not payload.title.strip():
+@@ -744,6 +781,8 @@ def _set_status_direct(conn: sqlite3.Connection, task_id: str, new_status: str)
+     terminations: list[tuple[Optional[int], Optional[str], Optional[int]]] = []
+     effective_status = new_status
+     with kanban_db.write_txn(conn):
++        from hermes_cli.kanban_db_mutation_guard import guard_mutation
++        guard_mutation(conn, 'set_status', task_id, {'status': new_status})
+         prev = conn.execute(
+             "SELECT status, current_run_id, worker_pid, claim_lock, worker_started_at FROM tasks WHERE id = ?",
+             (task_id,)).fetchone()
+@@ -1376,6 +1415,23 @@ def _board_counts(slug: str) -> dict[str, int]:
+         return {}
+ 
+ 
++def _board_awaiting(slug: str) -> int:
++    """How many blocked cards on a board wait for a human decision; ``0`` on a missing board or one without factory tables.
++
++    Every Factory run lives on its own board, so the switcher needs this per board to show where approval is pending."""
++    try:
++        if not kanban_db.kanban_db_path(board=slug).exists():
++            return 0
++        with closing(kbc.connect(board=slug)) as conn:
++            ids = _awaiting_human_task_ids(conn)
++            if not ids:
++                return 0
++            marks = ",".join("?" for _ in ids)
++            return int(conn.execute(f"SELECT COUNT(*) FROM tasks WHERE status = 'blocked' AND id IN ({marks})", tuple(ids)).fetchone()[0])
++    except Exception:
++        return 0
++
++
+ def _default_workspace_kind(board: dict[str, Any]) -> str:
+     """Recommend a non-destructive task workspace from board metadata."""
+     workdir = str(board.get("default_workdir") or "").strip()
+@@ -1418,6 +1474,7 @@ def list_boards(include_archived: bool = Query(False)):
+         # Live cards only — archived tasks are hidden from every default board view,
+         # so counting them in the switcher badge would visibly disagree.
+         b["total"] = sum(n for status, n in b["counts"].items() if status != "archived")
++        b["awaiting"] = _board_awaiting(b["slug"]) if not b.get("archived") else 0
+         b["default_workspace_kind"] = _default_workspace_kind(b)
+         pid = b["project_id"] = b.get("project_id") or None
+         proj = proj_map.get(pid) if pid else None
