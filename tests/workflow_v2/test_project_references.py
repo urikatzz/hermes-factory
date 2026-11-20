@@ -154,6 +154,7 @@ class ReferenceModuleTests(unittest.TestCase):
                 'No placeholder art and no simplified geometry: V1 hazard stripes and V2 slanted segments are built as shown.',
                 'The current palette.txt has no steel grey and no hazard stripe colour, so the bible must be amended before V1 hazard stripes can be checked.',
                 'T1 amends STYLE.md to remove the superseded greybox-only rules and add painted classes that carry V1 hazard stripes and V2 slanted segments.',
+                'Room01PresentationTests assert V1 hazard stripes and V2 slanted segments through the L-rules and the presence of spark effects instead of greybox assertions that every sprite is WhiteSquare.',
                 'SUPERSEDED (rewrite, do not preserve): AC10 grey-box assertions for V1 hazard stripes; greybox-only assertions replaced by V2 slanted segment checks.'):
             self.assertEqual(refs.find_contradictions(faithful, {'PLAN.md': sentence}), [], sentence)
 
@@ -170,6 +171,11 @@ class ReferenceModuleTests(unittest.TestCase):
         by_line = {(c['line'], c['requirement']) for c in found if c['kind'] == 'forbids'}
         self.assertEqual(by_line, {(1, 'V2'), (2, 'V1'), (2, 'V2')})  # S1 forbids V2's texture/gradient/particle; S9 forbids V1's stripes/crosshair/joints and V2's painted art
         self.assertTrue({c['keyword'] for c in found if c['kind'] == 'implicit_deferral'} >= {'grey-box only', 'deferred look'})
+
+    def test_instead_of_a_simplification_is_accepted_but_the_simplification_itself_is_not(self):
+        self.assertEqual(refs.find_contradictions(self.records, {'PLAN.md': 'V1 hazard stripes are painted instead of greybox rectangles.'}), [])
+        found = refs.find_contradictions(self.records, {'PLAN.md': 'V1 hazard stripes are delivered as greybox rectangles instead of painted trim.'})
+        self.assertEqual({c['kind'] for c in found}, {'implicit_deferral'})
 
     def test_a_removal_word_far_from_the_simplification_does_not_excuse_it(self):
         far = 'We removed the old compiler warnings last week and then reviewed every other open item at length, and meanwhile V1 hazard stripes are delivered as placeholder rectangles.'

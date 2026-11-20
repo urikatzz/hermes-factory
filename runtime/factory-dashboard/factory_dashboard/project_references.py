@@ -299,12 +299,17 @@ def _governs(clause, start):
 _REMOVING = re.compile(r"\b(remov\w*|supersed\w*|replac\w*|rewrit\w*|amend\w*|correct\w*|delet\w*|drop\w*|retir\w*|eliminat\w*|no longer|stop\w*|conflict\w*|contradict\w*|obsolete|legacy)\b", re.I)
 
 
+_INSTEAD = re.compile(r"\b(?:instead of|rather than|in place of|as opposed to)\s+(?:the\s+|any\s+|old\s+|former\s+)*$", re.I)
+
+
 def _rejects(clause, start, line, word):
     """Simplification wording that is negated, or sits within a few words of a removal, replacement or supersession, is a rejection of the simplification, not a deferral."""
     if _governs(clause, start):
         return True
     offset = line.find(clause)
     position = offset + start if offset >= 0 else line.lower().find(word.lower())
+    if position >= 0 and _INSTEAD.search(line[max(0, position - 30):position]):
+        return True
     window = line[max(0, position - 90):position + len(word) + 90] if position >= 0 else clause
     return bool(_REMOVING.search(window))
 
