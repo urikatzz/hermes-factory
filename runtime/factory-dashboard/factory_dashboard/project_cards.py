@@ -113,6 +113,8 @@ not raise new wording nits. Retain PLAN-REVIEW.md. Report in metadata.findings, 
 or a defect the correction itself introduced. Set metadata.plan_defect if the correction changed the architecture or an acceptance criterion. Finish DONE with the
 inherited project ac_ids.'''
 
+SUPERSEDED = '''Earlier attempts of this stage ({ids}) are superseded. Their verdicts and MANIFEST values do not describe the current state, and the "Recent work" list in your context may still show them as DONE. Only the BASELINE and MANIFEST fields in this card's header apply: BASELINE none means there is no baseline to check, so never run fw.py check --expect with a manifest taken from an earlier attempt or from a "Recent work" entry. Work from the files as they are now.'''
+
 PLAN_DEFECT = '''If the failure comes from a wrong, contradictory or untestable task plan or acceptance criterion rather than from the
 implementation, set metadata.plan_defect to a one-sentence reason. The engine then returns the project to the architect instead of repairing.'''
 

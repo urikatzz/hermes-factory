@@ -1092,6 +1092,9 @@ class ProjectControllerTests(unittest.TestCase):
         self.assertEqual(project['replans'], replans)
         self.assertGreaterEqual(len(project['history']), history)
         self.assertEqual(project['stage_retries'], {'task-code-implement:0': 1})
+        card = self.board.cards[self.only('developer')['task_id']]['body']
+        self.assertIn('Earlier attempts of this stage (' + old_task + ') are superseded', card)
+        self.assertIn('never run fw.py check --expect with a manifest taken from an earlier attempt', card)
         self.assertEqual(project['orchestration_log'][-2]['kind'], 'human_stage_retry')
         self.board.complete(self.only('developer')); self.tick()  # the fresh result carries no stale defect: the project goes on
         self.only('verifier')
