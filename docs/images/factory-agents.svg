@@ -1,13 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="2476" viewBox="0 0 1200 2476" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="2346" viewBox="0 0 1200 2346" role="img" aria-labelledby="title desc">
 <title id="title">Hermes Factory project and task workflow</title>
-<desc id="desc">Orchestrator selects relevant art and audio directors, then the architect consumes their plans and decomposes the project into many small tasks, several per discipline; a plan review precedes any work. Each dependent small task has a writer, verification before independent reviews, specialist repair routing with scoped re-reviews, and a bounded path back to the architect. Final integration repeats the checks with the complete panel; factory-retro proposes improvements. A human submits the request, approves the art director's plan before architecture, and reviews or recovers the project when it escalates or blocks.</desc>
+<desc id="desc">Orchestrator selects relevant art and audio directors, then the architect consumes their plans and decomposes the project into many small tasks, several per discipline. Each dependent small task has a writer, verification before independent reviews, specialist repair routing with scoped re-reviews, and a bounded path back to the architect. Final integration repeats the checks with the complete panel; factory-retro proposes improvements. A human submits the request, approves the art director's plan before architecture, and reviews or recovers the project when it escalates or blocks.</desc>
 <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10" fill="#778bab"/></marker><marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10" fill="#ffc773"/></marker></defs>
 <style>text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif}.title{fill:#f2f5ff;font-size:34px;font-weight:700}.name{fill:#eef3ff;font-size:22px;font-weight:650}.body{fill:#b1c0d8;font-size:16px}.small{fill:#b1c0d8;font-size:14px}.label{font-size:12px;font-weight:700;letter-spacing:1.7px}.chip{fill:#eef3ff;font-size:17px;font-weight:650}.back{fill:none;stroke:#ffc773;stroke-width:2.5;stroke-dasharray:7 5;marker-end:url(#b)}.line{fill:none;stroke:#778bab;stroke-width:2;marker-end:url(#a)}</style>
-<rect width="1200" height="2476" rx="24" fill="#0b1220"/>
+<rect width="1200" height="2346" rx="24" fill="#0b1220"/>
 
 <text x="48" y="48" class="label" fill="#93a9cd">HERMES / PROJECT WORKFLOW V2</text>
 <text x="1152" y="48" class="label" fill="#ff8fb1" text-anchor="end">PINK = HUMAN IN THE LOOP</text>
-<text x="48" y="96" class="title">Review the plan. Verify every task. Improve the factory.</text>
+<text x="48" y="96" class="title">Plan once. Verify every task. Improve the factory.</text>
 <text x="48" y="129" class="body">Director intent flows into architecture, implementation, and the final integrated result.</text>
 <rect x="336" y="168" width="528" height="72" rx="14" fill="#2a1622" stroke="#6b3550"/>
 <rect x="336" y="184" width="3" height="40" rx="1.5" fill="#ff8fb1"/>
@@ -54,15 +54,9 @@
 <text x="268" y="806" class="body">Consume the relevant director plans, then design the code and integration.</text>
 <text x="268" y="829" class="body">Break the project into small tasks with dependencies and acceptance criteria.</text>
 <path d="M600 854 V892" class="line"/>
-<rect x="248" y="892" width="704" height="88" rx="14" fill="#152137" stroke="#2b3b55"/>
-<rect x="248" y="908" width="3" height="56" rx="1.5" fill="#80d8a0"/>
-<text x="268" y="923" class="name">Plan review</text>
-<text x="268" y="952" class="body">A code reviewer checks the task graph and acceptance criteria before any work starts.</text>
-<path d="M248 936 H224 V800 H248" class="back"/>
-<text x="212" y="872" class="label" fill="#ffc773" text-anchor="end">BLOCKING FINDINGS</text>
-<path d="M1152 1366 H1176 V800 H952" class="back"/>
+<path d="M1152 1236 H1176 V800 H952" class="back"/>
 <text x="1170" y="788" class="label" fill="#ffc773" text-anchor="end">REPLAN PATH · MAX 2</text>
-<path d="M600 980 V1022" class="line"/>
+<g transform="translate(0,-130)">
 <rect x="48" y="1022" width="1104" height="236" rx="14" fill="#101b2d" stroke="#25344e"/>
 <text x="72" y="1053" class="label" fill="#93a9cd">CAPTURED TASK GRAPH / EXAMPLE: ONE FEATURE, MANY SMALL TASKS</text>
 <text x="72" y="1081" class="body">The architect splits a feature into many small tasks, up to 40: each has one owner, its dependencies and acceptance criteria.</text>
@@ -174,4 +168,5 @@
 <text x="660" y="2351" class="body">A note cannot waive a defect or change scope.</text>
 <text x="48" y="2414" class="small">Publishing, when separately invoked: pr-writer drafts the description; the publisher opens a draft PR.</text>
 <text x="48" y="2439" class="small">Existing tasks retain their captured v1 workflow. New v2 tasks use this project / task hierarchy.</text>
+</g>
 </svg>

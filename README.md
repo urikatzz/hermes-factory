@@ -6,10 +6,10 @@ This checkout complements an existing Hermes Factory installation. It is not a s
 
 ## Agents and workflow
 
-Factory v2 plans the project first: the art/audio directors plan when needed, a human approves the art plan, the architect splits the work into small dependent tasks, and a code reviewer checks the plan. Each task then runs its own cycle of writing, verification, reviews, and bounded specialist repairs; a task that cannot be repaired goes back to the architect for a replan.
+Factory v2 plans the project first: the art/audio directors plan when needed, a human approves the art plan, and the architect splits the work into small dependent tasks. Each task then runs its own cycle of writing, verification, reviews, and bounded specialist repairs; a task that cannot be repaired goes back to the architect for a replan.
 
 <p align="center">
-  <img src="docs/images/factory-agents.svg" alt="Factory v2: relevant directors before architecture, plan review, small dependent tasks, verification before reviews, specialist repairs with scoped re-reviews, bounded replanning, final integration, factory-retro, and the human touchpoints: request, art plan approval, review and recovery." width="100%">
+  <img src="docs/images/factory-agents.svg" alt="Factory v2: relevant directors before architecture, small dependent tasks, verification before reviews, specialist repairs with scoped re-reviews, bounded replanning, final integration, factory-retro, and the human touchpoints: request, art plan approval, review and recovery." width="100%">
 </p>
 
 Final integration repeats the cycle over the assembled project with the complete review panel, and `factory-retro` then proposes improvements to Factory itself. Existing tasks retain their captured v1 workflows.

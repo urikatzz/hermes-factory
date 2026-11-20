@@ -132,3 +132,12 @@ class Board:
         self._append_event(conn, tid, 'completed', {})
         conn.commit()
         return metadata
+
+
+def enable_plan_review(test):
+    """The reviewer stage is off by default; tests of its retained machinery (findings, correction, reference rulings) switch it on."""
+    from unittest import mock
+    from factory_dashboard import project_controller
+    patcher = mock.patch.object(project_controller, 'PLAN_REVIEW_ENABLED', True)
+    patcher.start()
+    test.addCleanup(patcher.stop)

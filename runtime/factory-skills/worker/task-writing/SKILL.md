@@ -19,7 +19,7 @@ The engine only checks that project-plan.json is well formed: valid ids, owners,
 - Do not loosen a criterion just so work passes, and do not change director intent.
 
 ## Coverage
-- Every project AC in PLAN.md should be stated by at least one task, using the same AC id. An AC no task states is not a formatting error: the engine records it, the plan reviewer is told about it (a missing functional requirement is a BLOCKER that sends the plan back to you), and the final integration task turns each one into explicit work. That is late and costly, so cover every AC yourself before you finish.
+- Every project AC in PLAN.md should be stated by at least one task, using the same AC id. No reviewer checks the plan before tasks start, so this is on you. An AC no task states is recorded and becomes explicit work in the final integration task, which is late and costly: cover every AC yourself before you finish.
 
 ## Dependencies and ownership
 - Asset tasks come first. A code task that uses an asset lists the artist or sound-designer task in dependencies.

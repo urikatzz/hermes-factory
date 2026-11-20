@@ -6,7 +6,7 @@ import sqlite3
 import tempfile
 import unittest
 
-from board_fixture import Board
+from board_fixture import Board, enable_plan_review
 from factory_dashboard import project_references as refs
 from factory_dashboard.workflow_controller import WorkflowController
 from factory_dashboard.workflow_state import WorkflowState
@@ -107,6 +107,7 @@ class ReferenceFlow(unittest.TestCase):
     EXTRA = None
 
     def setUp(self):
+        enable_plan_review(self)
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.project = Path(self.temp.name) / 'game'

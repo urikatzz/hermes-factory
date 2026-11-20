@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from board_fixture import Board
+from board_fixture import Board, enable_plan_review
 from factory_dashboard.model_policy import ConfigurationError
 from factory_dashboard.project_decisions import normalize_constraint
 from factory_dashboard.project_policy import budget_used
@@ -20,6 +20,7 @@ SPRITES = dict(id='sprites', title='Make sprites', owner='artist', dependencies=
 
 class ProjectControllerTests(unittest.TestCase):
     def setUp(self):
+        enable_plan_review(self)
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.board = Board(self.temp.name)
@@ -985,6 +986,38 @@ class ProjectControllerTests(unittest.TestCase):
         self.controller.resume(self.conn, self.root, 'Re-judge under the corrected controller', None, True)
         self.only('architect')
         self.assertEqual(developers(), before)
+
+    # --- the independent plan review is off by default ---
+    def review_off(self):
+        from unittest import mock
+        from factory_dashboard import project_controller
+        patcher = mock.patch.object(project_controller, 'PLAN_REVIEW_ENABLED', False)
+        patcher.start(); self.addCleanup(patcher.stop)
+
+    def test_without_plan_review_a_valid_plan_goes_straight_to_task_execution(self):
+        self.review_off()
+        self.start_planning(); self.architect()
+        self.assertEqual(self.project()['mode'], 'tasks')
+        self.assertEqual(self.only('developer')['stage_key'], 'task-code-implement')
+        self.assertFalse(self.conn.execute("SELECT 1 FROM factory_workflow_stages WHERE stage_key LIKE 'project-plan-review%'").fetchone())
+        event = json.loads(self.conn.execute("SELECT document FROM factory_workflow_events WHERE kind='project_plan_approved'").fetchone()[0])
+        self.assertEqual((event['reviewer'], event['review']), (None, 'disabled'))
+
+    def test_without_plan_review_an_invalid_plan_is_still_rejected_structurally(self):
+        self.review_off()
+        self.start_planning(); self.architect(tasks=self.BAD_PLAN)
+        self.assertEqual(self.only('architect')['evidence_retry'], 1)
+        self.assertNotEqual(self.project()['mode'], 'tasks')
+
+    def test_a_project_stopped_in_the_old_review_stage_is_approved_without_a_reviewer_once_review_is_off(self):
+        self.start_planning(); self.architect()
+        self.assertEqual(self.project()['mode'], 'plan_review')
+        self.only('claude-reviewer')  # the review card exists, nobody ran it
+        self.review_off()
+        self.tick()
+        self.assertEqual(self.project()['mode'], 'tasks')
+        # The unrun review card stays on the board (the controller never archives mid-transaction); the project moves on without it.
+        self.assertTrue(self.conn.execute("SELECT 1 FROM factory_workflow_stages WHERE stage_key='task-code-implement'").fetchone())
 
     # --- uncovered project ACs are surfaced, reviewed and made explicit integration work ---
     def test_an_uncovered_project_ac_is_recorded_shown_to_the_plan_reviewer_and_is_not_an_error(self):

@@ -22,7 +22,7 @@ Every PLAN.md AC must be covered by at least one task; use the same AC IDs in ta
 Asset tasks precede code tasks that integrate their output: declare those dependencies explicitly.
 Plans must preserve the directors' asset paths, visual/audio criteria, and code integration contracts.
 The engine also runs a final integration cycle over every project AC. No code or asset writes in this stage.
-An independent reviewer checks this plan before any task starts.'''
+No reviewer checks this plan before tasks start, so check it yourself against the task-writing skill.'''
 
 REPLAN = '''This is a revision of the earlier plan; PROJECT_CONTEXT.replan gives the reason, the failing task and its findings.
 Load the task-writing skill first. Correct the plan defect: fix wrong or untestable acceptance criteria, split oversized tasks, add missing tasks or dependencies.

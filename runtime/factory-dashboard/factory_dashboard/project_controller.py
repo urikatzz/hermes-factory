@@ -24,6 +24,9 @@ MAX_SCAN_RETRIES = 3
 # A plan that fails structural validation (missing fields, no numbered criteria, bad graph) is corrected by the architect with the exact
 # errors; this never spends an architectural replan. Past the bound a human decides.
 MAX_PLAN_VALIDATION_RETRIES = 2
+# The independent plan-review stage is off: a structurally valid plan goes straight to task execution, and the deterministic
+# approved-reference scan at plan capture still applies. Set True to restore the reviewer stage (and, with it, plan correction).
+PLAN_REVIEW_ENABLED = False
 PLAN_SCHEMA = ('project-plan.json: {"tasks":[{"id":"lowercase-id","title":"...","owner":"developer|artist|sound-designer","dependencies":["task-id"],'
                '"acceptance":{"AC1":"observable criterion"},"needs":{"art":false,"audio":false,"ui":false,"ux":false},"risk":"normal|high",'
                '"preserve":["optional path"],"visual":["optional approved visual requirement ids V1.."]}],"constraints":[optional structured constraints]}; every task needs numbered acceptance criteria (each criterion text at most 1000 characters) '
@@ -558,13 +561,22 @@ class ProjectController:
             if any(done['id'] != 'integration' and previous.get(done['id']) not in tasks for done in project['completed']):
                 raise ConfigurationError('Replan changed a task that already passed')
             project['plans'] = [p for p in project['plans'] if p['profile'] != 'architect'] + [evidence]
-            project.update(ac_ids=result.metadata['ac_ids'], tasks=tasks, plan_constraints=plan_constraints, mode='plan_review')
+            project.update(ac_ids=result.metadata['ac_ids'], tasks=tasks, plan_constraints=plan_constraints, mode='plan_review' if PLAN_REVIEW_ENABLED else 'tasks')
             project['uncovered_acs'] = uncovered_acs(tasks, project['ac_ids'])
             if project['uncovered_acs']:
-                # Not a formatting error: the plan reviewer judges it (a genuine gap blocks), and the final integration task states each one explicitly.
+                # Not a formatting error: the plan reviewer (when enabled) judges it, and the final integration task always states each one explicitly.
                 project.setdefault('orchestration_log', []).append(dict(kind='plan_uncovered_acs', generation=gen, acs=project['uncovered_acs'], at=int(time.time())))
                 self._state.event(conn, root['root_id'], 'plan_uncovered_acs', dict(generation=gen, acs=project['uncovered_acs']))
             self._state.event(conn, root['root_id'], 'project_plan_captured', dict(tasks=tasks, plans=project['plans'], generation=gen))
+            if not PLAN_REVIEW_ENABLED:
+                project.pop('replan', None)
+                self._state.event(conn, root['root_id'], 'project_plan_approved', dict(task_id=row['task_id'], reviewer=None, generation=gen, review='disabled'))
+            return True
+        if mode == 'plan_review' and not PLAN_REVIEW_ENABLED:
+            # A project stopped in the old review stage: approve its captured plan without a reviewer.
+            project.pop('replan', None)
+            project['mode'] = 'tasks'
+            self._state.event(conn, root['root_id'], 'project_plan_approved', dict(task_id=None, reviewer=None, generation=project.get('gen', 0), review='disabled'))
             return True
         if mode == 'plan_review':
             # The plan is the most expensive thing to get wrong, so it is reviewed before any task is written.
