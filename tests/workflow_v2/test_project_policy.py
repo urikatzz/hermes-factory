@@ -43,6 +43,16 @@ class ProjectPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ConfigurationError, 'depend'):
             validate_plan(bad, scope, ['AC1', 'AC2'])
 
+    def test_an_over_long_acceptance_criterion_is_named_with_its_length_and_the_limit(self):
+        from factory_dashboard.project_policy import validate_plan
+        scope = dict(art=False, audio=False, ui=False, ux=False)
+        plan = dict(tasks=[dict(id='code', title='Wire', owner='developer', dependencies=[], acceptance={'AC1': 'x' * 1237}, needs=scope)])
+        with self.assertRaisesRegex(ConfigurationError, r'1000 characters.*AC1 \(1237 characters\)'):
+            validate_plan(plan, scope, ['AC1'])
+        plan['tasks'][0]['acceptance'] = {'one': 'text'}
+        with self.assertRaisesRegex(ConfigurationError, 'numbered acceptance criteria'):
+            validate_plan(plan, scope, ['AC1'])
+
     def test_plan_ignores_extra_top_level_keys_but_requires_tasks(self):
         from factory_dashboard.project_policy import validate_plan
         scope = dict(art=False, audio=False, ui=False, ux=False)

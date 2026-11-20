@@ -109,7 +109,9 @@ def validate_plan(document, scope, project_ac_ids):
             ac = task['acceptance']
             if not isinstance(ac, dict) or not ac or any(not isinstance(k, str) or not re.fullmatch(r'AC(?:[0-9]+|-GATE)', k)
                     or not isinstance(v, str) or not v.strip() or len(v) > 1000 for k, v in ac.items()):
-                raise ConfigurationError('Task requires numbered acceptance criteria')
+                too_long = [str(k) + ' (' + str(len(v)) + ' characters)' for k, v in (ac.items() if isinstance(ac, dict) else ()) if isinstance(v, str) and len(v) > 1000]
+                raise ConfigurationError('Task requires numbered acceptance criteria' + (': each criterion text is at most 1000 characters; shorten ' + ', '.join(too_long)
+                                         + ' or split it into more AC keys that the plan declares' if too_long else ' (keys AC1, AC2.., each a non-empty string)'))
             if not set(ac) <= set(project_ac_ids):
                 raise ConfigurationError('Task acceptance is outside the architecture plan')
             covered.update(ac)

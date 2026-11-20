@@ -26,7 +26,7 @@ MAX_SCAN_RETRIES = 3
 MAX_PLAN_VALIDATION_RETRIES = 2
 PLAN_SCHEMA = ('project-plan.json: {"tasks":[{"id":"lowercase-id","title":"...","owner":"developer|artist|sound-designer","dependencies":["task-id"],'
                '"acceptance":{"AC1":"observable criterion"},"needs":{"art":false,"audio":false,"ui":false,"ux":false},"risk":"normal|high",'
-               '"preserve":["optional path"],"visual":["optional approved visual requirement ids V1.."]}],"constraints":[optional structured constraints]}; every task needs numbered acceptance criteria '
+               '"preserve":["optional path"],"visual":["optional approved visual requirement ids V1.."]}],"constraints":[optional structured constraints]}; every task needs numbered acceptance criteria (each criterion text at most 1000 characters) '
                '(AC1, AC2, ...); together the tasks cover every project AC; completed tasks stay byte-for-byte unchanged. A task id is lowercase letters, digits and hyphens only, starting with a letter, '
                'at most 24 characters (no underscores, no "t_" prefix). Every requirement id you list in a task\'s "visual" must also be written (for example "V2") in that same task\'s acceptance text, '
                'and every demanded requirement must be listed by at least one task.')
