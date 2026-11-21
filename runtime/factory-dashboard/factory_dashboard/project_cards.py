@@ -216,6 +216,10 @@ BLOCKED_NEEDS_EVIDENCE = '''BLOCKED is a last resort, allowed only after a real 
 checks each item against the tool calls and outputs of your own session; a BLOCKED that does not match is sent straight back to you (a bounded retry that costs no repair budget). These are never blockers, because you do them yourself: a missing .factory/include.txt entry (add the path), a plan that is not staged in .factory
 (copy it from the absolute paths on your card), an unspecified pixel size (derive it), a path or filename named in the acceptance text (create it). Make the attempt first; finish the work, or report the exact failure you hit.'''
 
+VERIFIER_NO_STYLE_JUDGEMENT = '''Verify acceptance criteria that describe how an art asset looks (a palette, a rim light, a texture, a style rule, a likeness to the reference) only through objective, measurable properties: file validity, dimensions, opacity and coverage, cropping at the canvas edge, stray or
+detached fragments, import settings, art lint. Do not fail a criterion because the style or look seems off or because a stylistic effect is not demonstrated by pixel statistics: how the art looks is judged once, by the final art review of the complete game. When the objective parts pass, record the criterion as pass
+and say which stylistic parts are left to the final review. A cropped sprite, stray fragments, a wrong size or lost transparency are technical defects and still fail.'''
+
 ART_NO_INTERMEDIATE_REVIEW = '''No one reviews or scores an individual asset visually, and nothing here is blocked because an asset looks different from the reference. Build every asset to match the approved reference and its requirement ids
 (open the reference with vision_analyze and compare your own result as you work), then continue. The only visual gate is one final review of the complete, assembled and engine-rendered game against the whole reference. Technical checks still apply: valid files,
 opacity and coverage, integrity, build and tests.'''

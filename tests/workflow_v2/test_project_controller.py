@@ -1277,6 +1277,17 @@ class ProjectControllerTests(unittest.TestCase):
             self.assertIn('Do not judge how an art asset looks', body, profile)
             self.assertIn('your opinion of it is never a finding at any severity', body, profile)
 
+    def test_the_verifier_card_limits_look_criteria_to_objective_properties_and_leaves_style_to_the_final_review(self):
+        self.plan(art=True, tasks=[dict(SPRITES, id='sprites')])
+        self.board.complete(self.only('artist')); self.tick()
+        body = self.board.cards[self.only('verifier')['task_id']]['body']
+        for text in ('only through objective, measurable properties', 'cropping at the canvas edge', 'stray or\ndetached fragments', 'judged once, by the final art review of the complete game',
+                     'A cropped sprite, stray fragments, a wrong size or lost transparency are technical defects and still fail'):
+            self.assertIn(text, body)
+        self.board.complete(self.only('verifier')); self.tick()
+        for row in self.board.ready():
+            self.assertNotIn('only through objective, measurable properties', self.board.cards[row['task_id']]['body'], row['profile'])   # reviewers have their own rule
+
     def test_the_gate_waives_only_medium_visual_findings_of_non_art_reviewers_on_image_files(self):
         from factory_dashboard.workflow_gate import evaluate_cycle
         from types import SimpleNamespace

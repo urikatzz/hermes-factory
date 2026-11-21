@@ -10,7 +10,7 @@ import re
 import time
 
 from .model_policy import ConfigurationError
-from .project_cards import (ART_PLAN, ROLE_FINDINGS, APPROVED_COMPARISON, APPROVED_REFERENCES, INSPECTION, REFERENCE_AUDIT, VISUAL_TRACE, ARCHITECT, COMPARISON, CONFLICT_CHECK, DIRECTOR, PLAN_CORRECTION, PLAN_CORRECTION_REVIEW, ART_FIT, ART_NO_INTERMEDIATE_REVIEW, ART_SIZING, BLOCKED_NEEDS_EVIDENCE, INTEGRATION_SCENE, NO_VISUAL_JUDGEMENT, OWNED_CHECK, SCENE_GATE, CONTINUES, INSPECT_PATHS, PLAN_BLOCKED, PLAN_FINDING, STYLE_CHANGED, SUPERSEDED, WRITER_GATES,
+from .project_cards import (ART_PLAN, ROLE_FINDINGS, APPROVED_COMPARISON, APPROVED_REFERENCES, INSPECTION, REFERENCE_AUDIT, VISUAL_TRACE, ARCHITECT, COMPARISON, CONFLICT_CHECK, DIRECTOR, PLAN_CORRECTION, PLAN_CORRECTION_REVIEW, ART_FIT, ART_NO_INTERMEDIATE_REVIEW, ART_SIZING, BLOCKED_NEEDS_EVIDENCE, INTEGRATION_SCENE, VERIFIER_NO_STYLE_JUDGEMENT, NO_VISUAL_JUDGEMENT, OWNED_CHECK, SCENE_GATE, CONTINUES, INSPECT_PATHS, PLAN_BLOCKED, PLAN_FINDING, STYLE_CHANGED, SUPERSEDED, WRITER_GATES,
                             PLAN_REVIEW, REPLAN, RETRO, SCOPE, SPEC_CONSTRAINTS, TOOL_INCIDENTS, project_card)
 from .project_decisions import (MAX_STAGE_RETRIES, constraint_view, constraints_of, normalize_decisions, preserved_conflict, record_applied, relevant_constraints,
                                 validate_plan_constraints, validate_spec_conflicts)
@@ -824,7 +824,7 @@ class ProjectController:
                           'Verify only TASK acceptance IDs against the exact cumulative manifest. Run tests, integration checks, asset lint gates and release audit. '
                           'Record repair_domains (code/art/audio) for failed asset or integration checks. Missing tools are environment gaps, never passes. '
                           'Never use inline interpreter flags such as python -c or node -e (the safety guard blocks them): read files with the file tools or run a script file. '
-                          + WRITER_GATES + '\n' + TOOL_INCIDENTS + '\n' + SPEC_CONSTRAINTS + '\n' + PLAN_FINDING + self._style_note(conn, project),
+                          + VERIFIER_NO_STYLE_JUDGEMENT + '\n' + WRITER_GATES + '\n' + TOOL_INCIDENTS + '\n' + SPEC_CONSTRAINTS + '\n' + PLAN_FINDING + self._style_note(conn, project),
                           inputs, task=task, cycle=cycle)
         if not node:
             return False
