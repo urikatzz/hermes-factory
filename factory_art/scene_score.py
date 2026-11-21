@@ -21,6 +21,7 @@ ASPECT_TOLERANCE = 0.01        # the capture must be framed like the reference
 COPY_TOLERANCE = 0.004         # mean per-channel difference below this means the "screenshot" is the reference (or a copy of it)
 ASPECTS = ('color', 'lighting', 'texture', 'proportion', 'missing_detail', 'composition', 'other')
 RENDER_KEYS = {'schema', 'renderer', 'command', 'exit_code', 'scene', 'project_dir', 'screenshot', 'screenshot_sha256', 'width', 'height', 'captured_at'}
+RENDER_OPTIONAL = {'engine', 'completeness', 'layout_sha256', 'isolated_clone', 'duration_seconds'}   # written by factory_unity.scene_capture from the engine's own attestation
 
 PROMPT = '''The first image is a screenshot of the assembled game scene, rendered by the game engine. The second image is the human-approved reference for the same scene.
 Both are shown at the same framing and resolution. Score how closely the whole scene matches the whole reference in composition, subjects and their proportions,
@@ -59,11 +60,17 @@ def _mean_difference(a, b):
     return total / (3 * 255 * len(a.pixels)) if a.pixels else 1.0
 
 
-def validate_render(record, screenshot, reference, asset_files=()):
+def validate_render(record, screenshot, reference, asset_files=(), require_engine=False):
     """Everything that makes a screenshot admissible. Returns (problems, screenshot image, reference image); problems is empty when admissible."""
     problems = []
-    if not isinstance(record, dict) or set(record) != RENDER_KEYS or record.get('schema') != RENDER_SCHEMA:
+    if not isinstance(record, dict) or not RENDER_KEYS <= set(record) or set(record) - RENDER_KEYS - RENDER_OPTIONAL or record.get('schema') != RENDER_SCHEMA:
         return ['render record is missing or does not match ' + RENDER_SCHEMA], None, None
+    engine = record.get('engine')
+    if engine is not None:
+        if not isinstance(engine, dict) or engine.get('screenshot_sha256') != record['screenshot_sha256'] or not str(engine.get('graphics_device', '')).strip() or not str(engine.get('engine_version', '')).strip():
+            problems.append('the engine attestation does not match the screenshot')
+    elif require_engine:
+        problems.append('the render record carries no engine attestation: only a capture made by the game engine is accepted')
     command = record['command']
     if not (isinstance(command, str) and command.strip()) and not (isinstance(command, list) and command and all(isinstance(c, str) and c for c in command)):
         problems.append('render record has no capture command')
@@ -128,7 +135,7 @@ def score_scene(candidate, reference, assets, post, model=MODEL):
     return score, clean, diagnosis.strip()
 
 
-def run_scene_similarity(reference, screenshot, render_record, out, post=None, threshold=THRESHOLD, model=MODEL, assets=()):
+def run_scene_similarity(reference, screenshot, render_record, out, post=None, threshold=THRESHOLD, model=MODEL, assets=(), require_engine=False):
     """Write `out` (factory-scene-similarity/v1). status: pass / fail (a real score below the threshold) / blocked (no score was obtained, for any reason)."""
     out = Path(out)
     result = {'schema': SCHEMA, 'model': model, 'threshold': threshold, 'reference': {'path': str(reference)},
@@ -137,7 +144,7 @@ def run_scene_similarity(reference, screenshot, render_record, out, post=None, t
         record = json.loads(Path(render_record).read_text()) if Path(render_record).is_file() else None
     except (OSError, ValueError):
         record = None
-    problems, image, expected = validate_render(record, screenshot, reference, assets)
+    problems, image, expected = validate_render(record, screenshot, reference, assets, require_engine)
     if Path(reference).is_file():
         result['reference']['sha256'] = sha256_file(reference)
     if Path(screenshot).is_file():
@@ -156,6 +163,56 @@ def run_scene_similarity(reference, screenshot, render_record, out, post=None, t
             result['status'] = 'pass' if result['score'] >= threshold else 'fail'
         except SimilarityUnavailable as error:
             result['problems'] = [str(error)]
+    # Acceptance needs more than a score: an engine-attested capture of a COMPLETE scene. A scene that still misses required elements is a preliminary composition test.
+    done = (record or {}).get('completeness') if isinstance(record, dict) else None
+    complete = isinstance(done, dict) and done.get('missing') == [] and done.get('complete') is True
+    result['completeness'] = done if isinstance(done, dict) else None
+    result['attested'] = bool(isinstance(record, dict) and record.get('engine'))
+    result['preliminary'] = not complete
+    result['final_acceptance'] = result['status'] == 'pass' and complete and result['attested']
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(result, indent=2) + '\n')
     return result
+
+
+def codex_post(timeout=300, binary='codex'):
+    """A `post` for score_scene that uses the machine's Codex login instead of an API key: the two images go to `codex exec -i` and its JSON answer is returned in the
+    chat-completions shape score_scene reads. Nothing about a credential is read or forwarded here."""
+    import base64
+    import shutil
+    import subprocess
+    import tempfile
+
+    def post(body):
+        exe = shutil.which(binary)
+        if not exe:
+            raise SimilarityUnavailable('the codex CLI is not installed')
+        parts = body['messages'][0]['content']
+        text = next(p['text'] for p in parts if p['type'] == 'text')
+        images = [p['image_url']['url'] for p in parts if p['type'] == 'image_url']
+        with tempfile.TemporaryDirectory(prefix='scene-codex-') as work:
+            files = []
+            for index, url in enumerate(images):
+                header, _, data = url.partition(',')
+                path = Path(work) / f'image-{index}.png'
+                path.write_bytes(base64.b64decode(data))
+                files.append(str(path))
+            answer = Path(work) / 'answer.txt'
+            prompt = text + '\nThe first attached image is the engine screenshot of the scene, the second is the approved reference. Answer with the JSON object only.'
+            command = [exe, 'exec', '--skip-git-repo-check', '--ephemeral', '-s', 'read-only', '-C', work, '--color', 'never', '-o', str(answer)]
+            for f in files:
+                command += ['-i', f]
+            command += ['--', prompt]
+            try:
+                done = subprocess.run(command, capture_output=True, text=True, timeout=timeout)
+            except (OSError, subprocess.TimeoutExpired) as error:
+                raise SimilarityUnavailable(f'codex exec failed: {error}') from error
+            if done.returncode != 0 or not answer.is_file():
+                raise SimilarityUnavailable('codex exec returned no answer: ' + (done.stderr or '')[-200:])
+            content = answer.read_text().strip()
+            start, end = content.find('{'), content.rfind('}')
+            if start < 0 or end < start:
+                raise SimilarityUnavailable('codex answered without a JSON object')
+            return {'choices': [{'message': {'content': content[start:end + 1]}}]}
+    return post
+

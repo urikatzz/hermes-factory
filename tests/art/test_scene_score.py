@@ -133,6 +133,88 @@ class AdmissibleEvidenceTests(SceneFixture):
         self.assertEqual(problems, []); self.assertEqual((image.width, expected.width), (160, 160))
 
 
+class EngineAttestationAndAcceptanceTests(SceneFixture):
+    def engine(self, **changes):
+        digest = hashlib.sha256(self.screenshot.read_bytes()).hexdigest()
+        return dict(engine='Unity', engine_version='6000.4.11f1', graphics_device='Apple M1 Max', screenshot_sha256=digest, **changes)
+
+    COMPLETE = dict(required=['V1', 'V2'], present=['V1', 'V2'], missing=[], deferred=[], complete=True)
+    PARTIAL = dict(required=['V1', 'V2'], present=['V1'], missing=['V2'], deferred=[], complete=False)
+
+    def gate(self, post, require_engine=True, **record):
+        return run_scene_similarity(self.reference, self.screenshot, self.record(**record), self.root / 'out/scene-similarity.json', post, require_engine=require_engine)
+
+    def test_an_attested_complete_scene_at_80_is_final_acceptance(self):
+        result = self.gate(self.post(80), engine=self.engine(), completeness=self.COMPLETE)
+        self.assertEqual((result['status'], result['attested'], result['preliminary'], result['final_acceptance']), ('pass', True, False, True))
+
+    def test_a_high_score_for_a_scene_that_misses_required_elements_is_only_a_preliminary_test(self):
+        result = self.gate(self.post(97), engine=self.engine(), completeness=self.PARTIAL)
+        self.assertEqual((result['status'], result['score']), ('pass', 97))       # the score is real and reported
+        self.assertTrue(result['preliminary']); self.assertFalse(result['final_acceptance'])
+        self.assertEqual(result['completeness']['missing'], ['V2'])
+
+    def test_a_scene_without_a_completeness_account_is_never_final(self):
+        result = self.gate(self.post(97), engine=self.engine())
+        self.assertFalse(result['final_acceptance']); self.assertTrue(result['preliminary'])
+
+    def test_an_unattested_render_is_blocked_when_the_engine_is_required_and_never_final_otherwise(self):
+        blocked = self.gate(self.post(95), completeness=self.COMPLETE)
+        self.assertEqual((blocked['status'], blocked['score']), ('blocked', None)); self.assertIn('engine attestation', ' '.join(blocked['problems']))
+        self.assertEqual(self.calls, [])
+        allowed = self.gate(self.post(95), require_engine=False, completeness=self.COMPLETE)
+        self.assertEqual(allowed['status'], 'pass'); self.assertFalse(allowed['final_acceptance']); self.assertFalse(allowed['attested'])
+
+    def test_an_attestation_for_another_screenshot_or_without_a_graphics_device_blocks(self):
+        for bad in (self.engine(), ):
+            bad = dict(bad, screenshot_sha256='0' * 64)
+            result = self.gate(self.post(95), engine=bad, completeness=self.COMPLETE)
+            self.assertEqual(result['status'], 'blocked'); self.assertIn('engine attestation does not match', ' '.join(result['problems']))
+        result = self.gate(self.post(95), engine=self.engine() | dict(graphics_device=' '), completeness=self.COMPLETE)
+        self.assertEqual(result['status'], 'blocked')
+
+
+class CodexBackendTests(SceneFixture):
+    def fake_codex(self, body):
+        folder = self.root / 'bin'; folder.mkdir(exist_ok=True)
+        exe = folder / 'codex'; exe.write_text('#!/bin/sh\n' + body); exe.chmod(0o755)
+        return str(folder)
+
+    def run_post(self, path_dir):
+        import os
+        from factory_art.scene_score import codex_post, PROMPT, RESPONSE
+        from factory_art.similarity import _image
+        body = {'messages': [{'content': [{'type': 'text', 'text': PROMPT}, _image(self.screenshot), _image(self.reference)]}]}
+        old = os.environ['PATH']
+        os.environ['PATH'] = path_dir + os.pathsep + old
+        try:
+            return codex_post(timeout=30)(body)
+        finally:
+            os.environ['PATH'] = old
+
+    def test_the_scene_and_reference_go_to_codex_as_attached_images_and_its_json_answer_is_returned(self):
+        folder = self.fake_codex('out=""; imgs=0\nwhile [ $# -gt 0 ]; do case "$1" in -o) out="$2"; shift;; -i) imgs=$((imgs+1)); test -s "$2" || exit 9; shift;; esac; shift; done\n'
+                                 'echo "$imgs images" > "$out.count"; printf \'sure: {"score": 83, "differences": [], "diagnosis": "close"} done\' > "$out"\n')
+        answer = self.run_post(folder)
+        self.assertEqual(json.loads(answer['choices'][0]['message']['content'])['score'], 83)
+
+    def test_a_codex_failure_or_a_non_json_answer_is_unavailable_never_a_score(self):
+        from factory_art.similarity import SimilarityUnavailable
+        for body in ('exit 5\n', 'out=""; while [ $# -gt 0 ]; do case "$1" in -o) out="$2"; shift;; esac; shift; done; echo "no json here" > "$out"\n'):
+            with self.assertRaises(SimilarityUnavailable):
+                self.run_post(self.fake_codex(body))
+
+    def test_the_cli_scores_through_codex_when_no_key_is_forwarded(self):
+        folder = self.fake_codex('out=""; while [ $# -gt 0 ]; do case "$1" in -o) out="$2"; shift;; esac; shift; done\n'
+                                 'cat > "$out" <<EOF\n{"score": 41, "differences": [{"aspect": "color", "description": "the wall is far too dark", "impact": 5, "responsible": "wall.png", "repair": "lighten the panels"}], "diagnosis": "The wall is nearly black and carries most of the gap."}\nEOF\n')
+        done = subprocess.run([sys.executable, str(ROOT / 'scripts/scene_score.py'), '--reference', str(self.reference), '--screenshot', str(self.screenshot), '--render-record', str(self.record()),
+                               '--out', str(self.root / 'cli/s.json'), '--allow-unattested'], capture_output=True, text=True, env={'PATH': folder + ':/usr/bin:/bin', 'HOME': '/nonexistent'})
+        self.assertEqual(done.returncode, 2, done.stderr)               # a real score below 80
+        summary = json.loads(done.stdout)
+        self.assertEqual((summary['score'], summary['model'], summary['final_acceptance']), (41, 'codex-cli', False))
+        self.assertEqual(json.loads((self.root / 'cli/s.json').read_text())['differences'][0]['responsible'], 'wall.png')
+
+
 class SceneCommandLineTests(SceneFixture):
     def run_cli(self, *extra, env=None):
         return subprocess.run([sys.executable, str(ROOT / 'scripts/scene_score.py'), '--reference', str(self.reference), '--screenshot', str(self.screenshot),

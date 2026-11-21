@@ -188,14 +188,22 @@ For a mismatch report actionable findings with the relevant task AC and CHANGES_
 An unclear or contradictory director plan requires human review; never silently redefine intent.'''
 
 SCENE_GATE = '''Full-scene similarity gate (mandatory, blocking, pass is 80/100). Score the COMPLETE assembled scene against the COMPLETE approved reference, never an isolated sprite.
-1. Capture the actual scene from the game engine at the reference's framing and resolution (same camera, 16:9 or whatever the reference is). Retain the PNG and write scene-render.json
-   {{"schema":"factory-scene-render/v1","renderer":"<engine capture tool>","command":"<the exact capture command>","exit_code":0,"scene":"<scene file>","project_dir":"<PROJECT_DIR>","screenshot":"<png name>","screenshot_sha256":"<sha256>","width":<w>,"height":<h>,"captured_at":<unix seconds>}}.
-   The screenshot must be a real engine render: never an image you generated or painted, never the reference, never a single asset.
+1. First `fw.py check PROJECT_DIR --expect <this review's manifest>`, then capture the scene yourself (never trust the writer's capture): `python3 $HOME/.hermes/factory-skills/worker/unity-scene/scripts/unity_scene_capture.py --project PROJECT_DIR
+   --layout art/scene/scene-layout.json --out <your workspace>/scene --required {required}`. It builds a real scene from the layout in an isolated clone, renders it with the game engine at the layout's resolution (which must match the reference's framing),
+   and writes scene.png and scene-render.json with the engine's own attestation and the scene's completeness. The screenshot must be a real engine render: never an image you generated or painted, never the reference, never a single asset.
+   If the layout is missing or the capture exits 3, no scene exists: finish CHANGES_REQUIRED with a HIGH finding on the integration (`no scene layout` or the capture's stage and message) and never score anything else. A scene that still misses required reference elements
+   (completeness.missing) is a preliminary composition: it is scored, but it cannot be accepted, so report CHANGES_REQUIRED naming the missing elements.
 2. Run `SCENE_SCORE --reference <the ORIGINAL approved reference image> --screenshot <png> --render-record scene-render.json --out scene-similarity.json --assets <the scene's asset files, comma separated>` and retain
    scene-similarity.json, scene-render.json, the screenshot and scene-compared.png. (SCENE_SCORE is scene_score.py of the art-review skill; its section 2b has the details.) Never estimate or invent the score. Exit 3 (blocked: no engine render, bad framing, no credential) is an unresolved tool incident (blocked_tools), not a pass.
 3. Below 80: verdict CHANGES_REQUIRED with a HIGH finding per ranked difference from scene-similarity.json, formatted `[scene] <impact>/5 <aspect>: <description> | responsible: <asset or scene settings> | repair: <instruction>`, path = the responsible asset file. Add your own diagnosis of why the whole
    scene falls short (colour, lighting, texture, proportion, missing details, composition) and say which assets already match and must be preserved. Repair the cause, never the score.
 Per-requirement visual judgements and every other check still apply. {brief}'''
+
+INTEGRATION_SCENE = '''Scene assembly (final integration with an approved reference): the project is judged on a real engine render of the WHOLE scene against the approved reference. Write art/scene/scene-layout.json (factory-scene-layout/v1, see the
+unity-scene skill at $HOME/.hermes/factory-skills/worker/unity-scene/SKILL.md): one object per delivered asset with its Assets/ path, world position from the plan, size_units width, sorting_order and covers = the approved requirement ids it supplies; the camera
+matches the reference's framing (same aspect and resolution, orthographic size from the plan's scale). Put art/scene/ on .factory/include.txt. Check your own work: `python3 $HOME/.hermes/factory-skills/worker/unity-scene/scripts/unity_scene_capture.py --project PROJECT_DIR
+--layout art/scene/scene-layout.json --out <your workspace>/scene --required {required}` and look at scene.png with vision_analyze next to the reference. The reviewer captures the scene again independently. Every required requirement must be covered by an object that
+really delivers it: a missing element is reported as missing and the scene cannot be accepted, whatever it scores. Never claim coverage for an asset that does not exist.'''
 
 NO_SPRITE_SCORE = '''Never compute or report a similarity score for a single asset, and never compare an isolated sprite with the approved reference scene: the reference is one composed frame, so such a score is meaningless. Judge each requirement this task
 owns against the original reference with vision (comparison.json). The full-scene score is taken on the assembled scene at final integration.'''

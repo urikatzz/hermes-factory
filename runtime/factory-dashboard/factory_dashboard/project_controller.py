@@ -10,7 +10,7 @@ import re
 import time
 
 from .model_policy import ConfigurationError
-from .project_cards import (ART_PLAN, ROLE_FINDINGS, APPROVED_COMPARISON, APPROVED_REFERENCES, INSPECTION, REFERENCE_AUDIT, VISUAL_TRACE, ARCHITECT, COMPARISON, CONFLICT_CHECK, SIMILARITY, DIRECTOR, PLAN_CORRECTION, PLAN_CORRECTION_REVIEW, ART_FIT, NO_SPRITE_SCORE, OWNED_CHECK, SCENE_GATE, CONTINUES, INSPECT_PATHS, PLAN_BLOCKED, REVIEW_SCOPE, PLAN_FINDING, STYLE_CHANGED, SUPERSEDED, WRITER_GATES,
+from .project_cards import (ART_PLAN, ROLE_FINDINGS, APPROVED_COMPARISON, APPROVED_REFERENCES, INSPECTION, REFERENCE_AUDIT, VISUAL_TRACE, ARCHITECT, COMPARISON, CONFLICT_CHECK, SIMILARITY, DIRECTOR, PLAN_CORRECTION, PLAN_CORRECTION_REVIEW, ART_FIT, INTEGRATION_SCENE, NO_SPRITE_SCORE, OWNED_CHECK, SCENE_GATE, CONTINUES, INSPECT_PATHS, PLAN_BLOCKED, REVIEW_SCOPE, PLAN_FINDING, STYLE_CHANGED, SUPERSEDED, WRITER_GATES,
                             PLAN_REVIEW, REPLAN, RETRO, SCOPE, SPEC_CONSTRAINTS, TOOL_INCIDENTS, project_card)
 from .project_decisions import (MAX_STAGE_RETRIES, constraint_view, constraints_of, normalize_decisions, preserved_conflict, record_applied, relevant_constraints,
                                 validate_plan_constraints, validate_spec_conflicts)
@@ -752,6 +752,8 @@ class ProjectController:
             instructions += '\n' + SPEC_CONSTRAINTS + '\n' + PLAN_BLOCKED + self._style_note(conn, project)
             if profile == 'artist':
                 instructions += '\n' + ART_FIT
+            if task['id'] == 'integration' and refs.authoritative(project.get('reference_records', [])):
+                instructions += '\n' + INTEGRATION_SCENE.format(required=','.join(r['id'] for r in refs.required_requirements(project['reference_records'])))
             if repair and project.get('scene'):
                 instructions += '\n' + scene_loop.brief(project['scene']) + (
                     '\nRecord your plan in metadata.scene_repair_plan {"assets":[files you change],"instructions":"what you change","diagnosis_of_previous":"why the previous attempt scored below 80",'
@@ -826,7 +828,7 @@ class ProjectController:
             if profile == 'art-reviewer':
                 instructions += '\n' + COMPARISON + ('\n' + APPROVED_COMPARISON if human_approved else '')
                 if human_approved:
-                    instructions += '\n' + (SCENE_GATE.format(brief=scene_loop.brief(project.get('scene'))) if scene_gate else NO_SPRITE_SCORE)
+                    instructions += '\n' + (SCENE_GATE.format(brief=scene_loop.brief(project.get('scene')), required=','.join(r['id'] for r in refs.required_requirements(project['reference_records']))) if scene_gate else NO_SPRITE_SCORE)
             if profile == 'art-reviewer' and task['id'] != 'integration' and not human_approved:
                 instructions += '\n' + SIMILARITY
             selected = next((r.instructions for r in definition.reviewers if r.profile == profile), '')
@@ -849,8 +851,9 @@ class ProjectController:
                     owned = set(task['visual']) if task['id'] != 'integration' and task.get('visual') else None  # an asset task answers for the requirements it owns
                     refs.validate_reference_comparison(record, project['reference_records'], only=owned)
             if scene_gate:
-                scene_record, render_record = validate_scene_similarity(result, project['reference_records'])
-                self._record_scene(project, row, result, scene_record, work, context.get('project_dir', ''))
+                required = [r['id'] for r in refs.required_requirements(project['reference_records'])]
+                scene_record, render_record, incomplete = validate_scene_similarity(result, project['reference_records'], required)
+                self._record_scene(project, row, result, scene_record, work, context.get('project_dir', ''), incomplete)
             readers.append(result)
             rows.append(row)
         if waiting:
@@ -1120,7 +1123,7 @@ class ProjectController:
             raise ConfigurationError('Scene repair rejected: ' + '; '.join(problems))
         project['scene_pending_repair'] = dict(signature=scene_loop.signature(plan['assets'], plan.get('instructions')), assets=list(plan['assets']), instructions=str(plan.get('instructions', ''))[:500])
 
-    def _record_scene(self, project, row, result, record, work, project_dir):
+    def _record_scene(self, project, row, result, record, work, project_dir, incomplete=()):
         """Keep the scored attempt in the ledger (idempotent per task): scores, diagnosis, best verified result and the repair that led here."""
         hashes = {}
         try:
@@ -1130,8 +1133,13 @@ class ProjectController:
                     hashes[rel] = digest
         except (OSError, ValueError):
             hashes = {}
-        project['scene'] = scene_loop.record_attempt(project.get('scene'), task_id=row['task_id'], score=record['score'], status=record['status'],
-                                                     screenshot_sha256=record['screenshot'].get('sha256'), differences=record['differences'], diagnosis=record['diagnosis'],
+        differences, diagnosis = list(record['differences']), record['diagnosis']
+        if incomplete:    # a scene that still misses required elements fails acceptance whatever it scored: record it as a failed attempt with that as the top difference
+            differences = [dict(aspect='missing_detail', description='required elements are not in the scene: ' + ', '.join(incomplete), impact=5, responsible='scene settings',
+                                repair='build the missing required elements into the scene: ' + ', '.join(incomplete))] + differences
+            diagnosis = (diagnosis + ' ' if diagnosis else '') + 'The scene is incomplete: it is missing ' + ', '.join(incomplete) + ', so it cannot be accepted.'
+        project['scene'] = scene_loop.record_attempt(project.get('scene'), task_id=row['task_id'], score=record['score'], status='fail' if incomplete else record['status'],
+                                                     screenshot_sha256=record['screenshot'].get('sha256'), differences=differences, diagnosis=diagnosis,
                                                      assets_sha256=hashes, repair=project.pop('scene_pending_repair', None), snapshot=work.get('snapshot'))
 
     def _audit_start_check(self, conn, root, project, work, row, result, owned, repair):

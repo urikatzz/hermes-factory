@@ -142,7 +142,7 @@ def validate_comparison(profile, result, plans, integration, approved=False):
     return record
 
 
-def validate_scene_similarity(result, references):
+def validate_scene_similarity(result, references, required=()):
     """The full-scene gate: a real engine capture of the assembled scene scored against the human-approved reference. Never a sprite, never an invented score.
     Returns (record, render record). status `blocked` (no admissible evidence, no score) stops the project; `fail` needs CHANGES_REQUIRED and a ranked diagnosis."""
     record = retained_json(result.metadata['artifacts'], 'scene-similarity.json')
@@ -170,15 +170,28 @@ def validate_scene_similarity(result, references):
     digest = hashlib.sha256(data).hexdigest()
     if not data.startswith(b'\x89PNG\r\n\x1a\n') or digest != render.get('screenshot_sha256') or digest != shot.get('sha256'):
         raise ConfigurationError('The scored screenshot is not the retained render')
-    if status == 'fail':
-        diffs = record['differences']
+    # Acceptance needs an engine-attested capture of a COMPLETE scene. The required elements come from the approved reference (computed by the controller, never taken from the
+    # capture), so a render that understates what is required, or that still misses required elements, can be scored but never accepted.
+    engine = render.get('engine')
+    if not isinstance(engine, dict) or engine.get('screenshot_sha256') != digest or not str(engine.get('graphics_device', '')).strip() or not str(engine.get('engine_version', '')).strip():
+        raise ConfigurationError('The scene render carries no engine attestation: only a capture made by the game engine is accepted')
+    done = render.get('completeness')
+    if required:
+        if not isinstance(done, dict) or not set(required) <= set(done.get('required', [])) or not isinstance(done.get('missing'), list):
+            raise ConfigurationError('The scene render does not account for every required reference element')
+    incomplete = list(done.get('missing', [])) if isinstance(done, dict) else []
+    if status == 'pass' and incomplete:
+        status = 'incomplete'
+    if status in ('fail', 'incomplete'):
+        diffs = record['differences'] or ([dict(aspect='missing_detail', description='required elements are not in the scene: ' + ', '.join(incomplete), impact=5, responsible='scene settings',
+                                                repair='build the missing required elements into the scene: ' + ', '.join(incomplete))] if incomplete else [])
         ok = (isinstance(diffs, list) and diffs and all(isinstance(d, dict) and type(d.get('impact')) is int and 1 <= d['impact'] <= 5
                                                           and all(isinstance(d.get(k), str) and d[k].strip() for k in ('aspect', 'description', 'responsible', 'repair')) for d in diffs)
               and all(diffs[i]['impact'] >= diffs[i + 1]['impact'] for i in range(len(diffs) - 1)))
-        if not ok or not isinstance(record['diagnosis'], str) or len(record['diagnosis'].strip()) < 20:
+        if not ok or (status == 'fail' and (not isinstance(record['diagnosis'], str) or len(record['diagnosis'].strip()) < 20)):
             raise ConfigurationError('A failing scene score needs a ranked list of differences and a diagnosis')
         blocking = [f for f in result.metadata.get('findings', []) if f.split('|', 4)[1] in ('BLOCKER', 'HIGH')]
         if not blocking or result.metadata['verdict'] != 'CHANGES_REQUIRED':
-            raise ConfigurationError('A scene score below 80 requires a blocking finding and CHANGES_REQUIRED')
-    return record, render
+            raise ConfigurationError('A scene score below 80, or a scene that still misses required elements (' + ', '.join(incomplete) + '), requires a blocking finding and CHANGES_REQUIRED')
+    return record, render, incomplete
 

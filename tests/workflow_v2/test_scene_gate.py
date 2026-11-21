@@ -30,7 +30,9 @@ class SceneFlow(ArtReviewFlow):
         shot = folder / (name + '.png'); shot.write_bytes(png(size=24000 + len(name) + score))
         digest = hashlib.sha256(shot.read_bytes()).hexdigest()
         render = dict(schema='factory-scene-render/v1', renderer='engine-game-view', command=['engine', '--capture'], exit_code=0, scene='Scenes/Room01.unity',
-                      project_dir=self.temp.name, screenshot=shot.name, screenshot_sha256=digest, width=1280, height=720, captured_at=1)
+                      project_dir=self.temp.name, screenshot=shot.name, screenshot_sha256=digest, width=1280, height=720, captured_at=1,
+                      engine=dict(engine='Unity', engine_version='6000.4.11f1', graphics_device='Apple M1 Max', screenshot_sha256=digest),
+                      completeness=dict(required=['V1', 'V2'], present=['V1', 'V2'], missing=[], deferred=[], complete=True))
         status = status or ('pass' if score >= 80 else 'fail')
         record = dict(schema='factory-scene-similarity/v1', model='m', threshold=80, reference=dict(path='docs/look/reference.png', sha256=self.loaded['references'][0]['sha256']),
                       screenshot=dict(path=str(shot), sha256=digest), score=None if blocked else score, differences=[] if (status == 'pass' or blocked) else (differences or DIFFS),
@@ -56,7 +58,8 @@ class SceneGateCardTests(SceneFlow):
         self.review(self.only('art-reviewer'))
         integration = self.board.cards[self.reach_integration_review_after_asset()['task_id']]['body']
         for text in ('Full-scene similarity gate', 'COMPLETE assembled scene against the COMPLETE approved reference', 'never an isolated sprite', 'SCENE_SCORE --reference',
-                     'never an image you generated', 'pass is 80/100', 'Never estimate or invent the score'):
+                     'never an image you generated', 'pass is 80/100', 'Never estimate or invent the score', 'unity_scene_capture.py --project PROJECT_DIR', '--required V1,V2',
+                     'never trust the writer', 'preliminary composition', 'cannot be accepted'):
             self.assertIn(text, integration)
         self.assertNotIn('never compare an isolated sprite with the approved reference scene', integration)
 
@@ -67,6 +70,21 @@ class SceneGateCardTests(SceneFlow):
             if row['profile'] != 'art-reviewer':
                 self.board.complete(row)
         return self.only('art-reviewer')
+
+
+class IntegrationWriterCardTests(SceneFlow):
+    def test_the_integration_writer_is_told_to_assemble_a_layout_and_capture_the_scene(self):
+        self.review(self.reach_art_review())
+        card = self.board.cards[self.only('developer')['task_id']]['body']
+        for text in ('Scene assembly (final integration with an approved reference)', 'art/scene/scene-layout.json', 'factory-scene-layout/v1', 'covers = the approved requirement ids',
+                     'unity_scene_capture.py --project PROJECT_DIR', '--required V1,V2', 'a missing element is reported as missing', 'Never claim coverage for an asset that does not exist'):
+            self.assertIn(text, card)
+
+    def test_an_asset_task_writer_card_has_no_scene_assembly_text(self):
+        self.approved_director()
+        self.architect([self.visual_task(owner='artist')])
+        self.finish(self.only('claude-reviewer'), 'Plan reviewed against the reference.', document='PLAN-REVIEW.md')
+        self.assertNotIn('Scene assembly', self.board.cards[self.only('artist')['task_id']]['body'])
 
 
 class SceneGateEvaluationTests(SceneFlow):
@@ -110,6 +128,43 @@ class SceneGateEvaluationTests(SceneFlow):
     def test_a_lowered_threshold_or_a_contradictory_score_is_refused(self):
         self.integration_review(self.reach_integration_review(), score=70, status='pass', tamper=dict(threshold=60))
         self.assertIn('below the required 80', self.terminal()['reason'])
+
+
+class SceneCompletenessTests(SceneFlow):
+    MISSING = dict(required=['V1', 'V2'], present=['V1'], missing=['V2'], deferred=[], complete=False)
+
+    def test_a_scene_that_scores_above_80_but_misses_required_elements_cannot_be_accepted(self):
+        self.integration_review(self.reach_integration_review(), score=92, tamper=dict(render_completeness=self.MISSING))
+        self.assertIn('misses required elements (V2)', self.terminal()['reason'])      # the reviewer approved a preliminary composition: refused
+        self.assertNotEqual(self.terminal()['phase'], 'delivered')
+
+    def test_an_incomplete_scene_with_a_blocking_finding_is_a_failed_attempt_that_goes_back_for_the_missing_elements(self):
+        self.integration_review(self.reach_integration_review(), score=92, tamper=dict(render_completeness=self.MISSING), failing=True)
+        self.assertEqual([r['profile'] for r in self.board.ready()], ['artist'])
+        attempt = self.document()['scene']['attempts'][-1]
+        self.assertEqual((attempt['score'], attempt['status']), (92, 'fail'))         # a high score does not make a missing element acceptable
+        self.assertEqual(attempt['differences'][0]['aspect'], 'missing_detail')
+        self.assertIn('V2', attempt['differences'][0]['description']); self.assertIn('incomplete', attempt['diagnosis'])
+        self.assertFalse(scene_loop.passed(self.document()['scene']))
+
+    def test_a_render_with_no_engine_attestation_is_refused(self):
+        stage = self.reach_integration_review()
+        self._stage = stage
+        files = self.scene_files(score=95, tamper=dict(render_engine=None))
+        self.review(stage, mode='rendered_in_engine', extra=files)
+        self.assertIn('no engine attestation', self.terminal()['reason'])
+
+    def test_an_attestation_for_a_different_screenshot_is_refused(self):
+        self.integration_review(self.reach_integration_review(), score=95, tamper=dict(render_engine=dict(engine='Unity', engine_version='6000.4.11f1', graphics_device='Apple M1 Max', screenshot_sha256='0' * 64)))
+        self.assertIn('no engine attestation', self.terminal()['reason'])
+
+    def test_a_capture_that_understates_what_the_reference_requires_is_refused(self):
+        self.integration_review(self.reach_integration_review(), score=95, tamper=dict(render_completeness=dict(required=['V1'], present=['V1'], missing=[], deferred=[], complete=True)))
+        self.assertIn('does not account for every required reference element', self.terminal()['reason'])
+
+    def test_a_complete_attested_scene_at_80_is_delivered(self):
+        self.integration_review(self.reach_integration_review(), score=80)
+        self.assertEqual(self.document()['terminal']['phase'], 'delivered')
 
 
 class SceneLoopTests(unittest.TestCase):
