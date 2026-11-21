@@ -52,6 +52,12 @@ class ArtReviewFlow(ReferenceFlow):
 
 
 class ArtReviewerTests(ArtReviewFlow):
+    def test_the_art_reviewer_card_is_scoped_to_the_tasks_own_requirements(self):
+        stage = self.reach_art_review()
+        body = self.board.cards[stage['task_id']]['body']
+        self.assertIn("Scope of this review: only the requirement ids in this task's visual list (", body)
+        self.assertIn('an in-engine render of them is not required of this stage', body)
+
     def test_a_reviewer_who_never_opened_the_rendered_screenshots_is_sent_back(self):
         self.review(self.reach_art_review(), viewed_shots=False)
         _, context = self.rejection('art-reviewer')

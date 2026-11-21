@@ -7,7 +7,7 @@ import re
 import time
 
 from .model_policy import ConfigurationError
-from .project_cards import (ART_PLAN, ROLE_FINDINGS, APPROVED_COMPARISON, APPROVED_REFERENCES, INSPECTION, REFERENCE_AUDIT, VISUAL_TRACE, ARCHITECT, COMPARISON, CONFLICT_CHECK, SIMILARITY, DIRECTOR, PLAN_CORRECTION, PLAN_CORRECTION_REVIEW, CONTINUES, INSPECT_PATHS, PLAN_BLOCKED, PLAN_FINDING, STYLE_CHANGED, SUPERSEDED, WRITER_GATES,
+from .project_cards import (ART_PLAN, ROLE_FINDINGS, APPROVED_COMPARISON, APPROVED_REFERENCES, INSPECTION, REFERENCE_AUDIT, VISUAL_TRACE, ARCHITECT, COMPARISON, CONFLICT_CHECK, SIMILARITY, DIRECTOR, PLAN_CORRECTION, PLAN_CORRECTION_REVIEW, CONTINUES, INSPECT_PATHS, PLAN_BLOCKED, REVIEW_SCOPE, PLAN_FINDING, STYLE_CHANGED, SUPERSEDED, WRITER_GATES,
                             PLAN_REVIEW, REPLAN, RETRO, SCOPE, SPEC_CONSTRAINTS, TOOL_INCIDENTS, project_card)
 from .project_decisions import (MAX_STAGE_RETRIES, constraint_view, constraints_of, normalize_decisions, preserved_conflict, record_applied, relevant_constraints,
                                 validate_plan_constraints, validate_spec_conflicts)
@@ -108,6 +108,8 @@ class ProjectController:
             instructions += '\n' + APPROVED_REFERENCES
             if refs.must_inspect(profile, key):
                 instructions += '\n' + INSPECTION + '\n' + ROLE_FINDINGS[refs.role_kind(profile, key)]
+                if profile == 'art-reviewer' and task and task.get('id') != 'integration' and task.get('visual'):
+                    instructions += '\n' + REVIEW_SCOPE.format(ids=', '.join(task['visual']), kind=refs.role_kind(profile, key))
                 if context.get('project_dir'):
                     instructions += '\n' + INSPECT_PATHS.format(paths='; '.join(str(Path(context['project_dir']) / r['path']) for r in approved))
             if profile == 'art-director':
@@ -278,8 +280,10 @@ class ProjectController:
                 tasks = [t for t in retained_json(result.metadata['artifacts'], 'project-plan.json').get('tasks', []) if isinstance(t, dict) and isinstance(t.get('id'), str)]
             elif kind == 'plan_check':
                 tasks = project.get('tasks', [])
+            current = self._current(project) if project.get('work') or project.get('mode') == 'integration' else None
+            owned = set(current['visual']) if profile == 'art-reviewer' and current and current.get('id') != 'integration' and current.get('visual') else None
             try:
-                refs.validate_role_findings(inspection, records, kind, tasks, [p.name for p in images], result.metadata.get('findings', []), result.metadata.get('verdict'))
+                refs.validate_role_findings(inspection, records, kind, tasks, [p.name for p in images], result.metadata.get('findings', []), result.metadata.get('verdict'), only=owned)
             except ConfigurationError as exc:
                 return 'Reference inspection rejected: ' + str(exc)
             if key == refs.PLAN_REVIEW_KEY:

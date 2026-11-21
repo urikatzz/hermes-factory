@@ -363,6 +363,17 @@ class RoleFindingTests(unittest.TestCase):
             refs.validate_role_findings(record, self.records, 'achieve')
         self.assertEqual(sorted(r['id'] for r in refs.required_requirements(self.records)), ['V1', 'V2'])
 
+    def test_a_scoped_review_demands_findings_only_for_the_ids_it_owns(self):
+        record = self.findings('render_check')
+        record['role_findings'] = [e for e in record['role_findings'] if e['requirement_id'] == 'V1']
+        with self.assertRaisesRegex(ConfigurationError, 'Missing render_check findings.*V2'):
+            refs.validate_role_findings(record, self.records, 'render_check', screenshots=['shot.png'])  # unscoped: every approved requirement
+        refs.validate_role_findings(record, self.records, 'render_check', screenshots=['shot.png'], only={'V1'})
+        with self.assertRaisesRegex(ConfigurationError, 'Missing render_check findings.*V1'):
+            refs.validate_role_findings(dict(role_findings=[]), self.records, 'render_check', screenshots=['shot.png'], only={'V1'})  # the owned id is still demanded
+        full = self.findings('render_check')
+        refs.validate_role_findings(full, self.records, 'render_check', screenshots=['shot.png'], only={'V1'})  # extra findings for other ids are allowed
+
     def test_a_generic_copied_or_ungrounded_finding_is_rejected(self):
         for change, message in ((dict(finding='fine'), 'empty, repeated'),
                                 (dict(finding='Hazard stripes on platforms and the door frame'), 'restates the requirement'),

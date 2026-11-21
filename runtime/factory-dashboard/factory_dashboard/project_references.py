@@ -561,7 +561,7 @@ def role_kind(profile, key):
     return ROLE_KINDS['plan-review' if key == PLAN_REVIEW_KEY else profile]
 
 
-def validate_role_findings(record, references, kind, tasks=(), screenshots=(), findings=(), verdict=None):
+def validate_role_findings(record, references, kind, tasks=(), screenshots=(), findings=(), verdict=None, only=None):
     """Role-specific, image-grounded findings: one per demanded requirement, each tied to a region of the reference image.
 
     achieve (art director): how the requirement is achieved and whether by `generated`, `procedural` or `hybrid` production.
@@ -571,7 +571,7 @@ def validate_role_findings(record, references, kind, tasks=(), screenshots=(), f
     entries = record.get('role_findings')
     if not isinstance(entries, list):
         raise ConfigurationError('reference-inspection.json needs "role_findings": one entry of kind "' + kind + '" per approved requirement')
-    required = {r['id']: r for r in required_requirements(references)}
+    required = {r['id']: r for r in required_requirements(references) if only is None or r['id'] in only}  # `only`: the ids this stage's task owns
     seen, regions, texts = {}, [], set()
     task_ids = {t['id']: t for t in tasks}
     known = {q['id'] for ref in references for q in ref['requirements']}
