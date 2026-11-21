@@ -92,7 +92,9 @@ class ArtReviewerTests(ArtReviewFlow):
         self.finish(self.only('claude-reviewer'), 'Plan reviewed against the reference.', document='PLAN-REVIEW.md')
         card = self.board.cards[self.only('artist')['task_id']]['body']
         for text in ('Fit mode (required for every asset you fit)', '--coverage opaque', 'Full-bleed art', 'TOOL-MODE error', 'metadata.tool_defect', 'run it with',
-                     'No one reviews or scores an individual asset visually', 'nothing here is blocked because an asset looks different', 'one final review of the complete'):
+                     'No one reviews or scores an individual asset visually', 'nothing here is blocked because an asset looks different', 'one final review of the complete',
+                     'a missing pixel size is never a reason to block', 'an explicit size beats any estimate', "take its aspect ratio from that region", 'asset_size.py --aspect', 'caps the long side at 1024',
+                     'record in your report the pixel size, the world size', 'constraints that contradict each other (the tool exits 3'):
             self.assertIn(text, card)
 
     def test_no_art_reviewer_is_scheduled_for_an_asset_task_and_the_final_one_answers_for_every_requirement(self):

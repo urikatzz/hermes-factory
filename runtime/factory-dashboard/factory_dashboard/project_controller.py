@@ -10,7 +10,7 @@ import re
 import time
 
 from .model_policy import ConfigurationError
-from .project_cards import (ART_PLAN, ROLE_FINDINGS, APPROVED_COMPARISON, APPROVED_REFERENCES, INSPECTION, REFERENCE_AUDIT, VISUAL_TRACE, ARCHITECT, COMPARISON, CONFLICT_CHECK, DIRECTOR, PLAN_CORRECTION, PLAN_CORRECTION_REVIEW, ART_FIT, ART_NO_INTERMEDIATE_REVIEW, INTEGRATION_SCENE, NO_VISUAL_JUDGEMENT, OWNED_CHECK, SCENE_GATE, CONTINUES, INSPECT_PATHS, PLAN_BLOCKED, PLAN_FINDING, STYLE_CHANGED, SUPERSEDED, WRITER_GATES,
+from .project_cards import (ART_PLAN, ROLE_FINDINGS, APPROVED_COMPARISON, APPROVED_REFERENCES, INSPECTION, REFERENCE_AUDIT, VISUAL_TRACE, ARCHITECT, COMPARISON, CONFLICT_CHECK, DIRECTOR, PLAN_CORRECTION, PLAN_CORRECTION_REVIEW, ART_FIT, ART_NO_INTERMEDIATE_REVIEW, ART_SIZING, INTEGRATION_SCENE, NO_VISUAL_JUDGEMENT, OWNED_CHECK, SCENE_GATE, CONTINUES, INSPECT_PATHS, PLAN_BLOCKED, PLAN_FINDING, STYLE_CHANGED, SUPERSEDED, WRITER_GATES,
                             PLAN_REVIEW, REPLAN, RETRO, SCOPE, SPEC_CONSTRAINTS, TOOL_INCIDENTS, project_card)
 from .project_decisions import (MAX_STAGE_RETRIES, constraint_view, constraints_of, normalize_decisions, preserved_conflict, record_applied, relevant_constraints,
                                 validate_plan_constraints, validate_spec_conflicts)
@@ -750,7 +750,7 @@ class ProjectController:
                 instructions += '\nApproved plan files, read exactly these absolute paths (copy them, never retype them): ' + '; '.join(plan_files)
             instructions += '\n' + SPEC_CONSTRAINTS + '\n' + PLAN_BLOCKED + self._style_note(conn, project)
             if profile == 'artist':
-                instructions += '\n' + ART_FIT + '\n' + ART_NO_INTERMEDIATE_REVIEW
+                instructions += '\n' + ART_FIT + '\n' + ART_SIZING + '\n' + ART_NO_INTERMEDIATE_REVIEW
             if task['id'] == 'integration' and refs.authoritative(project.get('reference_records', [])):
                 instructions += '\n' + INTEGRATION_SCENE.format(required=','.join(r['id'] for r in refs.required_requirements(project['reference_records'])))
             if repair and project.get('scene'):

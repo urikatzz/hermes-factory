@@ -202,6 +202,8 @@ class NoIntermediateArtReviewTests(SceneFlow):
         self.assertIn('ONE final gate on the complete, assembled and engine-rendered game', card)
         self.assertIn('no individual task is visually reviewed', card)
         self.assertIn('Every approved requirement must therefore be owned by a task', card)
+        self.assertIn('an unspecified pixel size is an implementation decision for the artist', card)
+        self.assertIn('not a new mandatory field', card)
 
 
 class SceneLoopTests(unittest.TestCase):

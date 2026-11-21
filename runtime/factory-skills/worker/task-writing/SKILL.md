@@ -21,6 +21,10 @@ The engine only checks that project-plan.json is well formed: valid ids, owners,
 ## Coverage
 - Every project AC in PLAN.md should be stated by at least one task, using the same AC id. No reviewer checks the plan before tasks start, so this is on you. An AC no task states is recorded and becomes explicit work in the final integration task, which is late and costly: cover every AC yourself before you finish.
 
+## Asset sizes and placement
+- State an asset's world size and its placement or scale reference when the plan or the approved reference gives them (for example "drawn for 1.7 x 1.7 world units", "centre about 0.30, 0.49 of the frame", "figure 4.08 units"). That lets the artist derive a sensible size.
+- Do not demand exact pixel dimensions unless the reference or a downstream requirement really needs them. An unspecified pixel size is an implementation decision for the artist, inside the asset class's range, not a gap for you to fill with an invented number and not a new mandatory field.
+
 ## Dependencies and ownership
 - Asset tasks come first. A code task that uses an asset lists the artist or sound-designer task in dependencies.
 - Declare only real dependencies. Needless chains stop tasks running in parallel.
