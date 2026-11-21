@@ -115,6 +115,13 @@ class ReferenceModuleTests(unittest.TestCase):
         self.assertFalse(refs.viewed_via_lint_views('door.png', seen))
         self.assertFalse(refs.viewed_via_lint_views('room01-door.png', []))
 
+    def test_a_retained_copy_named_after_the_viewed_lint_render_counts_only_for_that_render(self):
+        seen = ['/ws/t_1/lint/views/Assets__Art__Room01__room01-door-open.png/dark.png']
+        for name in ('room01-door-open.png', 'room01-door-open-dark.png', 'room01-door-open_dark.png'):
+            self.assertTrue(refs.viewed_via_lint_views(name, seen), name)
+        for name in ('room01-door-open-grey.png', 'room01-door-open-transparent.png', 'room01-door-dark.png', 'room01-floor-band-dark.png', 'dark.png'):
+            self.assertFalse(refs.viewed_via_lint_views(name, seen), name)  # a view or an asset that was not opened
+
     def test_viewed_images_lists_only_successful_calls(self):
         image = Path(self.temp.name) / 'docs/look/reference.png'
         home = Path(self.temp.name) / 'home'

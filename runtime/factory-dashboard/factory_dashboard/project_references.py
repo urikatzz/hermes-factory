@@ -482,12 +482,21 @@ def validate_reference_comparison(record, references):
 
 
 def viewed_via_lint_views(name, viewed):
-    """True when one of the viewed images is the art lint's own render of the asset `name`.
+    """True when `name` is the asset, or a copy of the render, that one of the viewed images shows.
 
-    The art lint writes every asset on grey and transparent backdrops to <workspace>/lint/views/<Assets__Dir__name>/grey.png. Those are deterministic
-    renders of exactly that asset, so looking at one is looking at the asset even though the file name differs."""
-    marker = '__' + str(name) + '/'
-    return any('/lint/views/' in str(v).replace('\\', '/') and marker in str(v).replace('\\', '/') for v in viewed)
+    The art lint writes every asset on grey, dark and transparent backdrops to <workspace>/lint/views/<Assets__Dir__asset.png>/<view>.png. Those are
+    deterministic renders of exactly that asset, so looking at one is looking at the asset. A retained file counts when it is named after the asset
+    (wall.png) or after the render the reviewer opened (wall-dark.png or wall_dark.png for dark.png); the view must be one that
+    was actually opened. The scratch folder is gone when the stage is checked, so the link is by name, not by bytes."""
+    for seen in viewed:
+        parts = str(seen).replace('\\', '/').split('/')
+        if '/lint/views/' not in '/'.join(parts) or len(parts) < 2:
+            continue
+        asset, view = parts[-2].split('__')[-1], Path(parts[-1])
+        stem, suffix = Path(asset).stem, view.suffix or '.png'
+        if str(name) in (asset, stem + '-' + view.stem + suffix, stem + '_' + view.stem + suffix):
+            return True
+    return False
 
 
 def viewed_images(profile, session_id, home):
