@@ -7,7 +7,7 @@ description: Procedure and scripts for the Factory artist - Codex concept images
 
 Tools (run each as its own terminal command, never through `bash -c` or a pipe):
 
-- `IMAGE` = `sh ${HERMES_SKILL_DIR}/scripts/codex_image.sh <prompt-file> <out.png>`: one Codex image (up to 5 minutes). Exit 0 means `out.png` exists and decodes.
+- `IMAGE` = `sh ${HERMES_SKILL_DIR}/scripts/codex_image.sh <prompt-file> <out.png>`: one Codex image (up to 5 minutes). Exit 0 means `out.png` exists and decodes. The prompt file must already exist: write the prompt text to it first (write_file or a shell heredoc), then call the script; exit 2 names what was wrong with the arguments, usually a prompt file you have not written yet. That is yours to fix, not a tooling fault, and never a reason to finish BLOCKED.
 - `FIT` = `python3 ${HERMES_SKILL_DIR}/scripts/sprite_fit.py <in.png> <out.png> --size WxH [--palette <art/style/palette file>]` plus `--coverage opaque|cutout|auto [--hint "<asset name and its criterion>"]`: nearest-neighbour fit to the class size, palette quantize, and the coverage mode below. It verifies its own result; exit 3 prints a JSON diagnosis and the supported fix.
 - `TRIPO` = `python3 ${HERMES_SKILL_DIR}/scripts/tripo_model.py <concept.png> <out.glb>`: Tripo image-to-model, up to 10 minutes. Exit 0 done, 3 fallback (no key, no credits, API down; nothing was charged), 1 failed (any failure once the create request was sent, including a lost reply: possibly charged). It prints JSON with `tripo_tasks`; copy those IDs into your metadata every time, including failures. `unknown-create` in `tripo_tasks` means a task may have been created and charged without an ID coming back.
 - `BLENDER` = `sh ${HERMES_SKILL_DIR}/scripts/blender_run.sh`:

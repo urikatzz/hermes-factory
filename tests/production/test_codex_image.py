@@ -153,5 +153,9 @@ class CodexImageTests(unittest.TestCase):
 
     def test_usage_and_missing_codex(self):
         self.assertEqual(self.run_script('copy', self.prompt).returncode, 2)
+        missing = self.run_script('copy', self.root / 'not-written-yet.txt', self.root / 'out.png')
+        self.assertEqual(missing.returncode, 2)
+        self.assertIn('prompt file not found', missing.stderr)   # names the real cause instead of a bare usage line
+        self.assertIn('not-written-yet.txt', missing.stderr)
         self.assertEqual(self.run_script('copy', self.prompt, self.root / 'gem.jpg').returncode, 2)
         self.assertEqual(self.run_script('copy', CODEX_BIN=str(self.root / 'missing')).returncode, 4)

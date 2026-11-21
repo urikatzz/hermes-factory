@@ -77,7 +77,7 @@ def child(selection_text):
     except AuthorityRefusal as exc:
         print(json.dumps({'refused': str(exc), 'cause': repr(exc.__cause__)[:300]}))
         return 0
-    print(json.dumps({'model': policy.model, 'provider': policy.provider, 'reasoning': str(policy.reasoning_config)}))
+    print(json.dumps({'model': policy.model, 'provider': policy.provider, 'reasoning': str(policy.reasoning_config), 'toolsets': sorted(policy.toolsets)}))
     return 0
 
 

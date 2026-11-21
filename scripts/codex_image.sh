@@ -5,9 +5,10 @@
 # env: CODEX_BIN (default codex), CODEX_HOME (default $HERMES_REAL_HOME/.codex, else $HOME/.codex),
 #      CODEX_IMAGE_TIMEOUT seconds (default 300), CODEX_IMAGE_MODEL (optional -m)
 set -u
-usage() { echo "usage: codex_image.sh <prompt-file> <out.png>" >&2; exit 2; }
-[ $# -eq 2 ] && [ -f "$1" ] || usage
-case "$2" in *.png) ;; *) usage ;; esac
+usage() { echo "codex_image: $1" >&2; echo "usage: codex_image.sh <prompt-file> <out.png>   (the prompt file must already exist: write the prompt text to it first; out.png must end in .png)" >&2; exit 2; }
+[ $# -eq 2 ] || usage "expected exactly 2 arguments, got $#"
+[ -f "$1" ] || usage "prompt file not found: $1 (create it with the prompt text before calling this script)"
+case "$2" in *.png) ;; *) usage "output must end in .png: $2" ;; esac
 here=$(cd "$(dirname "$0")" && pwd)
 out=$2
 codex=${CODEX_BIN:-codex}
