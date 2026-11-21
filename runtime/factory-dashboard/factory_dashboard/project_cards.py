@@ -126,6 +126,9 @@ STYLE_CHANGED = '''The completed task {id} amended the style bible under art/sty
 If your stage runs the art lint gate, take the expected hash when your stage starts: run art_lint.py PROJECT_DIR --style-hash before you write anything, use that value for --expect-style-hash, and record it in metadata.style_sha256.
 A verifier or reviewer on the frozen copy uses the style_sha256 the writer recorded. The gate still fails if art/style changes during the stage.'''
 
+INSPECT_PATHS = '''Open exactly these absolute paths with vision_analyze: {paths}. They are the originals in PROJECT_DIR (reading them there is allowed; zoom crops of an original are fine).
+Do not open a copy of an approved image: a copy in a frozen snapshot (src-<sha12>/...), your scratch workspace or an evidence folder is deleted before the stage is checked, so the call cannot be verified and the inspection is rejected, even when the copy is byte-identical.'''
+
 PLAN_BLOCKED = '''If the task plan or an acceptance criterion is wrong, contradictory or untestable, or the available tools cannot express it, do not work around it and do not weaken the criterion:
 finish VERDICT=BLOCKED with blocked_reason naming the criterion and why. The project then stops for a human, who decides. Nothing is sent back to the architect.'''
 

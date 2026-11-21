@@ -445,6 +445,14 @@ class ReferenceWorkflowTests(ReferenceFlow):
         reference = context['approved_references'][0]
         self.assertEqual((reference['path'], reference['sha256'], reference['milestone']), ('docs/look/reference.png', self.loaded['references'][0]['sha256'], 1))
         self.assertEqual([r['id'] for r in reference['requirements']], ['V1', 'V2', 'V3'])
+        # The card names the exact originals to open, and says a copy in a snapshot or scratch folder cannot be verified.
+        expected = str(Path(context['project_dir']) / 'docs/look/reference.png') if context.get('project_dir') else None
+        self.assertIn('Open exactly these absolute paths with vision_analyze: ', body)
+        self.assertRegex(body, r'Open exactly these absolute paths with vision_analyze: /\S+/docs/look/reference\.png')
+        self.assertIn('Do not open a copy of an approved image', body)
+        self.assertIn('deleted before the stage is checked', body)
+        if expected:
+            self.assertIn(expected, body)
 
     def test_a_director_that_never_opened_the_reference_is_sent_back_with_the_exact_reason(self):
         self.start()
