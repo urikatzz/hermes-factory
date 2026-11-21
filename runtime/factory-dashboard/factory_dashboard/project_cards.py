@@ -129,7 +129,7 @@ A verifier or reviewer on the frozen copy uses the style_sha256 the writer recor
 INSPECT_PATHS = '''Open exactly these absolute paths with vision_analyze: {paths}. They are the originals in PROJECT_DIR (reading them there is allowed; zoom crops of an original are fine).
 Do not open a copy of an approved image: a copy in a frozen snapshot (src-<sha12>/...), your scratch workspace or an evidence folder is deleted before the stage is checked, so the call cannot be verified and the inspection is rejected, even when the copy is byte-identical.'''
 
-REVIEW_SCOPE = '''Scope of this review: only the requirement ids in this task's visual list ({ids}). Write {kind} findings and declare required tool incidents only for those ids. The other approved requirements belong to other tasks
+REVIEW_SCOPE = '''Scope of this review: only the requirement ids in this task's visual list ({ids}). Write {kind} findings and one comparison.json criterion per requirement, and declare required tool incidents, only for those ids (the HOLISTIC criterion and holistic judgement stay). The other approved requirements belong to other tasks
 and to the final integration, which reviews all of them with in-engine Game-view screenshots; an in-engine render of them is not required of this stage, so it is not a tool incident. Still inspect the whole reference image.'''
 
 PLAN_BLOCKED = '''If the task plan or an acceptance criterion is wrong, contradictory or untestable, or the available tools cannot express it, do not work around it and do not weaken the criterion:

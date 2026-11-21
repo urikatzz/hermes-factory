@@ -773,7 +773,8 @@ class ProjectController:
             if profile == 'art-reviewer' and close_enough:
                 record = validate_comparison(profile, result, project['plans'], task['id'] == 'integration', human_approved)
                 if human_approved:
-                    refs.validate_reference_comparison(record, project['reference_records'])
+                    owned = set(task['visual']) if task['id'] != 'integration' and task.get('visual') else None  # an asset task answers for the requirements it owns
+                    refs.validate_reference_comparison(record, project['reference_records'], only=owned)
             readers.append(result)
             rows.append(row)
         if waiting:

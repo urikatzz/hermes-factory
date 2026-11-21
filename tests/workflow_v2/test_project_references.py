@@ -323,6 +323,14 @@ class ReferenceModuleTests(unittest.TestCase):
             with self.assertRaisesRegex(ConfigurationError, message):
                 refs.validate_reference_comparison(self.comparison(**change), self.records)
 
+    def test_a_scoped_comparison_needs_a_criterion_only_for_the_ids_the_task_owns(self):
+        scoped = self.comparison(criteria=[c for c in self.comparison()['criteria'] if c['rule'].startswith(('V1', 'HOLISTIC'))])
+        with self.assertRaisesRegex(ConfigurationError, 'no criterion.*V2'):
+            refs.validate_reference_comparison(scoped, self.records)  # unscoped: every approved requirement
+        self.assertTrue(refs.validate_reference_comparison(scoped, self.records, only={'V1'}))
+        with self.assertRaisesRegex(ConfigurationError, 'no criterion.*V1'):
+            refs.validate_reference_comparison(self.comparison(criteria=[c for c in self.comparison()['criteria'] if c['rule'].startswith('HOLISTIC')]), self.records, only={'V1'})
+
     def test_every_requirement_passing_does_not_make_a_rejected_whole_acceptable(self):
         rejected = self.comparison(holistic={**self.comparison()['holistic'], 'verdict': 'reject'})
         with self.assertRaisesRegex(ConfigurationError, 'HOLISTIC.*equals the holistic verdict'):

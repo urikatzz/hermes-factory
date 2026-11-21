@@ -446,14 +446,14 @@ HOLISTIC_DIMENSIONS = ('matches', 'close', 'differs')
 MIN_SUMMARY = 120
 
 
-def validate_reference_comparison(record, references):
+def validate_reference_comparison(record, references, only=None):
     """Rendered results are judged against the original reference per requirement AND as a whole; never against a derived mockup or a score."""
     needed = authoritative(references)
     cited = record.get('references')
     if not isinstance(cited, list) or {(c.get('id'), c.get('sha256')) if isinstance(c, dict) else None for c in cited} != {(r['id'], r['sha256']) for r in needed}:
         raise ConfigurationError('comparison.json must cite every approved reference with its sha256, and only those')
     rules = ' '.join(c['rule'] for c in record['criteria'])
-    missing = [r['id'] for r in required_requirements(references) if not re.search(r'\b' + re.escape(r['id']) + r'\b', rules)]
+    missing = [r['id'] for r in required_requirements(references) if (only is None or r['id'] in only) and not re.search(r'\b' + re.escape(r['id']) + r'\b', rules)]
     if missing:
         raise ConfigurationError('comparison.json has no criterion for approved visual requirement(s): ' + ', '.join(missing))
     derived = [Path(r['path']).name for r in references if r not in needed]
