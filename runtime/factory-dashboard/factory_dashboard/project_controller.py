@@ -79,16 +79,24 @@ OWNED_FILE = re.compile(r'[A-Za-z0-9_][A-Za-z0-9_./ +@=,-]*\.[A-Za-z0-9]{1,8}')
 
 
 def owned_paths(findings):
-    """The files a repair task is assigned to repair: the explicit file path of each finding routed to it (`<id>|SEV|AC|path|text`). A finding with no usable explicit
-    path (missing, a pattern, absolute, '..') contributes nothing, so ownership that is missing or ambiguous leaves no owned files."""
+    """The files a repair task is assigned to repair: the explicit file paths of each finding routed to it (`<id>|SEV|AC|path|text`). The path field may carry a region after the
+    file (`dummy.png:x0-391`) and several files separated by `;` (later ones may omit the directory of the first). A token that is not an explicit file path (a pattern, an
+    absolute or `..` path, prose such as "all seven dummy sprites") contributes nothing, so ownership that is missing or ambiguous leaves no owned files."""
     chosen = []
     for finding in findings or []:
         parts = str(finding).split('|')
-        path = parts[3].strip() if len(parts) >= 5 else ''
-        if (path and OWNED_FILE.fullmatch(path) and ',' not in path and not path.startswith('/') and '..' not in path.split('/') and not any(c in path for c in '*?[]\\')
-                and path not in chosen):
-            chosen.append(path)
+        field = parts[3].strip() if len(parts) >= 5 else ''
+        directory = ''
+        for token in field.split(';'):
+            path = re.sub(r':[xyXY]?[0-9][^/]*$', '', token.strip())
+            if path and '/' not in path and directory:
+                path = directory + '/' + path
+            if (path and OWNED_FILE.fullmatch(path) and ',' not in path and not path.startswith('/') and '..' not in path.split('/') and not any(c in path for c in '*?[]\\')):
+                directory = path.rsplit('/', 1)[0] if '/' in path else directory
+                if path not in chosen:
+                    chosen.append(path)
     return chosen
+
 
 class ProjectBlocked(ConfigurationError):
     """Recoverable missing environment; requires an explicit human recovery note."""
@@ -1178,6 +1186,10 @@ class ProjectController:
         if check is None:
             return
         baseline = str(work.get('manifest', ''))[:12]
+        if isinstance(check, dict) and not owned and not check.get('accepted_owned') and not check.get('rejected_outside_scope'):
+            # The worker ran a stricter owned check than its card asked for and it accepted nothing: harmless, noted, not a reason to stop a finished repair.
+            project.setdefault('orchestration_log', []).append(dict(kind='start_check_ignored', task=row['task_id'], reason='the card gave no OWNED_PATHS and nothing was accepted', at=int(time.time())))
+            return
         if not repair or not owned or not isinstance(check, dict):
             raise ConfigurationError('start_check is only valid on a repair task that was given OWNED_PATHS')
         accepted, differed = check.get('accepted_owned'), check.get('differed')

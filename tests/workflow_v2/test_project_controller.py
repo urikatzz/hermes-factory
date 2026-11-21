@@ -1309,6 +1309,29 @@ class ProjectControllerTests(unittest.TestCase):
             self.assertEqual(owned_paths([bad]), [], bad)
         self.assertEqual(owned_paths(None), [])
 
+    def test_owned_paths_accept_regions_and_several_files_in_one_finding_and_ignore_prose(self):
+        from factory_dashboard.project_controller import owned_paths
+        self.assertEqual(owned_paths(['verifier:F1|HIGH|AC2|Assets/Art/Room01/dummy-defeated.png:x0-391|cropped']), ['Assets/Art/Room01/dummy-defeated.png'])
+        self.assertEqual(owned_paths(['verifier:F2|HIGH|AC2|Assets/Art/Room01/dummy-launched.png:x227-360,y477-521; dummy-windup.png:x317-351,y423-521|stray fragments']),
+                         ['Assets/Art/Room01/dummy-launched.png', 'Assets/Art/Room01/dummy-windup.png'])      # a later file without a directory shares the first one's
+        self.assertEqual(owned_paths(['verifier:F4|MEDIUM|AC2|all seven dummy sprites|rim light']), [])
+        self.assertEqual(owned_paths(['F1|HIGH|AC2|../escape.png:x1-2|up', 'F2|HIGH|AC2|Assets/*.png:x1-2|pattern']), [])
+
+    def test_a_start_check_that_accepted_nothing_on_a_card_without_owned_paths_does_not_stop_a_finished_repair(self):
+        row = self.routed_repair('F1|HIGH|AC1|all the sprites|Real defect to repair')        # no explicit path: no OWNED_PATHS on the card
+        base = self.project()['work']['manifest'][:12]
+        self.finish_repair(row, dict(baseline_sha12=base, owned=['a.png'], differed=[], accepted_owned=[], rejected_outside_scope=[]))
+        project = self.project()
+        self.assertNotIn('terminal', project)                                                  # the repair was accepted and the project moves on to verification
+        self.assertTrue(any(e['kind'] == 'start_check_ignored' for e in project['orchestration_log']))
+
+    def test_a_start_check_that_accepted_files_without_any_owned_paths_still_fails_closed(self):
+        row = self.routed_repair('F1|HIGH|AC1|all the sprites|Real defect to repair')
+        base = self.project()['work']['manifest'][:12]
+        self.finish_repair(row, dict(baseline_sha12=base, owned=['a.png'], differed=['a.png'], accepted_owned=['a.png'], rejected_outside_scope=[]))
+        self.assertEqual(self.project()['terminal']['phase'], 'human_review')
+        self.assertIn('only valid on a repair task that was given OWNED_PATHS', self.project()['terminal']['reason'])
+
     def test_a_repair_card_names_the_owned_files_and_keeps_the_check_mandatory(self):
         card = self.board.cards[self.routed_repair('F1|HIGH|AC1|code.py|Real defect to repair')['task_id']]['body']
         self.assertIn('OWNED_PATHS code.py', card)
