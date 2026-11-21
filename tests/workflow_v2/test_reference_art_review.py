@@ -30,7 +30,7 @@ class ArtReviewFlow(ReferenceFlow):
                 self.board.complete(row)
         return self.only('art-reviewer')
 
-    def review(self, stage, holistic='accept', outcome=None, verdict='NO_BLOCKING_FINDINGS', findings=(), viewed_shots=True, per_requirement=None, dimensions=None, whole_outcome=None):
+    def review(self, stage, holistic='accept', outcome=None, verdict='NO_BLOCKING_FINDINGS', findings=(), viewed_shots=True, per_requirement=None, dimensions=None, whole_outcome=None, viewed_as=None):
         folder = Path(self.temp.name) / 'review'
         folder.mkdir(exist_ok=True)
         shot = folder / 'game-view.png'
@@ -48,12 +48,24 @@ class ArtReviewFlow(ReferenceFlow):
                                     dimensions=dimensions or {t: ('matches' if holistic == 'accept' else 'differs') for t in TOPICS}, screenshots=['game-view.png']))
         comparison = self.write(stage, 'comparison.json', record)
         self.finish(stage, 'Art review report.', document='report.md', extra=[comparison, str(shot)], screenshots=['game-view.png'], per_requirement=per_requirement,
-                    shots_viewed=[shot] if viewed_shots else [], verdict=verdict, findings=list(findings))
+                    shots_viewed=viewed_as if viewed_as is not None else ([shot] if viewed_shots else []), verdict=verdict, findings=list(findings))
 
 
 class ArtReviewerTests(ArtReviewFlow):
     def test_a_reviewer_who_never_opened_the_rendered_screenshots_is_sent_back(self):
         self.review(self.reach_art_review(), viewed_shots=False)
+        _, context = self.rejection('art-reviewer')
+        self.assertIn('never opened any of the rendered screenshots', context['previous_handoff_rejected']['reason'])
+
+    def test_a_reviewer_who_opened_the_lints_own_renders_of_the_retained_asset_is_not_sent_back(self):
+        # The retained screenshot is game-view.png; the reviewer looked at the lint's grey-backdrop render of that very asset.
+        render = Path(self.temp.name) / 'ws' / 'lint' / 'views' / 'Assets__Art__Room01__game-view.png' / 'grey.png'
+        self.review(self.reach_art_review(), viewed_as=[render])
+        self.assertEqual([r['profile'] for r in self.board.ready()], ['developer'])  # accepted, not sent back
+
+    def test_a_lint_render_of_a_different_asset_does_not_count(self):
+        render = Path(self.temp.name) / 'ws' / 'lint' / 'views' / 'Assets__Art__Room01__some-other-asset.png' / 'grey.png'
+        self.review(self.reach_art_review(), viewed_as=[render])
         _, context = self.rejection('art-reviewer')
         self.assertIn('never opened any of the rendered screenshots', context['previous_handoff_rejected']['reason'])
 

@@ -107,6 +107,22 @@ class ReferenceModuleTests(unittest.TestCase):
         with self.assertRaisesRegex(ConfigurationError, 'unreadable'):
             refs.vision_proof('nobody', 'sessionAAAA', home, wanted)
 
+    def test_the_lints_renders_of_an_asset_count_as_viewing_that_asset_only(self):
+        seen = ['/ws/t_1/lint/views/Assets__Art__Room01__room01-door.png/grey.png', '/ws/t_1/other/Assets__Art__Room01__room01-wall.png/grey.png']
+        self.assertTrue(refs.viewed_via_lint_views('room01-door.png', seen))
+        self.assertFalse(refs.viewed_via_lint_views('room01-wall.png', seen))   # not under lint/views
+        self.assertFalse(refs.viewed_via_lint_views('room01-doo.png', seen))    # the name must match exactly
+        self.assertFalse(refs.viewed_via_lint_views('door.png', seen))
+        self.assertFalse(refs.viewed_via_lint_views('room01-door.png', []))
+
+    def test_viewed_images_lists_only_successful_calls(self):
+        image = Path(self.temp.name) / 'docs/look/reference.png'
+        home = Path(self.temp.name) / 'home'
+        record_session(home, 'art-reviewer', 'local-' + 'a' * 64, [image])
+        record_session(home, 'art-reviewer', 'local-' + 'b' * 64, [image], succeeded=False)
+        self.assertEqual(refs.viewed_images('art-reviewer', 'local-' + 'a' * 64, home), [str(image)])
+        self.assertEqual(refs.viewed_images('art-reviewer', 'local-' + 'b' * 64, home), [])
+
     def test_vision_proof_accepts_the_current_hermes_session_id_format_and_still_rejects_malformed_ids(self):
         image = Path(self.temp.name) / 'docs/look/reference.png'
         home = Path(self.temp.name) / 'home'

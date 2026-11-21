@@ -481,12 +481,47 @@ def validate_reference_comparison(record, references):
     return record
 
 
+def viewed_via_lint_views(name, viewed):
+    """True when one of the viewed images is the art lint's own render of the asset `name`.
+
+    The art lint writes every asset on grey and transparent backdrops to <workspace>/lint/views/<Assets__Dir__name>/grey.png. Those are deterministic
+    renders of exactly that asset, so looking at one is looking at the asset even though the file name differs."""
+    marker = '__' + str(name) + '/'
+    return any('/lint/views/' in str(v).replace('\\', '/') and marker in str(v).replace('\\', '/') for v in viewed)
+
+
+def viewed_images(profile, session_id, home):
+    """Paths of every image the stage opened with a successful vision_analyze call (from the worker's own session log)."""
+    return _viewed(profile, session_id, home)
+
+
 def vision_proof(profile, session_id, home, wanted, scratch_ok=()):
     """Which of the wanted images the stage really opened with vision_analyze: {label: path} -> list of labels with no successful call.
 
     Reads the worker's own session log (the profile's state.db). A correctly shaped JSON file is not evidence; a successful tool call on that
     exact file (same path or same bytes) is. Labels in scratch_ok are files the worker itself made in its scratch workspace, which is gone by the time
     the stage is checked: for those a call on a missing file with the same name counts (the call itself is still required and must have succeeded)."""
+    viewed = _viewed(profile, session_id, home)
+    digests = {}
+
+    def same(seen, wanted_path, scratch):
+        try:
+            if scratch and not Path(seen).exists() and Path(seen).name == Path(wanted_path).name:
+                return True
+            if Path(seen).resolve() == Path(wanted_path).resolve():
+                return True
+            if Path(seen).is_file():
+                digests.setdefault(seen, _digest(seen))
+                digests.setdefault(str(wanted_path), _digest(wanted_path))
+                return digests[seen] == digests[str(wanted_path)]
+        except OSError:
+            return False
+        return False
+
+    return [label for label, path in wanted.items() if not any(same(seen, path, label in scratch_ok) for seen in viewed)]
+
+
+def _viewed(profile, session_id, home):
     # Only a sanity check on the shape (the id is a bound query parameter): Hermes ids are 22 characters in older versions and
     # 'local-' plus 64 hex digits (70 characters) in current ones.
     if not isinstance(session_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]{6,128}', session_id):
@@ -513,23 +548,7 @@ def vision_proof(profile, session_id, home, wanted, scratch_ok=()):
         elif role == 'tool' and tool_name == 'vision_analyze' and call_id in requested and requested[call_id]:
             if '"success": false' not in (content or '')[:400] and '"error"' not in (content or '')[:60]:
                 viewed.append(str(requested[call_id]))
-    digests = {}
-
-    def same(seen, wanted_path, scratch):
-        try:
-            if scratch and not Path(seen).exists() and Path(seen).name == Path(wanted_path).name:
-                return True
-            if Path(seen).resolve() == Path(wanted_path).resolve():
-                return True
-            if Path(seen).is_file():
-                digests.setdefault(seen, _digest(seen))
-                digests.setdefault(str(wanted_path), _digest(wanted_path))
-                return digests[seen] == digests[str(wanted_path)]
-        except OSError:
-            return False
-        return False
-
-    return [label for label, path in wanted.items() if not any(same(seen, path, label in scratch_ok) for seen in viewed)]
+    return viewed
 
 
 # What each visual role must say after looking, beyond describing the image: findings that only someone who looked and did that role's job can write.
