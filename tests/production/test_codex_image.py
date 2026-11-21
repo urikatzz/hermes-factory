@@ -153,6 +153,10 @@ class CodexImageTests(unittest.TestCase):
 
     def test_usage_and_missing_codex(self):
         self.assertEqual(self.run_script('copy', self.prompt).returncode, 2)
+        for flag in ('--help', '-h'):
+            helped = subprocess.run(['sh', str(ROOT / 'scripts/codex_image.sh'), flag], capture_output=True, text=True)
+            self.assertEqual(helped.returncode, 0, flag)          # asking for help is not a usage error, and must not look like a tool failure
+            self.assertIn('usage: codex_image.sh <prompt-file> <out.png>', helped.stdout)
         missing = self.run_script('copy', self.root / 'not-written-yet.txt', self.root / 'out.png')
         self.assertEqual(missing.returncode, 2)
         self.assertIn('prompt file not found', missing.stderr)   # names the real cause instead of a bare usage line

@@ -6,6 +6,10 @@
 #      CODEX_IMAGE_TIMEOUT seconds (default 300), CODEX_IMAGE_MODEL (optional -m)
 set -u
 usage() { echo "codex_image: $1" >&2; echo "usage: codex_image.sh <prompt-file> <out.png>   (the prompt file must already exist: write the prompt text to it first; out.png must end in .png)" >&2; exit 2; }
+case "${1:-}" in -h|--help)
+  echo "usage: codex_image.sh <prompt-file> <out.png>"; echo "Generates one PNG with Codex image_gen. The prompt file must already exist (write the prompt text to it first); out.png must end in .png."
+  echo "exit: 0 out.png written and decodes, 1 no image / bad image / timeout, 2 bad arguments, 4 codex CLI not found"; exit 0 ;;
+esac
 [ $# -eq 2 ] || usage "expected exactly 2 arguments, got $#"
 [ -f "$1" ] || usage "prompt file not found: $1 (create it with the prompt text before calling this script)"
 case "$2" in *.png) ;; *) usage "output must end in .png: $2" ;; esac
