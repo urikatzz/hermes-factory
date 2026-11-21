@@ -36,6 +36,22 @@ def update_running(source):
         return False
 
 
+def check_behavior(source, report, previous):
+    """Patches that apply cleanly can still stop working after an update, so run the behavioral probe (cached per Hermes head and patch set)."""
+    key = json.dumps([report["head"], [p["state"] for p in report["patches"]]])
+    old = previous.get("behavior") or {}
+    if old.get("key") == key and old.get("ok") is not None:
+        return old
+    if not report["ok"]:
+        return dict(ok=None, key=key, detail="not checked: patches are not all applied")
+    try:
+        import probe_owner_model as probe
+        result = probe.probe(source)
+        return dict(ok=result["ok"], key=key, detail=result["detail"] or "")
+    except Exception as exc:  # a probe that cannot run must not break the guard; it is reported, not trusted
+        return dict(ok=None, key=key, detail="probe could not run: %s" % str(exc)[:200])
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--check-only", action="store_true", help="report only; never apply patches")
@@ -64,7 +80,11 @@ def main():
         if code == 0 and report["ok"]:
             repaired = [p["id"] for p in previous.get("patches", []) if p["state"] != "applied"] or previous.get("missing", [])
             messages.append("HERMES PATCHES REAPPLIED (%s) on Hermes %s. Restart the Hermes gateway to load them." % (", ".join(repaired), report["head"][:12]))
-    state = dict(ok=report["ok"], checked_at=now, head=report["head"], known_head=report["known_head"], missing=report["missing"],
+    behavior = check_behavior(source, report, previous)
+    if report["ok"] and behavior["ok"] is False and previous.get("behavior", {}).get("detail") != behavior["detail"]:
+        messages.append("HERMES PATCHES ARE APPLIED BUT DO NOT WORK: %s. Run `probe_owner_model.py --json` in ~/.hermes/hermes-patches for the evidence, restart the Hermes gateway if "
+                        "it started before the patches, and re-export the patch if a Hermes update changed what it patches." % behavior["detail"])
+    state = dict(ok=report["ok"], behavior=behavior, checked_at=now, head=report["head"], known_head=report["known_head"], missing=report["missing"],
                  conflicts=report["conflicts"], patches=report["patches"], signature=json.dumps([report["head"], report["missing"], report["conflicts"]]),
                  first_seen=first_seen if not report["ok"] else now, reapplied=repaired or previous.get("reapplied", []))
     if not report["ok"] and previous.get("signature") != state["signature"]:

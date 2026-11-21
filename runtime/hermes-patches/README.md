@@ -39,3 +39,10 @@ python3 runtime/hermes-patches/hermes_patches.py apply           # backs up repl
 - `runtime/factory-scripts/factory_patch_check.py` is a cron job (no agent). It records `state/factory/hermes-patches.json`, prints one message when the situation changes, and the intake pump starts no new work while patches are missing. It also applies clean patches itself (`--check-only` turns that off), but only after the problem has persisted for two minutes, never while a Hermes update is running, and never over a conflict. It does not restart the gateway.
 
 Install the set where the cron job finds it: `cp -R runtime/hermes-patches ~/.hermes/hermes-patches` (or set `HERMES_PATCHES_DIR`).
+
+## 0003-owner-applies-worker-model
+
+The dispatcher captures the model chosen for an attempt in the run's metadata (`worker_model_selection`), but the profile owner (`gateway/session_kanban.py build_kanban_policy`) rebuilds the session policy from the task row, which does not carry it, so workers silently ran each profile's default model. The patch applies the captured selection (model, provider, effort) to the policy and refuses the claim when the selection is malformed. Nothing else in the owner path or any profile configuration changes.
+
+`probe_owner_model.py` proves the behavior rather than the patch text: it builds a throwaway board and profile, runs the owner's own policy builder and reads the model it picked (selection applied, default untouched without one, malformed refused). `factory_patch_check.py` runs it per Hermes head and reports patches that are applied but do not work.
+

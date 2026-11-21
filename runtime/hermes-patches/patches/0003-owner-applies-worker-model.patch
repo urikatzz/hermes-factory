@@ -1,0 +1,19 @@
+diff --git a/gateway/session_kanban.py b/gateway/session_kanban.py
+index 33c53ee6b79..800e66fefe6 100644
+--- a/gateway/session_kanban.py
++++ b/gateway/session_kanban.py
+@@ -41,6 +41,14 @@ def build_kanban_policy(connection, params, config):
+                                  (task.id, task.current_run_id)).fetchone()
+             if bound and json.loads(bound[0])['request_id'] != 'kanban:' + json.dumps([board, task.id, task.current_run_id], separators=(',', ':')):
+                 raise AuthorityRefusal('stale_kanban_claim')
++            selection = json.loads(run['metadata'] or '{}').get('worker_model_selection')
++            if selection is not None:
++                # The dispatcher captured the model chosen for this attempt (the Factory's per-task choice) in the run's metadata. The owner re-reads the task
++                # row, which does not carry it, so apply it here; otherwise the profile default silently runs instead. A malformed selection refuses the claim.
++                from hermes_cli.kanban_db_worker_model import _validate as _validate_selection
++                chosen = _validate_selection(selection)
++                task = replace(task, model_override=chosen['model'], provider_override=chosen['provider'],
++                               reasoning_effort=chosen.get('effort', task.reasoning_effort))
+             context = kb.build_worker_context(conn, task.id)
+             skills = list(task.skills or ())
+             if kb._retry_status_for_run(conn, task.id, task.current_run_id) == 'review':

@@ -81,6 +81,20 @@
     }
    ],
    "description": "Kanban dashboard: awaiting-approval column and run-board aware API"
+  },
+  {
+   "id": "0003-owner-applies-worker-model",
+   "pathspecs": [
+    "gateway/session_kanban.py"
+   ],
+   "files": [
+    {
+     "path": "gateway/session_kanban.py",
+     "new": false,
+     "sha256": "c0294b00bc9310f01f7e8e4e27ddf65b15ac36cf52a421c1b279dcb897533b7e"
+    }
+   ],
+   "description": "The profile owner applies the model the dispatcher captured for the attempt (worker_model_selection) instead of re-reading the task row, which does not carry it"
   }
  ]
 }

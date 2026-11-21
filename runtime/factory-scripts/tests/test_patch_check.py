@@ -70,6 +70,25 @@ class PatchCheckTests(unittest.TestCase):
         self.assertEqual(self.check(), "")
         self.assertTrue(self.state()["ok"])
 
+    def install_probe(self, ok, detail=""):
+        with open(os.path.join(self.patches, "probe_owner_model.py"), "w") as f:
+            f.write("def probe(source):\n    return dict(ok=%r, detail=%r)\n" % (ok, detail))
+
+    def test_applied_patches_that_do_not_work_are_reported_once_with_the_symptom(self):
+        self.apply_by_hand(); self.install_probe(False, "the owner ignored the captured selection")
+        out = self.check()
+        self.assertIn("APPLIED BUT DO NOT WORK", out); self.assertIn("the owner ignored the captured selection", out)
+        self.assertFalse(self.state()["behavior"]["ok"])
+        self.assertEqual(self.check(), "")   # not re-announced every run
+
+    def test_a_working_probe_is_silent_and_a_probe_that_cannot_run_is_recorded_but_not_reported_as_broken(self):
+        self.apply_by_hand(); self.install_probe(True)
+        self.assertEqual(self.check(), ""); self.assertTrue(self.state()["behavior"]["ok"])
+        os.remove(os.path.join(self.patches, "probe_owner_model.py"))
+        state = self.state(); state["behavior"] = {}; self.sb.set_state("hermes-patches.json", state)
+        self.assertEqual(self.check(), "")
+        self.assertIsNone(self.state()["behavior"]["ok"]); self.assertIn("could not run", self.state()["behavior"]["detail"])
+
     def test_missing_patches_alert_once_and_are_recorded(self):
         out = self.check()
         self.assertIn("HERMES PATCHES missing: 0001-core", out); self.assertIn("New factory work is paused", out)

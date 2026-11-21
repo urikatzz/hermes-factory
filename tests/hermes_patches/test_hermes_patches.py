@@ -11,6 +11,8 @@ from unittest import mock
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'runtime/hermes-patches'))
 import hermes_patches as hp  # noqa: E402
 
+ROOT = Path(__file__).resolve().parents[2] / 'runtime/hermes-patches'
+
 BASE_A = ''.join(f'x{i} = {i}\n' for i in range(1, 41))
 
 
@@ -117,3 +119,46 @@ class PatchSetTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class OwnerModelProbeTests(unittest.TestCase):
+    """The probe is what tells "patch applied" from "the owner really runs the captured model"."""
+
+    def setUp(self):
+        import probe_owner_model
+        self.probe = probe_owner_model
+
+    def cases(self, with_selection, without=None, malformed=None):
+        answers = iter([with_selection, without if without is not None else dict(model='', provider=None), malformed if malformed is not None else dict(refused='invalid_kanban_claim')])
+        return mock.patch.object(self.probe, 'run_child', lambda *a, **k: next(answers))
+
+    def test_it_passes_when_the_captured_model_is_applied_the_default_is_left_alone_and_a_malformed_selection_is_refused(self):
+        with self.cases(dict(model='anthropic/claude-opus-5.5', provider='openrouter', reasoning="{'enabled': True, 'effort': 'low'}")):
+            result = self.probe.probe('unused')
+        self.assertTrue(result['ok'], result)
+
+    def test_it_fails_naming_the_symptom_when_the_owner_ignores_the_captured_model(self):
+        with self.cases(dict(model='', provider=None, reasoning='None')):
+            result = self.probe.probe('unused')
+        self.assertFalse(result['ok'])
+        self.assertIn('ignored the captured selection', result['detail'])
+
+    def test_it_fails_when_a_malformed_selection_is_not_refused_or_the_reasoning_effort_is_lost(self):
+        good = dict(model='anthropic/claude-opus-5.5', provider='openrouter', reasoning="{'enabled': True, 'effort': 'low'}")
+        with self.cases(good, malformed=dict(model='x', provider='y')):
+            self.assertFalse(self.probe.probe('unused')['ok'])
+        with self.cases(dict(good, reasoning='None')):
+            self.assertFalse(self.probe.probe('unused')['ok'])
+
+    def test_the_patch_is_in_the_manifest_and_touches_only_the_owner_policy(self):
+        manifest = json.loads((ROOT / 'manifest.json').read_text())
+        entry = next(p for p in manifest['patches'] if p['id'] == '0003-owner-applies-worker-model')
+        self.assertEqual([f['path'] for f in entry['files']], ['gateway/session_kanban.py'])
+        text = (ROOT / 'patches/0003-owner-applies-worker-model.patch').read_text()
+        self.assertIn("worker_model_selection", text)
+        self.assertEqual(text.count('diff --git'), 1)   # no profile config or unrelated file is modified
+
+    @unittest.skipUnless((Path.home() / '.hermes/hermes-agent/gateway/session_kanban.py').exists(), 'no Hermes install')
+    def test_the_installed_hermes_runs_the_captured_model(self):
+        result = self.probe.probe(Path.home() / '.hermes/hermes-agent')
+        self.assertTrue(result['ok'], result['detail'])
