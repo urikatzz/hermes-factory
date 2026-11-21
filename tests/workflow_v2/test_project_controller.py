@@ -1215,6 +1215,68 @@ class ProjectControllerTests(unittest.TestCase):
             normalize_decisions(dict(model_overrides={'Bad Name': None}), 'x')
         self.assertEqual(normalize_decisions(dict(model_overrides=dict(fixer=None)), 'x')['model_overrides'], dict(fixer=None))
 
+    def routed_repair(self, finding):
+        self.plan(); self.board.complete(self.only('developer')); self.tick()
+        self.board.complete(self.only('verifier'), verdict='FAIL', ac_results={'AC1': 'fail'}, findings=[finding], repair_domains=['code']); self.tick()
+        return self.only('fixer')
+
+    def test_owned_paths_come_only_from_explicit_finding_files_and_fail_closed(self):
+        from factory_dashboard.project_controller import owned_paths
+        self.assertEqual(owned_paths(['verifier:F1|HIGH|AC2|Assets/Art/a.png|x', 'F2|LOW|AC2|Assets/Art/a.png|dup', 'F3|LOW|AC2|b/c d.txt|x']), ['Assets/Art/a.png', 'b/c d.txt'])
+        for bad in ('F1|HIGH|AC2||no path', 'F1|HIGH|AC2|Assets/*.png|pattern', 'F1|HIGH|AC2|/abs/a.png|abs', 'F1|HIGH|AC2|../a.png|up', 'F1|HIGH|AC2|Assets|dir', 'F1|HIGH|AC2|a.png,b.png|two', 'short|only'):
+            self.assertEqual(owned_paths([bad]), [], bad)
+        self.assertEqual(owned_paths(None), [])
+
+    def test_a_repair_card_names_the_owned_files_and_keeps_the_check_mandatory(self):
+        card = self.board.cards[self.routed_repair('F1|HIGH|AC1|code.py|Real defect to repair')['task_id']]['body']
+        self.assertIn('OWNED_PATHS code.py', card)
+        self.assertIn('fw.py check PROJECT_DIR --expect BASELINE --owned "code.py"', card)
+        self.assertIn('still mandatory', card)
+
+    def test_a_repair_with_no_usable_finding_path_gets_no_owned_check(self):
+        card = self.board.cards[self.routed_repair('F1|HIGH|AC1||Real defect with no file')['task_id']]['body']
+        self.assertNotIn('OWNED_PATHS', card)
+
+    def test_a_normal_writer_card_has_no_owned_check(self):
+        self.plan()
+        self.assertNotIn('OWNED_PATHS', self.board.cards[self.only('developer')['task_id']]['body'])
+
+    def finish_repair(self, row, start_check):
+        self.board.complete(row, verdict='DONE', start_check=start_check); self.tick()
+
+    def test_an_owned_start_check_is_accepted_recorded_and_audited(self):
+        row = self.routed_repair('F1|HIGH|AC1|code.py|Real defect to repair')
+        base = self.project()['work']['manifest']
+        self.finish_repair(row, dict(baseline_sha12=base[:12], owned=['code.py'], differed=['code.py'], accepted_owned=['code.py'], rejected_outside_scope=[]))
+        project = self.project()
+        entry = next(e for e in project['orchestration_log'] if e['kind'] == 'start_check_owned')
+        self.assertEqual((entry['accepted'], entry['differed'], entry['baseline']), (['code.py'], ['code.py'], base[:12]))
+        self.assertTrue(self.conn.execute("SELECT 1 FROM factory_workflow_events WHERE kind='project_start_check_owned'").fetchone())
+
+    def test_a_start_check_that_accepts_a_file_the_repair_does_not_own_is_rejected(self):
+        row = self.routed_repair('F1|HIGH|AC1|code.py|Real defect to repair')
+        base = self.project()['work']['manifest']
+        self.finish_repair(row, dict(baseline_sha12=base[:12], owned=['code.py', 'other.py'], differed=['other.py'], accepted_owned=['other.py'], rejected_outside_scope=[]))
+        self.assertFalse(any(e['kind'] == 'start_check_owned' for e in self.project().get('orchestration_log', [])))
+        self.assertNotEqual(self.project().get('work', {}).get('step'), 'verifying')
+
+    def test_a_start_check_against_another_baseline_or_with_outside_differences_is_rejected(self):
+        for wrong in (dict(baseline_sha12='0' * 12), dict(rejected_outside_scope=['other.py'])):
+            with self.subTest(wrong=wrong):
+                row = self.routed_repair('F1|HIGH|AC1|code.py|Real defect to repair')
+                base = self.project()['work']['manifest']
+                record = dict(baseline_sha12=base[:12], owned=['code.py'], differed=['code.py'], accepted_owned=['code.py'], rejected_outside_scope=[])
+                record.update(wrong)
+                self.finish_repair(row, record)
+                self.assertFalse(any(e['kind'] == 'start_check_owned' for e in self.project().get('orchestration_log', [])))
+                self.tearDown(); self.setUp()
+
+    def test_a_start_check_on_a_card_without_owned_paths_is_rejected(self):
+        row = self.routed_repair('F1|HIGH|AC1||Real defect with no file')
+        base = self.project()['work']['manifest']
+        self.finish_repair(row, dict(baseline_sha12=base[:12], owned=['code.py'], differed=['code.py'], accepted_owned=['code.py'], rejected_outside_scope=[]))
+        self.assertFalse(any(e['kind'] == 'start_check_owned' for e in self.project().get('orchestration_log', [])))
+
     def test_a_non_artist_writer_card_has_no_fit_mode_text(self):
         self.plan()
         self.assertNotIn('Fit mode (required', self.board.cards[self.only('developer')['task_id']]['body'])

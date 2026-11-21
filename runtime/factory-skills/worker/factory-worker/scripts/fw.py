@@ -2,7 +2,10 @@
 """fw.py - software-factory worker helper. Standard library only, Python 3.9+, never runs git.
 
   manifest PROJECT_DIR [--final]        writer: rebuild .factory/SHA256SUMS from .factory/include.txt
-  check    PROJECT_DIR [--expect S12]   verify the manifest (read-only)
+  check    PROJECT_DIR [--expect S12] [--owned P1,P2]
+                                        verify the manifest (read-only). --owned (repair stages only; the card's OWNED_PATHS) lets a file
+                                        differ from the manifest when it is one of the listed paths the task is assigned to repair; every other
+                                        difference, a missing file, an excluded path or an unusable owned list still fails (exit 4 / 2)
   snapshot PROJECT_DIR WS [--expect S12]
                                         reader: WS/src-<sha12>.tgz (manifest files only) + WS/src-<sha12>/
   delta    BASE_TGZ NEW_DIR OUT_DIFF    cycle>=2 reader: extract BASE_TGZ beside OUT_DIFF, diff -ruN
@@ -167,9 +170,27 @@ def ac_ids(root):
         return ["AC%d" % i for i in sorted({int(x) for x in re.findall(r"\bAC(\d{1,3})\b", f.read())})]
 
 
-def check(root, expect=None):
+def owned_set(root, manifest, owned):
+    """Validate a repair task's owned paths, failing closed: each must be an explicit safe relative file path listed in the manifest."""
+    if not owned:
+        raise Refused("--owned needs at least one explicit manifest file path (ownership is missing or empty)", 2)
+    listed = {rel for _, rel in manifest}
+    chosen = []
+    for raw in owned:
+        rel = safe_rel(raw)
+        if any(c in rel for c in "*?[]"):
+            raise Refused("--owned path %r is a pattern; list explicit files" % rel, 2)
+        if rel not in listed:
+            raise Refused("--owned path %r is not a file of the manifest: ownership is ambiguous" % rel, 2)
+        if rel not in chosen:
+            chosen.append(rel)
+    return chosen
+
+
+def check(root, expect=None, owned=None):
     missing, mismatched, bad = [], [], []
     manifest = rows(root)
+    owned = owned_set(root, manifest, owned) if owned is not None else None
     for digest, rel in manifest:
         full = os.path.join(root, rel)
         if excluded(rel):
@@ -180,9 +201,15 @@ def check(root, expect=None):
             missing.append(rel)
         elif sha256(full) != digest:
             mismatched.append(rel)
-    res = {"ok": not (missing or mismatched or bad), "sha12": sha12(root), "files": len(manifest),
-           "missing": missing[:50], "mismatched": mismatched[:50], "excluded_listed": bad[:50],
+    outside = [m for m in mismatched if owned is None or m not in owned]
+    res = {"ok": not (missing or outside or bad), "sha12": sha12(root), "files": len(manifest),
+           "missing": missing[:50], "mismatched": outside[:50], "excluded_listed": bad[:50],
            "ac_ids": ac_ids(root), "dir": root}
+    if owned is not None:
+        accepted = sorted(m for m in mismatched if m in owned)
+        # The audit record the worker copies into metadata.start_check and the controller verifies: nothing is hidden, nothing is rebaselined.
+        res["start_check"] = {"baseline_sha12": res["sha12"], "owned": owned, "differed": sorted(mismatched), "accepted_owned": accepted,
+                              "rejected_outside_scope": outside[:50]}
     if not res["ok"]:
         return res, 4
     if expect is not None:
@@ -284,7 +311,8 @@ def extract(tgz, dest):
 
 
 def cmd_check(a):
-    emit(*check(abs_dir(a.project_dir, "PROJECT_DIR"), a.expect))
+    owned = [x for x in re.split(r"[,\n]", a.owned) if x.strip()] if a.owned is not None else None
+    emit(*check(abs_dir(a.project_dir, "PROJECT_DIR"), a.expect, owned))
 
 
 def cmd_snapshot(a):
@@ -453,7 +481,7 @@ def main():
     p = argparse.ArgumentParser(prog="fw.py", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd")
     for name, fn, args, opts in (("manifest", cmd_manifest, ["project_dir"], []),
-                                 ("check", cmd_check, ["project_dir"], ["--expect"]),
+                                 ("check", cmd_check, ["project_dir"], ["--expect", "--owned"]),
                                  ("snapshot", cmd_snapshot, ["project_dir", "workspace"], ["--expect"]),
                                  ("delta", cmd_delta, ["base_tgz", "new_dir", "out_diff"], []),
                                  ("audit", cmd_audit, ["dir"], ["--project-dir"]),

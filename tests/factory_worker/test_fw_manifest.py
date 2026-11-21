@@ -101,3 +101,85 @@ class ManifestTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class OwnedStartCheckTests(unittest.TestCase):
+    """A repair task may start when the files it is assigned to repair already differ from the baseline manifest; nothing else may."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        (self.root / '.factory').mkdir()
+        (self.root / '.factory/PLAN.md').write_text('AC1: x\n')
+        for rel in ('Assets/wall.png', 'Assets/floor.png', 'Assets/door.png', 'code/main.py'):
+            path = self.root / rel; path.parent.mkdir(parents=True, exist_ok=True); path.write_text('original ' + rel)
+        (self.root / '.factory/include.txt').write_text('Assets\ncode\n')
+        self.run_fw('manifest')
+        self.baseline = json.loads(self.run_fw('check')[1])['sha12']
+
+    def run_fw(self, *args):
+        run = subprocess.run([sys.executable, str(FW), *args[:1], str(self.root), *args[1:]], capture_output=True, text=True)
+        return run.returncode, run.stdout, run.stderr
+
+    def check(self, *flags):
+        code, out, err = self.run_fw('check', '--expect', self.baseline, *flags)
+        return code, (json.loads(out) if out.strip() else {}), err
+
+    def change(self, *rels):
+        for rel in rels:
+            (self.root / rel).write_text('changed by an earlier attempt: ' + rel)
+
+    def test_a_normal_check_still_fails_on_any_difference(self):
+        self.change('Assets/wall.png')
+        code, out, _ = self.check()
+        self.assertEqual((code, out['mismatched']), (4, ['Assets/wall.png']))
+        self.assertNotIn('start_check', out)
+
+    def test_a_non_repair_check_with_no_differences_passes_and_records_nothing_extra(self):
+        code, out, _ = self.check()
+        self.assertEqual((code, out['ok']), (0, True))
+
+    def test_differences_confined_to_the_owned_files_are_accepted_and_recorded(self):
+        self.change('Assets/wall.png', 'Assets/floor.png')
+        code, out, _ = self.check('--owned', 'Assets/wall.png,Assets/floor.png')
+        self.assertEqual((code, out['ok']), (0, True))
+        record = out['start_check']
+        self.assertEqual(record['baseline_sha12'], self.baseline)
+        self.assertEqual(record['differed'], ['Assets/floor.png', 'Assets/wall.png'])
+        self.assertEqual(record['accepted_owned'], ['Assets/floor.png', 'Assets/wall.png'])
+        self.assertEqual(record['rejected_outside_scope'], [])
+
+    def test_a_difference_outside_the_owned_files_still_blocks(self):
+        self.change('code/main.py')
+        code, out, _ = self.check('--owned', 'Assets/wall.png,Assets/floor.png')
+        self.assertEqual((code, out['ok'], out['mismatched']), (4, False, ['code/main.py']))
+        self.assertEqual(out['start_check']['accepted_owned'], [])
+
+    def test_mixed_differences_block_and_name_only_the_outside_file(self):
+        self.change('Assets/wall.png', 'Assets/door.png')
+        code, out, _ = self.check('--owned', 'Assets/wall.png,Assets/floor.png')
+        self.assertEqual((code, out['mismatched']), (4, ['Assets/door.png']))
+        self.assertEqual(out['start_check']['accepted_owned'], ['Assets/wall.png'])
+        self.assertEqual(out['start_check']['rejected_outside_scope'], ['Assets/door.png'])
+
+    def test_a_missing_owned_file_is_never_accepted(self):
+        (self.root / 'Assets/wall.png').unlink()
+        code, out, _ = self.check('--owned', 'Assets/wall.png')
+        self.assertEqual((code, out['ok'], out['missing']), (4, False, ['Assets/wall.png']))
+
+    def test_ownership_that_is_missing_empty_ambiguous_or_unsafe_fails_closed(self):
+        self.change('Assets/wall.png')
+        for owned in ('', ',', 'Assets/*.png', 'Assets', 'not/in/the/manifest.png', '../etc/passwd', '/abs/wall.png'):
+            with self.subTest(owned=owned):
+                code, out, err = self.check('--owned', owned)
+                self.assertIn(code, (2, 3), (owned, out, err))   # refused: never exit 0 and never ok
+                self.assertFalse(out.get('ok', False))
+
+    def test_the_baseline_is_never_rewritten_and_a_wrong_expected_baseline_still_fails(self):
+        before = (self.root / '.factory/SHA256SUMS').read_text()
+        self.change('Assets/wall.png')
+        self.check('--owned', 'Assets/wall.png')
+        self.assertEqual((self.root / '.factory/SHA256SUMS').read_text(), before)
+        code, out, _ = self.run_fw('check', '--expect', 'deadbeef0000', '--owned', 'Assets/wall.png')
+        self.assertEqual(code, 5)
+

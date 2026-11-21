@@ -7,7 +7,7 @@ import re
 import time
 
 from .model_policy import ConfigurationError
-from .project_cards import (ART_PLAN, ROLE_FINDINGS, APPROVED_COMPARISON, APPROVED_REFERENCES, INSPECTION, REFERENCE_AUDIT, VISUAL_TRACE, ARCHITECT, COMPARISON, CONFLICT_CHECK, SIMILARITY, DIRECTOR, PLAN_CORRECTION, PLAN_CORRECTION_REVIEW, ART_FIT, CONTINUES, INSPECT_PATHS, PLAN_BLOCKED, REVIEW_SCOPE, PLAN_FINDING, STYLE_CHANGED, SUPERSEDED, WRITER_GATES,
+from .project_cards import (ART_PLAN, ROLE_FINDINGS, APPROVED_COMPARISON, APPROVED_REFERENCES, INSPECTION, REFERENCE_AUDIT, VISUAL_TRACE, ARCHITECT, COMPARISON, CONFLICT_CHECK, SIMILARITY, DIRECTOR, PLAN_CORRECTION, PLAN_CORRECTION_REVIEW, ART_FIT, OWNED_CHECK, CONTINUES, INSPECT_PATHS, PLAN_BLOCKED, REVIEW_SCOPE, PLAN_FINDING, STYLE_CHANGED, SUPERSEDED, WRITER_GATES,
                             PLAN_REVIEW, REPLAN, RETRO, SCOPE, SPEC_CONSTRAINTS, TOOL_INCIDENTS, project_card)
 from .project_decisions import (MAX_STAGE_RETRIES, constraint_view, constraints_of, normalize_decisions, preserved_conflict, record_applied, relevant_constraints,
                                 validate_plan_constraints, validate_spec_conflicts)
@@ -43,6 +43,22 @@ from .workflow_guards import controller_scope
 from .workflow_handoffs import VERDICTS
 from .workflow_types import StageSpec
 
+
+
+OWNED_FILE = re.compile(r'[A-Za-z0-9_][A-Za-z0-9_./ +@=,-]*\.[A-Za-z0-9]{1,8}')
+
+
+def owned_paths(findings):
+    """The files a repair task is assigned to repair: the explicit file path of each finding routed to it (`<id>|SEV|AC|path|text`). A finding with no usable explicit
+    path (missing, a pattern, absolute, '..') contributes nothing, so ownership that is missing or ambiguous leaves no owned files."""
+    chosen = []
+    for finding in findings or []:
+        parts = str(finding).split('|')
+        path = parts[3].strip() if len(parts) >= 5 else ''
+        if (path and OWNED_FILE.fullmatch(path) and ',' not in path and not path.startswith('/') and '..' not in path.split('/') and not any(c in path for c in '*?[]\\')
+                and path not in chosen):
+            chosen.append(path)
+    return chosen
 
 class ProjectBlocked(ConfigurationError):
     """Recoverable missing environment; requires an explicit human recovery note."""
@@ -706,6 +722,9 @@ class ProjectController:
             instructions += '\n' + SPEC_CONSTRAINTS + '\n' + PLAN_BLOCKED + self._style_note(conn, project)
             if profile == 'artist':
                 instructions += '\n' + ART_FIT
+            owned = owned_paths(blocking) if repair else []
+            if owned:
+                instructions += '\n' + OWNED_CHECK.format(owned=','.join(owned))
             node = self._node(conn, root, definition, context, project, key, 'repair' if repair else 'implement', profile,
                               instructions, work['writer_inputs'], task=task, cycle=cycle)
             if not node:
@@ -717,6 +736,7 @@ class ProjectController:
             # is still rejected. The verifier re-checks every task AC either way.
             if (not reported or not reported <= set(project['ac_ids']) or not reported & expected) if repair else reported != expected:
                 raise ConfigurationError('Writer acceptance differs from the captured small-task plan')
+            self._audit_start_check(conn, root, project, work, row, result, owned, repair)
             work.update(writer_key=key, writer_task=row['task_id'], manifest=result.metadata['manifest_sha12'])
             if repair:
                 work['repairs'].pop(0)
@@ -1036,6 +1056,23 @@ class ProjectController:
             if changed:
                 return '\n' + STYLE_CHANGED.format(id=done['id'])
         return ''
+
+    def _audit_start_check(self, conn, root, project, work, row, result, owned, repair):
+        """Verify and record a repair writer's scope-aware start check. Fail closed: a start_check that is not from a repair card, names a file the task does not own, or used another baseline blocks."""
+        check = result.metadata.get('start_check')
+        if check is None:
+            return
+        baseline = str(work.get('manifest', ''))[:12]
+        if not repair or not owned or not isinstance(check, dict):
+            raise ConfigurationError('start_check is only valid on a repair task that was given OWNED_PATHS')
+        accepted, differed = check.get('accepted_owned'), check.get('differed')
+        if (not isinstance(accepted, list) or not isinstance(differed, list) or not set(accepted) <= set(owned) or not set(accepted) <= set(differed)
+                or check.get('baseline_sha12') != baseline or check.get('rejected_outside_scope')):
+            raise ConfigurationError('start_check rejected: accepted files must be owned by this repair and the baseline must be ' + baseline)
+        entry = dict(kind='start_check_owned', task=row['task_id'], baseline=baseline, owned=sorted(owned), differed=sorted(differed), accepted=sorted(accepted),
+                     at=int(time.time()))
+        project.setdefault('orchestration_log', []).append(entry)
+        self._state.event(conn, root['root_id'], 'project_start_check_owned', entry)
 
     def _refund_tool_defect(self, conn, root, project, kind, key, row, result):
         """A repair that ends BLOCKED with `metadata.tool_defect` did not fail as a repair: give its product charge back (bounded) and record why."""

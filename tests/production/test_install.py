@@ -50,6 +50,11 @@ class InstallTests(unittest.TestCase):
 class SoulTextTests(unittest.TestCase):
     SOULS = ROOT / 'art_production/install'
 
+    def test_the_artist_soul_runs_the_start_check_with_owned_paths_when_the_card_gives_them(self):
+        text = (ROOT / 'art_production/install/artist.SOUL.md').read_text()
+        for clause in ('OWNED_PATHS', '--owned', 'start_check', 'any other difference still blocks'):
+            self.assertIn(clause, text)
+
     def test_artist_soul_has_the_writer_start_of_stage_checks(self):
         soul = (self.SOULS / 'artist.SOUL.md').read_text()
         for text in ('.factory/ROOT', 'PROJECT_MODE=new', '`$HERMES_KANBAN_WORKSPACE` differs from the card\'s PROJECT_DIR',
