@@ -31,6 +31,8 @@ def main():
     parser.add_argument('--keep-background', action='store_true', help='do not turn the flat background into alpha')
     parser.add_argument('--coverage', choices=('auto',) + COVERAGES, default='cutout', help='opaque: keep every pixel; cutout: flat background to alpha; auto: choose from --hint')
     parser.add_argument('--hint', default='', help='the asset name or its acceptance criterion text, used by --coverage auto')
+    parser.add_argument('--margin', type=int, default=None, help='transparent pixels kept on every side of a cutout (default 2) so the sprite never reads as cropped at the canvas edge; 0 fills the canvas')
+    parser.add_argument('--drop-fragments-below', type=int, default=0, metavar='PX', help='cutout: clear detached visible groups smaller than PX pixels (never the largest); the JSON always reports the fragments it sees')
     parser.add_argument('--allow-mostly-transparent', action='store_true', help='accept a cut-out that erases almost the whole image (a small sprite on a large flat background)')
     parser.add_argument('--tolerance', type=int, default=24, help='background colour tolerance per channel')
     args = parser.parse_args()
@@ -39,7 +41,8 @@ def main():
         palette = load_palette(args.palette) if args.palette else None
         if args.palette and not palette:
             raise ValueError(f'{args.palette} has no colours')
-        sprite, report = fit_asset(read_png(args.source), *args.size, palette, coverage, args.tolerance, args.allow_mostly_transparent)
+        sprite, report = fit_asset(read_png(args.source), *args.size, palette, coverage, args.tolerance, args.allow_mostly_transparent,
+                                  2 if args.margin is None else max(0, args.margin), max(0, args.drop_fragments_below))
     except FitError as error:
         print(json.dumps(dict(ok=False, **error.diagnosis)))
         print(f'sprite_fit: {error.diagnosis["defect"]} defect: {error}. {error.diagnosis["fix"]}', file=sys.stderr)
@@ -51,7 +54,8 @@ def main():
     write_png(out, sprite)
     print(json.dumps({'ok': True, 'out': str(out), 'width': sprite.width, 'height': sprite.height,
                       'transparent': sum(1 for pixel in sprite.pixels if not pixel[3]),
-                      'coverage': report['coverage'], 'opaque': report['opaque'], 'palette': len(palette or [])}))
+                      'coverage': report['coverage'], 'opaque': report['opaque'], 'palette': len(palette or []),
+                      **{k: report[k] for k in ('edge_contact', 'margin', 'fragment_count', 'fragments', 'dropped_fragments', 'dropped_px') if k in report}}))
     return 0
 
 

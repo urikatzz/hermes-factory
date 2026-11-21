@@ -61,12 +61,13 @@ def downscale(image, width, height):
         for y in range(height) for x in range(width)])
 
 
-def fit(image, width, height):
-    """Scale the visible content uniformly to fit inside width x height, centred on a transparent canvas."""
+def fit(image, width, height, margin=0):
+    """Scale the visible content uniformly to fit inside width x height (less `margin` transparent pixels on every side), centred on a transparent canvas."""
     content = crop_to_content(image)
-    scale = min(width / content.width, height / content.height)
-    w = min(width, max(1, round(content.width * scale)))
-    h = min(height, max(1, round(content.height * scale)))
+    room_w, room_h = max(1, width - 2 * margin), max(1, height - 2 * margin)
+    scale = min(room_w / content.width, room_h / content.height)
+    w = min(room_w, max(1, round(content.width * scale)))
+    h = min(room_h, max(1, round(content.height * scale)))
     small = downscale(content, w, h)
     left, top = (width - w) // 2, (height - h) // 2
     pixels = [TRANSPARENT] * (width * height)
@@ -107,10 +108,10 @@ def quantize(image, palette):
                  [nearest(pixel[:3]) + (pixel[3],) if pixel[3] else TRANSPARENT for pixel in image.pixels])
 
 
-def make_sprite(image, width, height, palette=None, keep_background=False, tolerance=24):
+def make_sprite(image, width, height, palette=None, keep_background=False, tolerance=24, margin=0):
     if not keep_background:
         image = remove_background(image, tolerance)
-    sprite = harden_alpha(fit(image, width, height))
+    sprite = harden_alpha(fit(image, width, height, margin))
     return quantize(sprite, palette) if palette else sprite
 
 
@@ -140,7 +141,52 @@ def opaque_fraction(image):
     return sum(1 for pixel in image.pixels if pixel[3] == 255) / total if total else 0.0
 
 
-def fit_asset(image, width, height, palette=None, coverage='cutout', tolerance=24, allow_mostly_transparent=False):
+def _groups(image):
+    """Connected groups (4-neighbour) of visible pixels, largest first: [(px, bbox, [pixel indices])]."""
+    w, h, seen, found = image.width, image.height, bytearray(len(image.pixels)), []
+    for start, pixel in enumerate(image.pixels):
+        if not pixel[3] or seen[start]:
+            continue
+        stack, members, seen[start] = [start], [], 1
+        x0, y0, x1, y1 = w, h, 0, 0
+        while stack:
+            i = stack.pop(); members.append(i); x, y = i % w, i // w
+            x0, y0, x1, y1 = min(x0, x), min(y0, y), max(x1, x), max(y1, y)
+            for j in ((i - 1) if x else -1, (i + 1) if x < w - 1 else -1, (i - w) if y else -1, (i + w) if y < h - 1 else -1):
+                if j >= 0 and image.pixels[j][3] and not seen[j]:
+                    seen[j] = 1; stack.append(j)
+        found.append((len(members), (x0, y0, x1, y1), members))
+    return sorted(found, key=lambda g: -g[0])
+
+
+def components(image):
+    """The visible groups of a sprite as [{'px', 'bbox': (x0, y0, x1, y1)}], largest first."""
+    return [dict(px=px, bbox=bbox) for px, bbox, _ in _groups(image)]
+
+
+def drop_fragments(image, min_px):
+    """Clear every visible group smaller than min_px pixels except the largest one. Returns (image, [removed groups])."""
+    groups = _groups(image)
+    if len(groups) < 2 or min_px <= 0:
+        return image, []
+    doomed = [g for g in groups[1:] if g[0] < min_px]
+    if not doomed:
+        return image, []
+    pixels = list(image.pixels)
+    for _, _, members in doomed:
+        for index in members:
+            pixels[index] = (0, 0, 0, 0)
+    return type(image)(image.width, image.height, pixels), [dict(px=px, bbox=bbox) for px, bbox, _ in doomed]
+
+
+def edge_contact(image):
+    """Which canvas edges carry visible pixels: a sprite that touches an edge reads as cropped there."""
+    w, h = image.width, image.height
+    return dict(left=any(image.pixels[y * w][3] for y in range(h)), right=any(image.pixels[y * w + w - 1][3] for y in range(h)),
+                top=any(image.pixels[x][3] for x in range(w)), bottom=any(image.pixels[(h - 1) * w + x][3] for x in range(w)))
+
+
+def fit_asset(image, width, height, palette=None, coverage='cutout', tolerance=24, allow_mostly_transparent=False, margin=0, drop_fragments_below=0):
     """Fit `image` to width x height in the given coverage mode; returns (sprite, report). Raises FitError when a required property is destroyed."""
     if coverage not in COVERAGES:
         raise ValueError('coverage must be one of: ' + ', '.join(COVERAGES))
@@ -150,9 +196,17 @@ def fit_asset(image, width, height, palette=None, coverage='cutout', tolerance=2
         if palette:
             sprite = quantize(sprite, palette)
     else:
-        sprite = make_sprite(image, width, height, palette, keep_background=False, tolerance=tolerance)
+        sprite = make_sprite(image, width, height, palette, keep_background=False, tolerance=tolerance, margin=margin)
+    dropped = []
+    if coverage == 'cutout' and drop_fragments_below > 0:
+        sprite, dropped = drop_fragments(sprite, drop_fragments_below)
     result_opaque = opaque_fraction(sprite)
     report = dict(coverage=coverage, source_opaque=round(source_opaque, 4), opaque=round(result_opaque, 4), width=sprite.width, height=sprite.height)
+    if coverage == 'cutout':
+        # What the technical check will see: detached groups and canvas edges that carry pixels. Reported so the artist can fix them (--drop-fragments-below, --margin) or regenerate.
+        groups = components(sprite)
+        report.update(edge_contact=edge_contact(sprite), margin=margin, fragments=[dict(px=g['px'], bbox=list(g['bbox'])) for g in groups[1:9]], fragment_count=max(0, len(groups) - 1),
+                      dropped_fragments=len(dropped), dropped_px=sum(g['px'] for g in dropped))
     if coverage == 'opaque' and result_opaque < MIN_OPAQUE:
         raise FitError(dict(code='source_not_opaque', defect='generation', transformation='none (the opaque fit keeps and covers every pixel)', **report,
             message=f'the generated image itself is only {source_opaque:.1%} opaque, so the asset cannot be opaque',

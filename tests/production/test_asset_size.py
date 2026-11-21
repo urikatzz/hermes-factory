@@ -82,6 +82,11 @@ class SizingInstructionTests(unittest.TestCase):
                          'world size from the plan', '32 to 2048 px per side', 'caps the long side at 1024', 'record the pixel size, the world size', 'SIZE', 'exits 3'):
             self.assertIn(fragment, text)
 
+    def test_the_artist_skill_explains_edge_contact_and_fragments(self):
+        text = (ROOT / 'art_production/install/SKILL.md').read_text()
+        for fragment in ('edge_contact', 'fragment_count', '--drop-fragments-below', '--margin 2', 'never removes the largest group', 'regenerate the image rather than deleting it'):
+            self.assertIn(fragment, text)
+
     def test_the_task_writing_skill_asks_for_world_sizes_and_forbids_inventing_pixel_requirements(self):
         text = (ROOT / 'runtime/factory-skills/worker/task-writing/SKILL.md').read_text()
         for fragment in ('Asset sizes and placement', 'world size', 'unspecified pixel size is an implementation decision', 'not a new mandatory field'):

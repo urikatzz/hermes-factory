@@ -7,7 +7,7 @@ from pathlib import Path
 
 from production_fixtures import ROOT
 from art_fixtures import PALETTE, gpl, sprite, upscale_pixels
-from art_production.sprite_fit import FitError, choose_coverage, downscale, fit, fit_asset, fit_cover, make_sprite, opaque_fraction, quantize, remove_background
+from art_production.sprite_fit import FitError, choose_coverage, components, downscale, drop_fragments, edge_contact, fit, fit_asset, fit_cover, make_sprite, opaque_fraction, quantize, remove_background
 from factory_art.png import Image, read_png, write_png
 from factory_art.sprite_checks import check_sprite
 
@@ -134,6 +134,79 @@ class CoverageModeTests(unittest.TestCase):
                 self.assertEqual(opaque_fraction(sprite), 1.0, text)
             else:
                 self.assertEqual(sprite.pixels[0], CLEAR, text)
+
+
+def figure_with_specks(width=160, height=160):
+    """A big red figure plus a few detached specks, on a flat white background."""
+    return canvas(width, height, [(30, 10, 100, 140, RED), (4, 4, 3, 3, RED), (150, 150, 4, 4, RED), (140, 20, 6, 6, RED)])
+
+
+class EdgeAndFragmentTests(unittest.TestCase):
+    """The technical check reads opaque pixels on the canvas border as a crop and detached groups as stray fragments: the tool reports both and can prevent them."""
+
+    def test_a_margin_keeps_the_sprite_off_every_canvas_edge_and_zero_fills_the_canvas(self):
+        sprite, report = fit_asset(figure_with_specks(), 64, 64, coverage='cutout', margin=2)
+        self.assertEqual(edge_contact(sprite), dict(left=False, right=False, top=False, bottom=False))
+        self.assertEqual((sprite.width, sprite.height), (64, 64))
+        flush, flush_report = fit_asset(figure_with_specks(), 64, 64, coverage='cutout', margin=0)
+        self.assertTrue(any(edge_contact(flush).values()))                              # the old behaviour: content fills the canvas and touches its edges
+        self.assertTrue(any(flush_report['edge_contact'].values()))
+
+    def test_detached_fragments_are_reported_with_their_size_and_place(self):
+        _, report = fit_asset(figure_with_specks(), 64, 64, coverage='cutout', margin=2)
+        self.assertGreaterEqual(report['fragment_count'], 1)
+        self.assertTrue(all({'px', 'bbox'} <= set(f) for f in report['fragments']))
+        clean, clean_report = fit_asset(canvas(160, 160, [(30, 10, 100, 140, RED)]), 64, 64, coverage='cutout', margin=2)
+        self.assertEqual((clean_report['fragment_count'], clean_report['fragments']), (0, []))
+
+    def test_dropping_fragments_clears_the_small_groups_and_never_the_largest(self):
+        sprite, _ = fit_asset(figure_with_specks(), 64, 64, coverage='cutout', margin=2)
+        before = components(sprite)
+        cleared, removed = drop_fragments(sprite, before[0]['px'] + 1)                   # even a threshold above the largest group never removes the largest
+        self.assertEqual(len(components(cleared)), 1)
+        self.assertEqual(components(cleared)[0]['px'], before[0]['px'])
+        self.assertEqual(len(removed), len(before) - 1)
+        kept, none = drop_fragments(sprite, 1)                                           # nothing is below one pixel
+        self.assertEqual((kept.pixels, none), (sprite.pixels, []))
+        self.assertEqual(drop_fragments(sprite, 0)[1], [])                               # 0 disables
+
+    def test_dropping_only_the_tiny_groups_keeps_a_larger_separate_part(self):
+        art = canvas(160, 160, [(20, 10, 90, 140, RED), (120, 60, 30, 30, RED), (2, 2, 2, 2, RED)])
+        sprite, _ = fit_asset(art, 80, 80, coverage='cutout', margin=2)
+        groups = components(sprite)
+        threshold = (groups[1]['px'] + groups[2]['px']) // 2 if len(groups) > 2 else groups[-1]['px']
+        cleared, removed = drop_fragments(sprite, threshold)
+        self.assertEqual(len(components(cleared)), len(groups) - len(removed))
+        self.assertGreaterEqual(len(components(cleared)), 2 if len(groups) > 2 else 1)
+
+    def test_opaque_mode_is_unaffected_by_margin_and_fragment_options(self):
+        sprite, report = fit_asset(dark_wall(), 128, 64, coverage='opaque', margin=2, drop_fragments_below=500)
+        self.assertEqual(opaque_fraction(sprite), 1.0)
+        self.assertNotIn('fragments', report)
+
+
+class EdgeAndFragmentCommandLineTests(unittest.TestCase):
+    def run_fit(self, image, *arguments):
+        folder = tempfile.mkdtemp()
+        source, out = Path(folder) / 'in.png', Path(folder) / 'out.png'
+        write_png(source, image)
+        done = subprocess.run([sys.executable, str(ROOT / 'scripts/sprite_fit.py'), str(source), str(out), '--size', '64x64', *arguments], capture_output=True, text=True)
+        return done, out
+
+    def test_the_cli_keeps_a_two_pixel_margin_by_default_and_reports_edges_and_fragments(self):
+        done, out = self.run_fit(figure_with_specks())
+        report = json.loads(done.stdout)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(report['margin'], 2); self.assertFalse(any(report['edge_contact'].values()))
+        self.assertGreaterEqual(report['fragment_count'], 1)
+        self.assertFalse(any(edge_contact(read_png(out)).values()))
+
+    def test_the_cli_can_drop_fragments_and_can_disable_the_margin(self):
+        done, out = self.run_fit(figure_with_specks(), '--drop-fragments-below', '10000', '--margin', '0')
+        report = json.loads(done.stdout)
+        self.assertEqual((report['fragment_count'], report['margin']), (0, 0))
+        self.assertGreaterEqual(report['dropped_fragments'], 1)
+        self.assertEqual(len(components(read_png(out))), 1)
 
 
 class CoverageCommandLineTests(unittest.TestCase):
