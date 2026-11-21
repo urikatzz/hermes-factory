@@ -84,7 +84,7 @@ scan-adjudication.json: {"schema":"factory-scan-adjudication/v1","adjudications"
 "rationale":"<40+ characters, judged against the approved image and the surrounding text>"}]}. A contradiction also needs a BLOCKER/HIGH finding naming the id; ambiguous goes to the human.'''
 
 APPROVED_COMPARISON = '''Approved-reference comparison. Judge the real rendered result against the ORIGINAL approved reference images (never against a factory mockup),
-requirement by requirement. No similarity score or pixel threshold approves anything here. In comparison.json add "references":[{"id":"<ref id>","sha256":"<sha256>"}]
+requirement by requirement. No per-asset similarity score exists here: an isolated sprite is never scored against the reference scene. In comparison.json add "references":[{"id":"<ref id>","sha256":"<sha256>"}]
 for every approved reference, and one criterion per approved requirement whose "rule" starts with its V id (for example "V2: ..."), with expected = what the
 reference shows and observed = what the retained screenshot shows. Retained screenshots must be real in-engine renders for final integration. Also judge the WHOLE:
 open the reference and the screenshots side by side with vision_analyze and add "holistic":{"verdict":"accept"|"reject","summary":"at least 120 characters on how the
@@ -186,6 +186,19 @@ source="tool"|"human", outcome="pass"|"fail", criteria=[{rule,expected,observed,
 evidence=[absolute retained image paths]. Include the comparison file and all cited evidence as completion artifacts.
 For a mismatch report actionable findings with the relevant task AC and CHANGES_REQUIRED so the engine invokes the artist.
 An unclear or contradictory director plan requires human review; never silently redefine intent.'''
+
+SCENE_GATE = '''Full-scene similarity gate (mandatory, blocking, pass is 80/100). Score the COMPLETE assembled scene against the COMPLETE approved reference, never an isolated sprite.
+1. Capture the actual scene from the game engine at the reference's framing and resolution (same camera, 16:9 or whatever the reference is). Retain the PNG and write scene-render.json
+   {{"schema":"factory-scene-render/v1","renderer":"<engine capture tool>","command":"<the exact capture command>","exit_code":0,"scene":"<scene file>","project_dir":"<PROJECT_DIR>","screenshot":"<png name>","screenshot_sha256":"<sha256>","width":<w>,"height":<h>,"captured_at":<unix seconds>}}.
+   The screenshot must be a real engine render: never an image you generated or painted, never the reference, never a single asset.
+2. Run `SCENE_SCORE --reference <the ORIGINAL approved reference image> --screenshot <png> --render-record scene-render.json --out scene-similarity.json --assets <the scene's asset files, comma separated>` and retain
+   scene-similarity.json, scene-render.json, the screenshot and scene-compared.png. (SCENE_SCORE is scene_score.py of the art-review skill; its section 2b has the details.) Never estimate or invent the score. Exit 3 (blocked: no engine render, bad framing, no credential) is an unresolved tool incident (blocked_tools), not a pass.
+3. Below 80: verdict CHANGES_REQUIRED with a HIGH finding per ranked difference from scene-similarity.json, formatted `[scene] <impact>/5 <aspect>: <description> | responsible: <asset or scene settings> | repair: <instruction>`, path = the responsible asset file. Add your own diagnosis of why the whole
+   scene falls short (colour, lighting, texture, proportion, missing details, composition) and say which assets already match and must be preserved. Repair the cause, never the score.
+Per-requirement visual judgements and every other check still apply. {brief}'''
+
+NO_SPRITE_SCORE = '''Never compute or report a similarity score for a single asset, and never compare an isolated sprite with the approved reference scene: the reference is one composed frame, so such a score is meaningless. Judge each requirement this task
+owns against the original reference with vision (comparison.json). The full-scene score is taken on the assembled scene at final integration.'''
 
 SIMILARITY = '''Before any detailed judgement run the art-review similarity gate: the Jev model scores each rendered asset against its
 reference images. Retain similarity.json as a completion artifact. If any asset scores below 80% or has no reference image, stop there:

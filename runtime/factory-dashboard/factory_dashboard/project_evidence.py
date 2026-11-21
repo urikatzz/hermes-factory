@@ -140,3 +140,45 @@ def validate_comparison(profile, result, plans, integration, approved=False):
     if record['outcome'] == 'pass' and result.metadata['verdict'] != 'NO_BLOCKING_FINDINGS':
         raise ConfigurationError('Comparison and reviewer verdict disagree')
     return record
+
+
+def validate_scene_similarity(result, references):
+    """The full-scene gate: a real engine capture of the assembled scene scored against the human-approved reference. Never a sprite, never an invented score.
+    Returns (record, render record). status `blocked` (no admissible evidence, no score) stops the project; `fail` needs CHANGES_REQUIRED and a ranked diagnosis."""
+    record = retained_json(result.metadata['artifacts'], 'scene-similarity.json')
+    render = retained_json(result.metadata['artifacts'], 'scene-render.json')
+    keys = {'schema', 'model', 'threshold', 'reference', 'screenshot', 'score', 'differences', 'diagnosis', 'status', 'problems'}
+    if not isinstance(record, dict) or not keys <= set(record) or record['schema'] != 'factory-scene-similarity/v1':
+        raise ConfigurationError('Invalid scene similarity record')
+    threshold = record['threshold']
+    if type(threshold) is not int or not SIMILARITY_THRESHOLD <= threshold <= 100:
+        raise ConfigurationError('Scene similarity threshold is below the required 80')
+    if record['status'] == 'blocked' or record['score'] is None:
+        raise ConfigurationError('Scene similarity could not be evaluated, so no score exists: ' + '; '.join(str(p) for p in record.get('problems', []))[:300])
+    score, status = record['score'], record['status']
+    if status not in ('pass', 'fail') or type(score) is not int or not 0 <= score <= 100 or (status == 'pass') != (score >= threshold):
+        raise ConfigurationError('Contradictory scene similarity score')
+    authoritative = {r.get('sha256') for r in references if 'visual_reference' in r['roles'] and r['authority'] == 'human_approved'}
+    if not isinstance(record['reference'], dict) or record['reference'].get('sha256') not in authoritative:
+        raise ConfigurationError('Scene similarity was not scored against a human-approved reference')
+    shot = record['screenshot'] if isinstance(record['screenshot'], dict) else {}
+    named = [p for p in result.metadata['artifacts'] if isinstance(render, dict) and Path(p).name == Path(str(render.get('screenshot', ''))).name]
+    if (not isinstance(render, dict) or render.get('schema') != 'factory-scene-render/v1' or render.get('exit_code') != 0 or not render.get('command')
+            or len(named) != 1 or Path(named[0]).is_symlink() or not Path(named[0]).is_file()):
+        raise ConfigurationError('Scene similarity has no retained engine render record and screenshot')
+    data = Path(named[0]).read_bytes()
+    digest = hashlib.sha256(data).hexdigest()
+    if not data.startswith(b'\x89PNG\r\n\x1a\n') or digest != render.get('screenshot_sha256') or digest != shot.get('sha256'):
+        raise ConfigurationError('The scored screenshot is not the retained render')
+    if status == 'fail':
+        diffs = record['differences']
+        ok = (isinstance(diffs, list) and diffs and all(isinstance(d, dict) and type(d.get('impact')) is int and 1 <= d['impact'] <= 5
+                                                          and all(isinstance(d.get(k), str) and d[k].strip() for k in ('aspect', 'description', 'responsible', 'repair')) for d in diffs)
+              and all(diffs[i]['impact'] >= diffs[i + 1]['impact'] for i in range(len(diffs) - 1)))
+        if not ok or not isinstance(record['diagnosis'], str) or len(record['diagnosis'].strip()) < 20:
+            raise ConfigurationError('A failing scene score needs a ranked list of differences and a diagnosis')
+        blocking = [f for f in result.metadata.get('findings', []) if f.split('|', 4)[1] in ('BLOCKER', 'HIGH')]
+        if not blocking or result.metadata['verdict'] != 'CHANGES_REQUIRED':
+            raise ConfigurationError('A scene score below 80 requires a blocking finding and CHANGES_REQUIRED')
+    return record, render
+

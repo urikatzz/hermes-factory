@@ -10,11 +10,12 @@ import re
 import time
 
 from .model_policy import ConfigurationError
-from .project_cards import (ART_PLAN, ROLE_FINDINGS, APPROVED_COMPARISON, APPROVED_REFERENCES, INSPECTION, REFERENCE_AUDIT, VISUAL_TRACE, ARCHITECT, COMPARISON, CONFLICT_CHECK, SIMILARITY, DIRECTOR, PLAN_CORRECTION, PLAN_CORRECTION_REVIEW, ART_FIT, OWNED_CHECK, CONTINUES, INSPECT_PATHS, PLAN_BLOCKED, REVIEW_SCOPE, PLAN_FINDING, STYLE_CHANGED, SUPERSEDED, WRITER_GATES,
+from .project_cards import (ART_PLAN, ROLE_FINDINGS, APPROVED_COMPARISON, APPROVED_REFERENCES, INSPECTION, REFERENCE_AUDIT, VISUAL_TRACE, ARCHITECT, COMPARISON, CONFLICT_CHECK, SIMILARITY, DIRECTOR, PLAN_CORRECTION, PLAN_CORRECTION_REVIEW, ART_FIT, NO_SPRITE_SCORE, OWNED_CHECK, SCENE_GATE, CONTINUES, INSPECT_PATHS, PLAN_BLOCKED, REVIEW_SCOPE, PLAN_FINDING, STYLE_CHANGED, SUPERSEDED, WRITER_GATES,
                             PLAN_REVIEW, REPLAN, RETRO, SCOPE, SPEC_CONSTRAINTS, TOOL_INCIDENTS, project_card)
 from .project_decisions import (MAX_STAGE_RETRIES, constraint_view, constraints_of, normalize_decisions, preserved_conflict, record_applied, relevant_constraints,
                                 validate_plan_constraints, validate_spec_conflicts)
-from .project_evidence import dedupe_artifacts, plan_evidence, retained_json, validate_comparison, validate_similarity
+from . import scene_loop
+from .project_evidence import dedupe_artifacts, plan_evidence, retained_json, validate_comparison, validate_scene_similarity, validate_similarity
 from . import project_references as refs
 from .project_policy import (MAX_ORCHESTRATION_RECOVERIES, MAX_PLAN_CORRECTIONS, MAX_REPLANS, blocking_findings, budget_used, finding_id,
                              missing_baseline_tokens, plan_architecture_diff, repair_origin, finding_ac, planning_profiles, route_findings, rereview_profiles,
@@ -751,6 +752,10 @@ class ProjectController:
             instructions += '\n' + SPEC_CONSTRAINTS + '\n' + PLAN_BLOCKED + self._style_note(conn, project)
             if profile == 'artist':
                 instructions += '\n' + ART_FIT
+            if repair and project.get('scene'):
+                instructions += '\n' + scene_loop.brief(project['scene']) + (
+                    '\nRecord your plan in metadata.scene_repair_plan {"assets":[files you change],"instructions":"what you change","diagnosis_of_previous":"why the previous attempt scored below 80",'
+                    '"new_reason":"only if you repeat an earlier repair or change an asset the scorer did not blame","reconsidered":true when the last score did not improve,"restore_best":true when you restored the best result first}.')
             owned = owned_paths(blocking) if repair and re.fullmatch(r'[0-9a-f]{12}', str(work.get('manifest') or '')[:12]) else []   # no authoritative baseline: no owned check
             if owned:
                 expect = str(work.get('manifest') or '')[:12]
@@ -772,6 +777,7 @@ class ProjectController:
             if (not reported or not reported <= set(project['ac_ids']) or not reported & expected) if repair else reported != expected:
                 raise ConfigurationError('Writer acceptance differs from the captured small-task plan')
             self._audit_start_check(conn, root, project, work, row, result, owned, repair)
+            self._check_scene_repair(project, result, repair)
             work.update(writer_key=key, writer_task=row['task_id'], manifest=result.metadata['manifest_sha12'])
             if repair:
                 work['repairs'].pop(0)
@@ -816,8 +822,11 @@ class ProjectController:
         for profile in profiles:
             instructions = 'Review only your discipline against TASK acceptance and the inherited plans; report actionable findings.\n' + TOOL_INCIDENTS + '\n' + SPEC_CONSTRAINTS + '\n' + PLAN_FINDING
             human_approved = bool(refs.authoritative(project.get('reference_records', [])))
+            scene_gate = profile == 'art-reviewer' and human_approved and task['id'] == 'integration'
             if profile == 'art-reviewer':
                 instructions += '\n' + COMPARISON + ('\n' + APPROVED_COMPARISON if human_approved else '')
+                if human_approved:
+                    instructions += '\n' + (SCENE_GATE.format(brief=scene_loop.brief(project.get('scene'))) if scene_gate else NO_SPRITE_SCORE)
             if profile == 'art-reviewer' and task['id'] != 'integration' and not human_approved:
                 instructions += '\n' + SIMILARITY
             selected = next((r.instructions for r in definition.reviewers if r.profile == profile), '')
@@ -839,6 +848,9 @@ class ProjectController:
                 if human_approved:
                     owned = set(task['visual']) if task['id'] != 'integration' and task.get('visual') else None  # an asset task answers for the requirements it owns
                     refs.validate_reference_comparison(record, project['reference_records'], only=owned)
+            if scene_gate:
+                scene_record, render_record = validate_scene_similarity(result, project['reference_records'])
+                self._record_scene(project, row, result, scene_record, work, context.get('project_dir', ''))
             readers.append(result)
             rows.append(row)
         if waiting:
@@ -928,7 +940,10 @@ class ProjectController:
         if decision.decision == 'human_review' and decision.reason == REPAIR_LIMIT:
             # The repair limit stops the task for a human; it never goes back to the architect. A human reads the findings and resumes with
             # extra_repairs, optionally with model_overrides (a stronger model for a profile), or changes the plan and starts a new task.
-            self._terminal(conn, root, project, 'human_review', self._repair_limit_reason(task, work, decision))
+            reason = self._repair_limit_reason(task, work, decision)
+            if project.get('scene'):
+                reason = scene_loop.exhaustion_report(project['scene']) + ' ' + reason   # the remaining differences go to the human; the budget is never extended
+            self._terminal(conn, root, project, 'human_review', reason)
             return True
         if decision.decision == 'repair':
             # Only readers that reported a failure ask for repair domains; a passing verifier's leftover domain must not summon an agent.
@@ -1091,6 +1106,33 @@ class ProjectController:
             if changed:
                 return '\n' + STYLE_CHANGED.format(id=done['id'])
         return ''
+
+    def _check_scene_repair(self, project, result, repair):
+        """With a scored scene history, a repair must carry its diagnosis and plan, and must not be a blind or repeated one. Rejected otherwise (the stage fails, budget unchanged)."""
+        scene = project.get('scene')
+        if not repair or not scene or not scene.get('attempts') or scene['attempts'][-1]['status'] != 'fail':
+            return
+        plan = result.metadata.get('scene_repair_plan')
+        if not isinstance(plan, dict):
+            raise ConfigurationError('A repair after a failed full-scene score must record metadata.scene_repair_plan with its diagnosis')
+        problems = scene_loop.check_repair_plan(scene, plan)
+        if problems:
+            raise ConfigurationError('Scene repair rejected: ' + '; '.join(problems))
+        project['scene_pending_repair'] = dict(signature=scene_loop.signature(plan['assets'], plan.get('instructions')), assets=list(plan['assets']), instructions=str(plan.get('instructions', ''))[:500])
+
+    def _record_scene(self, project, row, result, record, work, project_dir):
+        """Keep the scored attempt in the ledger (idempotent per task): scores, diagnosis, best verified result and the repair that led here."""
+        hashes = {}
+        try:
+            for line in (Path(project_dir) / '.factory/SHA256SUMS').read_text().splitlines():
+                digest, _, rel = line.partition('  ')
+                if rel.startswith(('Assets/', 'art/')):
+                    hashes[rel] = digest
+        except (OSError, ValueError):
+            hashes = {}
+        project['scene'] = scene_loop.record_attempt(project.get('scene'), task_id=row['task_id'], score=record['score'], status=record['status'],
+                                                     screenshot_sha256=record['screenshot'].get('sha256'), differences=record['differences'], diagnosis=record['diagnosis'],
+                                                     assets_sha256=hashes, repair=project.pop('scene_pending_repair', None), snapshot=work.get('snapshot'))
 
     def _audit_start_check(self, conn, root, project, work, row, result, owned, repair):
         """Verify and record a repair writer's scope-aware start check. Fail closed: a start_check that is not from a repair card, names a file the task does not own, or used another baseline blocks."""

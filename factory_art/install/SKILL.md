@@ -18,7 +18,11 @@ It prints a one-line JSON summary. Full results are in `<workspace>/lint/lint.js
 - `assets[]`: `file`, `class`, `kind`, `rules` (STYLE.md IDs), `references` (absolute image paths), `images` (absolute paths prepared for you), `vision` (false means over the image budget).
 - `not_reviewed`, `unverified` (Blender unavailable: environment, not the asset's fault), `blocked_tools`, `warnings`.
 
-## 2. Similarity gate
+## 2. Similarity gates
+
+**Never score an isolated sprite against an approved reference scene.** A human-approved reference is one composed frame; a single sprite scored against it can only fail for "having no characters". When the card lists `approved_references`, skip the per-asset gate below completely and judge each requirement your task owns with vision against the ORIGINAL reference (section 3). The only similarity score against an approved reference is the full-scene score (2b).
+
+### 2a. Per-asset gate (only when the card has NO approved_references: assets against their own style-bible reference images)
 
 `SIMILARITY` means `python3 ${HERMES_SKILL_DIR}/scripts/art_similarity.py`. Run it as its own terminal command before you open any image yourself:
 
@@ -29,6 +33,18 @@ It sends each rendered asset and its reference images to the Jev model on OpenRo
 - `gate: "pass"`: every asset scored at least 80. Continue with section 3 to find what is still missing.
 - `gate: "fail"`: do not run section 3. For each asset with `status: "fail"` report a HIGH finding `[similarity] <score>% match, below 80%: <differences>`. For each `status: "no_reference"` report a BLOCKER finding `[similarity] no reference image for this asset class`, and in factory mode set metadata `plan_defect` to say which class lacks a reference. Verdict `CHANGES_REQUIRED`.
 - `gate: "blocked"`: the model or its key is unavailable. Never load a `.env` or look for the key yourself. Record it as an unresolved required tool incident (`blocked_tools: ["jev-similarity"]` and `tool_incidents`) and say the human should run `factory_secrets.py doctor`; do not approve and do not substitute your own estimate.
+
+### 2b. Full-scene gate (final integration with approved references; mandatory, pass is 80/100)
+
+`SCENE_SCORE` means `python3 ${HERMES_SKILL_DIR}/scripts/scene_score.py`. It scores the COMPLETE assembled scene, captured from the game engine, against the COMPLETE original approved reference.
+
+1. Capture the actual scene from the engine at the reference's framing and resolution. Retain the PNG and write `scene-render.json` (schema `factory-scene-render/v1`: renderer, the exact capture command, exit_code 0, scene, project_dir, screenshot name, screenshot_sha256, width, height, captured_at). It must be a real engine render: never an image you generated or painted, never the reference, never one asset.
+2. `SCENE_SCORE --reference <the ORIGINAL approved reference in PROJECT_DIR> --screenshot <png> --render-record scene-render.json --out scene-similarity.json --assets <the scene's asset files, comma separated>`.
+3. Exit 0 (`status: pass`, score >= 80): continue with section 3. Exit 2 (`status: fail`): report one HIGH finding per ranked difference, `[scene] <impact>/5 <aspect>: <description> | responsible: <asset or scene settings> | repair: <instruction>`, with the responsible asset file as the finding's file, verdict `CHANGES_REQUIRED`. Add your own diagnosis of why the whole scene falls short (colour, lighting, texture, proportion, missing detail, composition), rank what matters most, and name the assets that already match and must be preserved. Repair the cause, never the score.
+4. Exit 3 (`status: blocked`): no admissible engine render, wrong framing, a copy of the reference, or no credential. No score exists. Record an unresolved required tool incident (`blocked_tools: ["scene-similarity"]`); never estimate or invent a score and never substitute a per-asset score.
+5. When the card shows a SCENE SCORE HISTORY, compare with it: say whether the score improved, why, and whether the last repair addressed the ranked differences.
+
+Retain `scene-similarity.json`, `scene-render.json`, the screenshot and `scene-compared.png` as completion artifacts.
 
 ## 3. Judge
 
@@ -65,5 +81,5 @@ Follow the factory-worker contract preloaded on the card.
 4. A `bible` BLOCKER on a factory task usually means `art/style` is missing from `.factory/include.txt`. Say so in the finding.
 5. Metadata finding lines keep the contract's AC field: `F<n>|SEV|<AC id or ->|<file>|[<rule or check>] <problem>`. Map each finding to the AC it threatens in `.factory/PLAN.md`.
 6. Extra metadata: `art_surface: "assets"`, `images_inspected` (count), `not_reviewed`, `unverified`, and the lint `blocked_tools`.
-7. After lint, run the similarity gate into `"$HERMES_KANBAN_WORKSPACE/similarity.json"` and follow section 2. On final integration (in-engine screenshots) the gate does not apply.
-8. Attach `report.md`, `lint/lint.json`, `similarity.json` and every image you cite. Then `fw.py clean` and `kanban_complete`.
+7. After lint: with NO approved_references on the card, run the per-asset gate (2a) into `"$HERMES_KANBAN_WORKSPACE/similarity.json"`. With approved_references, never run it; at final integration run the full-scene gate (2b) into `"$HERMES_KANBAN_WORKSPACE/scene-similarity.json"`, and for an asset task judge only the requirements it owns against the original reference.
+8. Attach `report.md`, `lint/lint.json`, `similarity.json` when you ran it, the scene files from 2b when you ran them, and every image you cite. Then `fw.py clean` and `kanban_complete`.

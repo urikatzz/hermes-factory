@@ -30,7 +30,7 @@ class ArtReviewFlow(ReferenceFlow):
                 self.board.complete(row)
         return self.only('art-reviewer')
 
-    def review(self, stage, holistic='accept', outcome=None, verdict='NO_BLOCKING_FINDINGS', findings=(), viewed_shots=True, per_requirement=None, dimensions=None, whole_outcome=None, viewed_as=None):
+    def review(self, stage, holistic='accept', outcome=None, verdict='NO_BLOCKING_FINDINGS', findings=(), viewed_shots=True, per_requirement=None, dimensions=None, whole_outcome=None, viewed_as=None, mode='rendered_asset', extra=()):
         folder = Path(self.temp.name) / 'review'
         folder.mkdir(exist_ok=True)
         shot = folder / 'game-view.png'
@@ -41,13 +41,13 @@ class ArtReviewFlow(ReferenceFlow):
         criteria = [dict(rule=f'{r["id"]}: matches the reference', expected='as in the reference', observed='as in the screenshot', outcome='pass')
                     for r in refs.required_requirements(self.loaded['references'])]
         criteria.append(dict(rule='HOLISTIC', expected='the approved look as a whole', observed='the whole screenshot', outcome=whole))
-        record = dict(schema='factory-comparison/v1', plan_sha256=director['sha256'], manifest_sha12='abcdef123456', mode='rendered_asset', source='tool',
+        record = dict(schema='factory-comparison/v1', plan_sha256=director['sha256'], manifest_sha12='abcdef123456', mode=mode, source='tool',
                       outcome=outcome or ('pass' if all(c['outcome'] == 'pass' for c in criteria) else 'fail'), criteria=criteria, evidence=[str(shot)],
                       references=[dict(id=reference['id'], sha256=reference['sha256'])],
                       holistic=dict(verdict=holistic, summary='Whole screenshot against the whole approved image: composition, proportions, density and atmosphere compared side by side. ' * 2,
                                     dimensions=dimensions or {t: ('matches' if holistic == 'accept' else 'differs') for t in TOPICS}, screenshots=['game-view.png']))
         comparison = self.write(stage, 'comparison.json', record)
-        self.finish(stage, 'Art review report.', document='report.md', extra=[comparison, str(shot)], screenshots=['game-view.png'], per_requirement=per_requirement,
+        self.finish(stage, 'Art review report.', document='report.md', extra=[comparison, str(shot), *extra], screenshots=['game-view.png'], per_requirement=per_requirement,
                     shots_viewed=viewed_as if viewed_as is not None else ([shot] if viewed_shots else []), verdict=verdict, findings=list(findings))
 
 
@@ -116,6 +116,8 @@ class ArtReviewerTests(ArtReviewFlow):
         self.assertIn('Every requirement passing does not make the result acceptable', body)
         self.assertIn('Role findings (art reviewer)', body)
         self.assertNotIn('similarity gate', body)
+        self.assertIn('never compare an isolated sprite with the approved reference scene', body)   # an asset task is told the opposite of the old per-asset score
+        self.assertNotIn('Full-scene similarity gate', body)                                     # the full-scene gate belongs to final integration only
 
 
 class ReferenceExposureTests(ArtReviewFlow):
