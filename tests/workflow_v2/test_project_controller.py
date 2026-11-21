@@ -1194,6 +1194,27 @@ class ProjectControllerTests(unittest.TestCase):
         self.tick()
         return self.project()
 
+    def test_a_human_can_drop_a_model_override_and_the_profile_default_applies_again(self):
+        project = self.blocked_repair(None)
+        project['model_overrides'] = dict(fixer=dict(provider='openai-codex', model='gpt-5', effort='high', note='n', at=1))
+        self.conn.execute('UPDATE factory_project_execution SET document=?', (json.dumps(project),)); self.conn.commit()
+        self.conn.execute("UPDATE factory_workflow_roots SET phase='blocked'"); self.conn.commit()  # what the stop does to the root
+        self.controller.resume(self.conn, self.root, 'Provider key expired: back to the profile default', dict(model_overrides=dict(fixer=None)))
+        project = self.project()
+        self.assertEqual(project.get('model_overrides'), {})
+        entry = next(e for e in project['orchestration_log'] if e['kind'] == 'human_model_override')
+        self.assertEqual(entry['models'], {'fixer': 'profile default'})
+        self.assertEqual(self.used(), (1, 0))  # dropping an override grants nothing
+
+    def test_clearing_an_override_needs_a_recorded_note_and_a_valid_profile_name(self):
+        from factory_dashboard.project_decisions import normalize_decisions
+        from factory_dashboard.model_policy import ConfigurationError
+        with self.assertRaises(ConfigurationError):
+            normalize_decisions(dict(model_overrides=dict(fixer=None)), '')
+        with self.assertRaises(ConfigurationError):
+            normalize_decisions(dict(model_overrides={'Bad Name': None}), 'x')
+        self.assertEqual(normalize_decisions(dict(model_overrides=dict(fixer=None)), 'x')['model_overrides'], dict(fixer=None))
+
     def test_a_non_artist_writer_card_has_no_fit_mode_text(self):
         self.plan()
         self.assertNotIn('Fit mode (required', self.board.cards[self.only('developer')['task_id']]['body'])

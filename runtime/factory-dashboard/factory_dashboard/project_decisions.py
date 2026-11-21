@@ -164,6 +164,9 @@ def normalize_decisions(decisions, note, now=None):
         raise ConfigurationError(f'model_overrides maps at most {MAX_MODEL_OVERRIDES} profiles to {{"provider","model","effort"}}')
     model_overrides = {}
     for profile, spec in overrides.items():
+        if spec is None and isinstance(profile, str) and re.fullmatch(r'[a-z][a-z-]*', profile):
+            model_overrides[profile] = None   # drop this project's override: the profile's own model applies again
+            continue
         if not isinstance(profile, str) or not re.fullmatch(r'[a-z][a-z-]*', profile) or not isinstance(spec, dict) \
                 or set(spec) - {'provider', 'model', 'effort'} or not {'provider', 'model'} <= set(spec):
             raise ConfigurationError('Each model override is {"provider": ..., "model": ..., "effort": optional} for one profile name')

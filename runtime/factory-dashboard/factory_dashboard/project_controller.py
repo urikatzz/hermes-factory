@@ -1145,9 +1145,12 @@ class ProjectController:
             # against the model catalog). Recorded, never silent.
             kept = project.setdefault('model_overrides', {})
             for profile, spec in decided['model_overrides'].items():
-                kept[profile] = dict(spec, note=note.strip()[:300], at=int(time.time()))
+                if spec is None:
+                    kept.pop(profile, None)  # dropped by the human: the profile's own configured model applies again; the log below records it
+                else:
+                    kept[profile] = dict(spec, note=note.strip()[:300], at=int(time.time()))
             project.setdefault('orchestration_log', []).append(dict(kind='human_model_override', profiles=sorted(decided['model_overrides']),
-                                                                   models={p: s['provider'] + '/' + s['model'] for p, s in decided['model_overrides'].items()},
+                                                                   models={p: (s['provider'] + '/' + s['model'] if s else 'profile default') for p, s in decided['model_overrides'].items()},
                                                                    reason=note.strip()[:500], at=int(time.time())))
         project.setdefault('scan_resolved', []).extend(i for i in re.findall(r'SCAN-BENIGN ([0-9a-f]{8})', note) if i not in project.get('scan_resolved', []))
         if project.get('references_digest'):
