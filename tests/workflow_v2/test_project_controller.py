@@ -1230,32 +1230,78 @@ class ProjectControllerTests(unittest.TestCase):
     def test_a_repair_card_names_the_owned_files_and_keeps_the_check_mandatory(self):
         card = self.board.cards[self.routed_repair('F1|HIGH|AC1|code.py|Real defect to repair')['task_id']]['body']
         self.assertIn('OWNED_PATHS code.py', card)
-        self.assertIn('fw.py check PROJECT_DIR --expect BASELINE --owned "code.py"', card)
+        base = self.project()['work']['manifest'][:12]
+        self.assertIn('fw.py check PROJECT_DIR --expect %s --owned "code.py"' % base, card)
+        self.assertIn('authoritative baseline manifest for this check is ' + base, card)
         self.assertIn('still mandatory', card)
+
+    def test_with_a_verified_baseline_snapshot_the_card_header_keeps_the_controller_baseline(self):
+        import os
+        row = self.routed_repair('F1|HIGH|AC1|code.py|Real defect to repair')
+        authoritative = self.project()['work']['manifest'][:12]
+        snap = os.path.join(self.temp.name, 'src-%s.tgz' % authoritative)
+        open(snap, 'w').write('x')
+        from factory_dashboard import project_controller as pc
+        original = pc.baseline_snapshot
+        pc.baseline_snapshot = lambda manifest, hint: snap   # content verification of real archives is covered by its own test
+        self.addCleanup(lambda: setattr(pc, 'baseline_snapshot', original))
+        self.board.complete(row, verdict='BLOCKED', blocked_reason='start check failed', manifest_sha12='2a733f8c645d'); self.tick()
+        self.conn.execute("UPDATE factory_workflow_roots SET phase='blocked'"); self.conn.commit()
+        self.controller.resume(self.conn, self.root, 'Fresh attempt after a blocked one'); self.tick()
+        fixer = next(r for r in self.board.ready() if r['profile'] == 'fixer')
+        card = self.board.cards[fixer['task_id']]['body']
+        self.assertIn('BASELINE ' + authoritative, card)
+        self.assertNotIn('2a733f8c645d', card.split('INSTRUCTIONS')[0])
+        self.assertIn('--expect %s --owned "code.py" --baseline-tgz "%s"' % (authoritative, snap), card)
+
+    def test_run_214_a_blocked_predecessors_mutated_manifest_never_becomes_the_owned_checks_baseline(self):
+        row = self.routed_repair('F1|HIGH|AC1|code.py|Real defect to repair')
+        authoritative = self.project()['work']['manifest'][:12]
+        mutated = '2a733f8c645d'   # run 212: the blocked worker ran `fw.py manifest` and reported the rebuilt manifest
+        self.assertNotEqual(authoritative, mutated)
+        self.board.complete(row, verdict='BLOCKED', blocked_reason='start check failed', manifest_sha12=mutated); self.tick()
+        self.conn.execute("UPDATE factory_workflow_roots SET phase='blocked'"); self.conn.commit()
+        self.controller.resume(self.conn, self.root, 'Fresh attempt after a blocked one'); self.tick()
+        fixer = next(r for r in self.board.ready() if r['profile'] == 'fixer')   # the retro of the stopped attempt is ready too
+        card = self.board.cards[fixer['task_id']]['body']
+        self.assertIn('BASELINE ' + mutated, card)                    # the existing continue-from-the-tree header still follows the predecessor
+        self.assertIn('--expect %s --owned "code.py"' % authoritative, card)   # but the owned check expects the controller's baseline, never the mutated one
+        self.assertNotIn('--expect %s --owned' % mutated, card)
+        self.assertIn('authoritative baseline manifest for this check is ' + authoritative, card)
+        self.assertIn('overrides the BASELINE in this card', card)
+        self.assertEqual(self.project()['work']['manifest'][:12], authoritative)   # the controller's baseline was not redefined
 
     def test_a_blocked_before_editing_repair_is_told_not_to_rebuild_the_baseline_manifest(self):
         card = self.board.cards[self.routed_repair('F1|HIGH|AC1|code.py|Real defect to repair')['task_id']]['body']
         self.assertIn('never run `fw.py manifest`', card)
         self.assertIn('report the BASELINE value as manifest_sha12', card)
 
-    def test_the_baseline_snapshot_is_the_archive_named_after_the_baseline_manifest(self):
+    def test_the_baseline_snapshot_is_the_archive_that_really_holds_the_baseline_manifest(self):
         from factory_dashboard.project_controller import baseline_snapshot
-        import tempfile, os
+        import hashlib, io, os, tarfile, tempfile
+
+        def make(path, manifest_text):
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with tarfile.open(path, 'w:gz') as tar:
+                data = manifest_text.encode(); info = tarfile.TarInfo('.factory/SHA256SUMS'); info.size = len(data); tar.addfile(info, io.BytesIO(data))
+            return hashlib.sha256(manifest_text.encode()).hexdigest()[:12]
         with tempfile.TemporaryDirectory() as root:
-            for task, name in (('t_a', 'src-aaaaaaaaaaaa.tgz'), ('t_b', 'src-bbbbbbbbbbbb.tgz')):
-                os.makedirs(os.path.join(root, task)); open(os.path.join(root, task, name), 'w').write('x')
-            hint = os.path.join(root, 't_a', 'src-aaaaaaaaaaaa.tgz')
-            self.assertEqual(baseline_snapshot('bbbbbbbbbbbb0000', hint), os.path.join(root, 't_b', 'src-bbbbbbbbbbbb.tgz'))  # another snapshot of the same board
-            self.assertEqual(baseline_snapshot('aaaaaaaaaaaa', hint), hint)
-            self.assertEqual(baseline_snapshot('cccccccccccc', hint), '')               # none for this manifest: no --baseline-tgz
-            self.assertEqual(baseline_snapshot('bbbbbbbbbbbb', 'none'), '')
+            sha_a = make(os.path.join(root, 't_a', 'src-LAST.tgz'), 'a\n')            # the card's own snapshot: another manifest
+            sha_b = make(os.path.join(root, 't_b', 'src-%s.tgz' % hashlib.sha256(b'b\n').hexdigest()[:12]), 'b\n')
+            hint = os.path.join(root, 't_a', 'src-LAST.tgz')
+            self.assertEqual(baseline_snapshot(sha_b, hint), os.path.join(root, 't_b', 'src-%s.tgz' % sha_b))
+            self.assertEqual(baseline_snapshot(sha_a, hint), '')   # named src-LAST, not src-<sha>: never matched by content alone
+            lying = os.path.join(root, 't_c', 'src-%s.tgz' % ('c' * 12)); make(lying, 'not what the name says\n')
+            self.assertEqual(baseline_snapshot('c' * 12, hint), '')   # the name is not trusted: the content hash must match
+            self.assertEqual(baseline_snapshot('d' * 12, hint), '')
+            self.assertEqual(baseline_snapshot(sha_b, 'none'), '')
             self.assertEqual(baseline_snapshot('not-a-sha', hint), '')
             self.assertEqual(baseline_snapshot('', hint), '')
 
     def test_the_owned_check_uses_the_baseline_snapshot_only_when_the_card_has_one(self):
         from factory_dashboard.project_cards import OWNED_CHECK
-        with_tgz = OWNED_CHECK.format(owned='a.png', tgz=' --baseline-tgz "/x/src-0.tgz"', rebuilt=' --baseline-tgz compares')
-        without = OWNED_CHECK.format(owned='a.png', tgz='', rebuilt='')
+        with_tgz = OWNED_CHECK.format(owned='a.png', expect='abcdef123456', tgz=' --baseline-tgz "/x/src-0.tgz"', rebuilt=' --baseline-tgz compares')
+        without = OWNED_CHECK.format(owned='a.png', expect='abcdef123456', tgz='', rebuilt='')
         self.assertIn('--owned "a.png" --baseline-tgz "/x/src-0.tgz"', with_tgz)
         self.assertNotIn('--baseline-tgz', without)
 

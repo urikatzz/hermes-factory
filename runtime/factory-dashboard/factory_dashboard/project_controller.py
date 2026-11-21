@@ -1,6 +1,8 @@
 """Restart-safe two-level Factory execution over the existing guarded board API."""
 from dataclasses import asdict, replace
 import glob
+import tarfile
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -53,10 +55,23 @@ def baseline_snapshot(manifest, hint):
     if not re.fullmatch(r'[0-9a-f]{12}', sha) or not hint or hint == 'none' or not os.path.isabs(hint):
         return ''
     name = 'src-' + sha + '.tgz'
-    if os.path.basename(hint) == name and os.path.isfile(hint):
-        return hint
-    found = [p for p in glob.glob(os.path.join(os.path.dirname(os.path.dirname(hint)), '*', name)) if os.path.isfile(p)]
-    return max(found, key=os.path.getmtime) if found else ''
+    candidates = [hint] if os.path.basename(hint) == name else []
+    candidates += sorted(glob.glob(os.path.join(os.path.dirname(os.path.dirname(hint)), '*', name)), key=os.path.getmtime, reverse=True)
+    for path in dict.fromkeys(candidates):
+        if os.path.isfile(path) and snapshot_manifest_sha12(path) == sha:   # the name is not trusted: the archive must really hold this baseline manifest
+            return path
+    return ''
+
+
+def snapshot_manifest_sha12(path):
+    try:
+        with tarfile.open(path, 'r:gz') as tar:
+            member = tar.getmember('.factory/SHA256SUMS')
+            if not member.isfile() or member.size > 4 * 1024 * 1024:
+                return ''
+            return hashlib.sha256(tar.extractfile(member).read()).hexdigest()[:12]
+    except (tarfile.TarError, KeyError, OSError):
+        return ''
 
 
 OWNED_FILE = re.compile(r'[A-Za-z0-9_][A-Za-z0-9_./ +@=,-]*\.[A-Za-z0-9]{1,8}')
@@ -168,7 +183,7 @@ class ProjectController:
                 instructions += '\n' + SUPERSEDED.format(ids=', '.join(r['task_id'] for r in reversed(rows)))
                 prior = self._controller._result(conn, rows[0]) if kind in ('implement', 'repair') else None
                 left = prior.metadata.get('manifest_sha12') if prior is not None and prior.valid else None
-                if left and left != context.get('manifest'):
+                if left and left != context.get('manifest') and getattr(self, '_owned_baseline', None) != key:
                     # A writer that failed or blocked may have edited files and rebuilt the manifest. Its successor starts from that state,
                     # not from the last verified one, or its own start check would reject the tree the predecessor left.
                     context = {**context, 'manifest': left, 'baseline': left}
@@ -736,14 +751,17 @@ class ProjectController:
             instructions += '\n' + SPEC_CONSTRAINTS + '\n' + PLAN_BLOCKED + self._style_note(conn, project)
             if profile == 'artist':
                 instructions += '\n' + ART_FIT
-            owned = owned_paths(blocking) if repair else []
+            owned = owned_paths(blocking) if repair and re.fullmatch(r'[0-9a-f]{12}', str(work.get('manifest') or '')[:12]) else []   # no authoritative baseline: no owned check
             if owned:
-                tgz = baseline_snapshot(work.get('manifest'), context.get('baseline_tgz'))
-                instructions += '\n' + OWNED_CHECK.format(owned=','.join(owned), tgz=' --baseline-tgz "' + tgz + '"' if tgz else '',
+                expect = str(work.get('manifest') or '')[:12]
+                tgz = baseline_snapshot(expect, context.get('baseline_tgz'))
+                self._owned_baseline = key if tgz else None   # a verified baseline snapshot backs this card: its header keeps the controller's baseline
+                instructions += '\n' + OWNED_CHECK.format(owned=','.join(owned), expect=expect, tgz=' --baseline-tgz "' + tgz + '"' if tgz else '',
                                                            rebuilt=(' --baseline-tgz compares the files to the baseline manifest stored in that snapshot (verified against BASELINE), because a '
                                                                     'worker may have rebuilt the manifest on disk since; the on-disk manifest is not changed by the check.' if tgz else ''))
             node = self._node(conn, root, definition, context, project, key, 'repair' if repair else 'implement', profile,
                               instructions, work['writer_inputs'], task=task, cycle=cycle)
+            self._owned_baseline = None
             if not node:
                 return False
             row, result = node
