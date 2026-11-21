@@ -1,5 +1,6 @@
 """Restart-safe two-level Factory execution over the existing guarded board API."""
 from dataclasses import asdict, replace
+import glob
 import json
 import os
 from pathlib import Path
@@ -43,6 +44,19 @@ from .workflow_guards import controller_scope
 from .workflow_handoffs import VERDICTS
 from .workflow_types import StageSpec
 
+
+
+def baseline_snapshot(manifest, hint):
+    """The snapshot archive whose name carries the baseline manifest's sha12 (`src-<sha12>.tgz`), found beside the card's snapshot in the board's attachments, or ''.
+    The card's own BASELINE_TGZ is the last passing verifier snapshot, which is not necessarily the snapshot of the baseline manifest."""
+    sha = str(manifest or '')[:12]
+    if not re.fullmatch(r'[0-9a-f]{12}', sha) or not hint or hint == 'none' or not os.path.isabs(hint):
+        return ''
+    name = 'src-' + sha + '.tgz'
+    if os.path.basename(hint) == name and os.path.isfile(hint):
+        return hint
+    found = [p for p in glob.glob(os.path.join(os.path.dirname(os.path.dirname(hint)), '*', name)) if os.path.isfile(p)]
+    return max(found, key=os.path.getmtime) if found else ''
 
 
 OWNED_FILE = re.compile(r'[A-Za-z0-9_][A-Za-z0-9_./ +@=,-]*\.[A-Za-z0-9]{1,8}')
@@ -724,10 +738,10 @@ class ProjectController:
                 instructions += '\n' + ART_FIT
             owned = owned_paths(blocking) if repair else []
             if owned:
-                tgz = context.get('baseline_tgz') or 'none'
-                instructions += '\n' + OWNED_CHECK.format(owned=','.join(owned), tgz=' --baseline-tgz BASELINE_TGZ' if tgz != 'none' else '',
-                                                           rebuilt=(' --baseline-tgz compares the files to the baseline manifest stored in the BASELINE_TGZ snapshot (verified against BASELINE), because a '
-                                                                    'worker may have rebuilt the manifest on disk since; the on-disk manifest is not changed by the check.' if tgz != 'none' else ''))
+                tgz = baseline_snapshot(work.get('manifest'), context.get('baseline_tgz'))
+                instructions += '\n' + OWNED_CHECK.format(owned=','.join(owned), tgz=' --baseline-tgz "' + tgz + '"' if tgz else '',
+                                                           rebuilt=(' --baseline-tgz compares the files to the baseline manifest stored in that snapshot (verified against BASELINE), because a '
+                                                                    'worker may have rebuilt the manifest on disk since; the on-disk manifest is not changed by the check.' if tgz else ''))
             node = self._node(conn, root, definition, context, project, key, 'repair' if repair else 'implement', profile,
                               instructions, work['writer_inputs'], task=task, cycle=cycle)
             if not node:

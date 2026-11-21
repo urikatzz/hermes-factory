@@ -1238,11 +1238,25 @@ class ProjectControllerTests(unittest.TestCase):
         self.assertIn('never run `fw.py manifest`', card)
         self.assertIn('report the BASELINE value as manifest_sha12', card)
 
+    def test_the_baseline_snapshot_is_the_archive_named_after_the_baseline_manifest(self):
+        from factory_dashboard.project_controller import baseline_snapshot
+        import tempfile, os
+        with tempfile.TemporaryDirectory() as root:
+            for task, name in (('t_a', 'src-aaaaaaaaaaaa.tgz'), ('t_b', 'src-bbbbbbbbbbbb.tgz')):
+                os.makedirs(os.path.join(root, task)); open(os.path.join(root, task, name), 'w').write('x')
+            hint = os.path.join(root, 't_a', 'src-aaaaaaaaaaaa.tgz')
+            self.assertEqual(baseline_snapshot('bbbbbbbbbbbb0000', hint), os.path.join(root, 't_b', 'src-bbbbbbbbbbbb.tgz'))  # another snapshot of the same board
+            self.assertEqual(baseline_snapshot('aaaaaaaaaaaa', hint), hint)
+            self.assertEqual(baseline_snapshot('cccccccccccc', hint), '')               # none for this manifest: no --baseline-tgz
+            self.assertEqual(baseline_snapshot('bbbbbbbbbbbb', 'none'), '')
+            self.assertEqual(baseline_snapshot('not-a-sha', hint), '')
+            self.assertEqual(baseline_snapshot('', hint), '')
+
     def test_the_owned_check_uses_the_baseline_snapshot_only_when_the_card_has_one(self):
         from factory_dashboard.project_cards import OWNED_CHECK
-        with_tgz = OWNED_CHECK.format(owned='a.png', tgz=' --baseline-tgz BASELINE_TGZ', rebuilt=' --baseline-tgz compares')
+        with_tgz = OWNED_CHECK.format(owned='a.png', tgz=' --baseline-tgz "/x/src-0.tgz"', rebuilt=' --baseline-tgz compares')
         without = OWNED_CHECK.format(owned='a.png', tgz='', rebuilt='')
-        self.assertIn('--owned "a.png" --baseline-tgz BASELINE_TGZ', with_tgz)
+        self.assertIn('--owned "a.png" --baseline-tgz "/x/src-0.tgz"', with_tgz)
         self.assertNotIn('--baseline-tgz', without)
 
 
