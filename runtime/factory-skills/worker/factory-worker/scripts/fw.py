@@ -2,10 +2,13 @@
 """fw.py - software-factory worker helper. Standard library only, Python 3.9+, never runs git.
 
   manifest PROJECT_DIR [--final]        writer: rebuild .factory/SHA256SUMS from .factory/include.txt
-  check    PROJECT_DIR [--expect S12] [--owned P1,P2]
+  check    PROJECT_DIR [--expect S12] [--owned P1,P2 [--baseline-tgz TGZ]]
                                         verify the manifest (read-only). --owned (repair stages only; the card's OWNED_PATHS) lets a file
                                         differ from the manifest when it is one of the listed paths the task is assigned to repair; every other
-                                        difference, a missing file, an excluded path or an unusable owned list still fails (exit 4 / 2)
+                                        difference, a missing file, an excluded path or an unusable owned list still fails (exit 4 / 2).
+                                        --baseline-tgz (the card's BASELINE_TGZ, needs --expect and --owned) compares the files to the baseline
+                                        manifest stored in that snapshot, verified against --expect, when the on-disk manifest was rebuilt since
+                                        (a worker's `fw.py manifest`); the on-disk manifest is never rewritten
   snapshot PROJECT_DIR WS [--expect S12]
                                         reader: WS/src-<sha12>.tgz (manifest files only) + WS/src-<sha12>/
   delta    BASE_TGZ NEW_DIR OUT_DIFF    cycle>=2 reader: extract BASE_TGZ beside OUT_DIFF, diff -ruN
@@ -187,9 +190,43 @@ def owned_set(root, manifest, owned):
     return chosen
 
 
-def check(root, expect=None, owned=None):
+def baseline_rows(tgz, expect):
+    """The baseline manifest rows stored in a baseline snapshot, verified against the expected sha12 (never trusted blindly)."""
+    if not expect or not re.fullmatch(r"[0-9a-f]{12,64}", expect.strip().lower()):
+        raise Refused("--baseline-tgz needs --expect with the baseline sha12", 2)
+    if not tgz or not os.path.isabs(tgz) or not os.path.isfile(tgz):
+        raise Refused("--baseline-tgz must be an existing absolute file: %r" % tgz, 2)
+    try:
+        with tarfile.open(tgz, "r:gz") as tar:
+            member = tar.getmember(MANIFEST)
+            if not member.isfile() or member.size > 4 * 1024 * 1024:
+                raise Refused("baseline snapshot has no usable %s" % MANIFEST, 4)
+            data = tar.extractfile(member).read()
+    except (tarfile.TarError, KeyError, OSError) as exc:
+        raise Refused("baseline snapshot unreadable: %s" % exc, 4)
+    digest = hashlib.sha256(data).hexdigest()
+    if digest[:12] != expect.strip().lower()[:12]:
+        raise Refused("baseline snapshot manifest sha12 %s != expected %s" % (digest[:12], expect.strip().lower()[:12]), 5)
+    out = []
+    for n, line in enumerate(data.decode("utf-8").splitlines(), 1):
+        if line.strip():
+            m = LINE.match(line)
+            if not m:
+                raise Refused("baseline manifest line %d is malformed" % n, 4)
+            out.append((m.group(1), safe_rel(m.group(2))))
+    return out, digest[:12]
+
+
+def check(root, expect=None, owned=None, baseline_tgz=None):
     missing, mismatched, bad = [], [], []
-    manifest = rows(root)
+    if baseline_tgz is not None and owned is None:
+        raise Refused("--baseline-tgz is only valid with --owned", 2)
+    current = rows(root) if os.path.isfile(os.path.join(root, MANIFEST)) else None
+    baseline_sha = None
+    if baseline_tgz is not None:
+        manifest, baseline_sha = baseline_rows(baseline_tgz, expect)
+    else:
+        manifest = current if current is not None else rows(root)
     owned = owned_set(root, manifest, owned) if owned is not None else None
     for digest, rel in manifest:
         full = os.path.join(root, rel)
@@ -207,12 +244,22 @@ def check(root, expect=None, owned=None):
            "ac_ids": ac_ids(root), "dir": root}
     if owned is not None:
         accepted = sorted(m for m in mismatched if m in owned)
+        added = sorted({rel for _, rel in (current or [])} - {rel for _, rel in manifest}) if baseline_sha else []
+        added_outside = [a for a in added if a not in owned]
+        if added_outside:
+            outside = outside + added_outside
+            res["ok"] = False
+            res["mismatched"] = outside[:50]
         # The audit record the worker copies into metadata.start_check and the controller verifies: nothing is hidden, nothing is rebaselined.
-        res["start_check"] = {"baseline_sha12": res["sha12"], "owned": owned, "differed": sorted(mismatched), "accepted_owned": accepted,
+        res["start_check"] = {"baseline_sha12": baseline_sha or res["sha12"], "owned": owned, "differed": sorted(mismatched), "accepted_owned": accepted,
                               "rejected_outside_scope": outside[:50]}
+        if baseline_sha:
+            res["start_check"]["current_manifest_sha12"] = res["sha12"]
+            res["start_check"]["manifest_rebuilt_since_baseline"] = res["sha12"] != baseline_sha
+            res["start_check"]["added_outside_scope"] = added_outside
     if not res["ok"]:
         return res, 4
-    if expect is not None:
+    if expect is not None and baseline_sha is None:
         want = expect.strip().lower()
         if not re.fullmatch(r"[0-9a-f]{12,64}", want):
             raise Refused("--expect needs the 12-hex manifest sha12, got %r" % expect, 2)
@@ -312,7 +359,7 @@ def extract(tgz, dest):
 
 def cmd_check(a):
     owned = [x for x in re.split(r"[,\n]", a.owned) if x.strip()] if a.owned is not None else None
-    emit(*check(abs_dir(a.project_dir, "PROJECT_DIR"), a.expect, owned))
+    emit(*check(abs_dir(a.project_dir, "PROJECT_DIR"), a.expect, owned, a.baseline_tgz))
 
 
 def cmd_snapshot(a):
@@ -481,7 +528,7 @@ def main():
     p = argparse.ArgumentParser(prog="fw.py", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd")
     for name, fn, args, opts in (("manifest", cmd_manifest, ["project_dir"], []),
-                                 ("check", cmd_check, ["project_dir"], ["--expect", "--owned"]),
+                                 ("check", cmd_check, ["project_dir"], ["--expect", "--owned", "--baseline-tgz"]),
                                  ("snapshot", cmd_snapshot, ["project_dir", "workspace"], ["--expect"]),
                                  ("delta", cmd_delta, ["base_tgz", "new_dir", "out_diff"], []),
                                  ("audit", cmd_audit, ["dir"], ["--project-dir"]),

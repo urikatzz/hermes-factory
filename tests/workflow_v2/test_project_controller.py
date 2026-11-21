@@ -1233,7 +1233,19 @@ class ProjectControllerTests(unittest.TestCase):
         self.assertIn('fw.py check PROJECT_DIR --expect BASELINE --owned "code.py"', card)
         self.assertIn('still mandatory', card)
 
-    def test_a_repair_with_no_usable_finding_path_gets_no_owned_check(self):
+    def test_a_blocked_before_editing_repair_is_told_not_to_rebuild_the_baseline_manifest(self):
+        card = self.board.cards[self.routed_repair('F1|HIGH|AC1|code.py|Real defect to repair')['task_id']]['body']
+        self.assertIn('never run `fw.py manifest`', card)
+        self.assertIn('report the BASELINE value as manifest_sha12', card)
+
+    def test_the_owned_check_uses_the_baseline_snapshot_only_when_the_card_has_one(self):
+        from factory_dashboard.project_cards import OWNED_CHECK
+        with_tgz = OWNED_CHECK.format(owned='a.png', tgz=' --baseline-tgz BASELINE_TGZ', rebuilt=' --baseline-tgz compares')
+        without = OWNED_CHECK.format(owned='a.png', tgz='', rebuilt='')
+        self.assertIn('--owned "a.png" --baseline-tgz BASELINE_TGZ', with_tgz)
+        self.assertNotIn('--baseline-tgz', without)
+
+
         card = self.board.cards[self.routed_repair('F1|HIGH|AC1||Real defect with no file')['task_id']]['body']
         self.assertNotIn('OWNED_PATHS', card)
 

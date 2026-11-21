@@ -724,7 +724,10 @@ class ProjectController:
                 instructions += '\n' + ART_FIT
             owned = owned_paths(blocking) if repair else []
             if owned:
-                instructions += '\n' + OWNED_CHECK.format(owned=','.join(owned))
+                tgz = context.get('baseline_tgz') or 'none'
+                instructions += '\n' + OWNED_CHECK.format(owned=','.join(owned), tgz=' --baseline-tgz BASELINE_TGZ' if tgz != 'none' else '',
+                                                           rebuilt=(' --baseline-tgz compares the files to the baseline manifest stored in the BASELINE_TGZ snapshot (verified against BASELINE), because a '
+                                                                    'worker may have rebuilt the manifest on disk since; the on-disk manifest is not changed by the check.' if tgz != 'none' else ''))
             node = self._node(conn, root, definition, context, project, key, 'repair' if repair else 'implement', profile,
                               instructions, work['writer_inputs'], task=task, cycle=cycle)
             if not node:

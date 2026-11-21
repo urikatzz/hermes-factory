@@ -183,3 +183,68 @@ class OwnedStartCheckTests(unittest.TestCase):
         code, out, _ = self.run_fw('check', '--expect', 'deadbeef0000', '--owned', 'Assets/wall.png')
         self.assertEqual(code, 5)
 
+
+class OwnedStartCheckAgainstTheBaselineSnapshotTests(OwnedStartCheckTests):
+    """The on-disk manifest was rebuilt (by a blocked worker's `fw.py manifest`) after the baseline: the check compares against the baseline snapshot instead."""
+
+    def setUp(self):
+        super().setUp()
+        import tarfile
+        self.tgz = self.root.parent / (self.root.name + '-baseline.tgz')
+        self.addCleanup(lambda: self.tgz.unlink(missing_ok=True))
+        with tarfile.open(self.tgz, 'w:gz') as tar:
+            tar.add(self.root / '.factory/SHA256SUMS', arcname='.factory/SHA256SUMS')
+
+    def rebuild_manifest(self):
+        self.run_fw('manifest')   # what a worker that finishes BLOCKED used to do: the on-disk manifest now describes the changed files
+
+    def snapshot_check(self, *flags, expect=None):
+        code, out, err = self.run_fw('check', '--expect', expect or self.baseline, *flags, '--baseline-tgz', str(self.tgz))
+        return code, (json.loads(out) if out.strip() else {}), err
+
+    def test_a_rebuilt_manifest_no_longer_blocks_a_repair_whose_only_differences_are_its_own_files(self):
+        self.change('Assets/wall.png', 'Assets/floor.png'); self.rebuild_manifest()
+        self.assertEqual(self.check()[0], 5)   # the plain check cannot pass any more: the manifest on disk is not the baseline
+        code, out, _ = self.snapshot_check('--owned', 'Assets/wall.png,Assets/floor.png')
+        self.assertEqual((code, out['ok']), (0, True))
+        record = out['start_check']
+        self.assertEqual((record['baseline_sha12'], record['manifest_rebuilt_since_baseline']), (self.baseline, True))
+        self.assertNotEqual(record['current_manifest_sha12'], self.baseline)
+        self.assertEqual(record['accepted_owned'], ['Assets/floor.png', 'Assets/wall.png'])
+        self.assertEqual(record['rejected_outside_scope'], [])
+
+    def test_the_on_disk_manifest_is_not_rewritten_by_the_check(self):
+        self.change('Assets/wall.png'); self.rebuild_manifest()
+        before = (self.root / '.factory/SHA256SUMS').read_bytes()
+        self.snapshot_check('--owned', 'Assets/wall.png')
+        self.assertEqual((self.root / '.factory/SHA256SUMS').read_bytes(), before)
+
+    def test_an_unrelated_change_still_blocks_even_though_the_rebuilt_manifest_describes_it(self):
+        self.change('Assets/wall.png', 'code/main.py'); self.rebuild_manifest()
+        code, out, _ = self.snapshot_check('--owned', 'Assets/wall.png')
+        self.assertEqual((code, out['ok'], out['mismatched']), (4, False, ['code/main.py']))
+
+    def test_a_file_added_to_the_rebuilt_manifest_outside_the_owned_files_blocks(self):
+        self.change('Assets/wall.png'); self.write_new('Assets/extra.png'); self.rebuild_manifest()
+        code, out, _ = self.snapshot_check('--owned', 'Assets/wall.png')
+        self.assertEqual((code, out['ok']), (4, False))
+        self.assertEqual(out['start_check']['added_outside_scope'], ['Assets/extra.png'])
+
+    def write_new(self, rel):
+        (self.root / rel).write_text('new file')
+
+    def test_a_snapshot_that_is_not_the_expected_baseline_or_unreadable_fails_closed(self):
+        self.change('Assets/wall.png')
+        for kwargs in (dict(expect='deadbeef0000'),):
+            code, out, err = self.snapshot_check('--owned', 'Assets/wall.png', **kwargs)
+            self.assertEqual(code, 5, (out, err))
+        bad = self.root.parent / (self.root.name + '-bad.tgz'); bad.write_text('not a tarball'); self.addCleanup(lambda: bad.unlink(missing_ok=True))
+        code, out, _ = self.run_fw('check', '--expect', self.baseline, '--owned', 'Assets/wall.png', '--baseline-tgz', str(bad))
+        self.assertEqual(code, 4)
+        code, out, _ = self.run_fw('check', '--expect', self.baseline, '--owned', 'Assets/wall.png', '--baseline-tgz', '/no/such.tgz')
+        self.assertEqual(code, 2)
+
+    def test_a_baseline_snapshot_without_owned_files_is_refused(self):
+        code, out, _ = self.run_fw('check', '--expect', self.baseline, '--baseline-tgz', str(self.tgz))
+        self.assertEqual(code, 2)
+
