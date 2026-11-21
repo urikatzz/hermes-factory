@@ -41,6 +41,16 @@ class ProjectControllerTests(unittest.TestCase):
         os.environ['FACTORY_HERMES_HOME'] = str(self.home)
         self.addCleanup(lambda: os.environ.pop('FACTORY_HERMES_HOME') if previous is None else os.environ.__setitem__('FACTORY_HERMES_HOME', previous))
 
+    def stall(self, profile):
+        """A writer that keeps giving up through kanban_block: each attempt is blocked until the bounded retries are spent and the stop stands."""
+        for _ in range(4):
+            row = self.only(profile)
+            self.conn.execute("UPDATE tasks SET status='blocked',block_kind='needs_input' WHERE id=?", (row['task_id'],)); self.conn.commit()
+            self.tick()
+            if self.project().get('terminal'):
+                return row
+        raise AssertionError('the stop never stood after the bounded retries')
+
     def block(self, row, reason='Cannot continue', **extra):
         """Finish a writer BLOCKED the way a worker that really tried does: evidence that matches its own session log."""
         session = 'blocksession' + row['task_id'].replace('_', '')
@@ -687,8 +697,7 @@ class ProjectControllerTests(unittest.TestCase):
     def stalled_artist(self):
         """The real incident: the artist refuses a repair that contradicts the plan and the controller stops for a human."""
         self.mixed(); self.review_round()
-        artist = self.only('artist')
-        self.conn.execute("UPDATE tasks SET status='blocked' WHERE id=?", (artist['task_id'],)); self.conn.commit()
+        self.stall('artist')
         self.tick(); self.board.complete(self.only('factory-retro')); self.tick()
         self.assertEqual(self.state.read_root(self.conn, self.root)['phase'], 'blocked')
         return self.conn.execute('SELECT COUNT(*) FROM factory_workflow_stages').fetchone()[0]
@@ -1066,8 +1075,7 @@ class ProjectControllerTests(unittest.TestCase):
         self.plan(); self.board.complete(self.only('developer')); self.tick()
         findings = ['F1|HIGH|AC1|code.py|Real defect to repair', 'F2|MEDIUM|AC1|notes.md|Wording a human must confirm']
         self.board.complete(self.only('verifier'), verdict='FAIL', ac_results={'AC1': 'fail'}, findings=findings, repair_domains=['code']); self.tick()
-        stalled = self.only('fixer')
-        self.conn.execute("UPDATE tasks SET status='blocked' WHERE id=?", (stalled['task_id'],)); self.conn.commit()  # the worker called kanban_block
+        stalled = self.stall('fixer')                                                                         # the worker keeps calling kanban_block
         self.tick(); self.board.complete(self.only('factory-retro')); self.tick()
         self.assertEqual(self.state.read_root(self.conn, self.root)['phase'], 'blocked')
         waiver = dict(waivers=[dict(ac='AC1', path='notes.md', source='verifier', reason='Human confirmed this wording is authoritative')])
@@ -1471,6 +1479,23 @@ class ProjectControllerTests(unittest.TestCase):
         self.assertNotEqual(again['task_id'], row['task_id'])                        # a fresh card for the same stage
         body = self.board.cards[again['task_id']]['body']
         self.assertIn('Unsupported BLOCKED: no evidence of an attempt', json.dumps(self.board.get_task(self.conn, again['task_id']).__dict__, default=str) + body)
+
+    def test_a_writer_that_gives_up_through_kanban_block_is_sent_back_twice_then_the_stop_stands(self):
+        self.plan()
+        for attempt in (1, 2):
+            row = self.only('developer')
+            self.conn.execute("UPDATE tasks SET status='blocked',block_kind='needs_input',result='the next step is available but not done' WHERE id=?", (row['task_id'],)); self.conn.commit()
+            self.tick()
+            self.assertNotIn('terminal', self.project(), attempt)                             # sent back, not stopped
+            self.assertEqual(self.project()['handoff_retries']['task-code-implement:0'], attempt)
+            self.assertEqual(self.used(), (0, 0))                                             # no repair budget
+            self.assertNotEqual(self.only('developer')['task_id'], row['task_id'])
+        self.assertTrue(any('Unsupported block' in e['reason'] for e in self.project()['orchestration_log'] if e['kind'] == 'handoff_retry'))
+        row = self.only('developer')
+        self.conn.execute("UPDATE tasks SET status='blocked',block_kind='needs_input' WHERE id=?", (row['task_id'],)); self.conn.commit()
+        self.tick()
+        self.assertEqual(self.project()['terminal']['phase'], 'blocked')                      # the retries are spent: a human decides
+        self.assertIn('requires intervention', self.project()['terminal']['reason'])
 
     def test_evidence_that_the_session_never_produced_is_refused_as_invented(self):
         self.plan()

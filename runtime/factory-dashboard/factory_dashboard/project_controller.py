@@ -210,6 +210,19 @@ class ProjectController:
         result = self._controller._result(conn, row)
         if result is None:
             task_row = self._board.get_task(conn, row['task_id'])
+            if task_row and task_row.status == 'blocked' and kind in ('implement', 'repair'):
+                # A writer that gave up through kanban_block (no handoff, so no evidence) is sent back like an unsupported BLOCKED handoff: bounded, no repair budget.
+                tries = project.setdefault('handoff_retries', {}).get(token, 0)
+                if tries < MAX_HANDOFF_RETRIES:
+                    reason = ('Unsupported block: you stopped with kanban_block (' + str(getattr(task_row, 'result', '') or '')[:300] + '). BLOCKED is a last resort after a real attempt, and a writer reports it as a handoff '
+                              'with metadata.blocked_evidence ([{"command", "output"}] matching your own tool calls). If the next step is yours to take (regenerate the images, add the include entry, derive the size, '
+                              'use the fit tool\'s own options), take it and finish the work.')
+                    project['handoff_retries'][token] = tries + 1
+                    project.setdefault('orchestration_log', []).append(dict(kind='handoff_retry', key=key, attempt=tries + 1, reason=reason[:600], at=int(time.time())))
+                    project.setdefault('handoff_rejections', {})[key] = self._rejection(conn, row, None, kind, key, cycle, root, tries + 1, reason, MAX_HANDOFF_RETRIES)
+                    project.setdefault('retry_keys', []).append(token)
+                    self._state.event(conn, root['root_id'], 'handoff_rejected', dict(key=key, task_id=row['task_id'], reason=reason[:600], attempt=tries + 1))
+                    return self._node(conn, root, definition, context, project, key, kind, profile, original, [*inputs, row['task_id']], task=task, cycle=cycle)
             if not task_row or task_row.status in ('blocked', 'triage', 'archived'):
                 raise ProjectBlocked('Project stage requires intervention: ' + key)
             return None
