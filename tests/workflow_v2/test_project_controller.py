@@ -1182,6 +1182,43 @@ class ProjectControllerTests(unittest.TestCase):
         self.assertFalse(self.project()['completed'][0]['style_changed'])
         self.assertNotIn('amended the style bible', self.board.cards[self.only('developer')['task_id']]['body'])
 
+    def blocked_repair(self, defect, prior_refunds=0):
+        self.plan(); self.board.complete(self.only('developer')); self.tick()
+        self.board.complete(self.only('verifier'), verdict='FAIL', ac_results={'AC1': 'fail'},
+                            findings=['F1|HIGH|AC1|code.py|Real defect to repair'], repair_domains=['code']); self.tick()
+        if prior_refunds:
+            project = self.project(); project['work']['tool_defect_refunds'] = [dict(key='x')] * prior_refunds
+            self.conn.execute('UPDATE factory_project_execution SET document=?', (json.dumps(project),)); self.conn.commit()
+        extra = dict(tool_defect=defect) if defect else {}
+        self.board.complete(self.only('fixer'), verdict='BLOCKED', blocked_reason='Cannot continue', **extra)
+        self.tick()
+        return self.project()
+
+    def test_a_non_artist_writer_card_has_no_fit_mode_text(self):
+        self.plan()
+        self.assertNotIn('Fit mode (required', self.board.cards[self.only('developer')['task_id']]['body'])
+
+    def test_a_repair_that_reports_a_tool_defect_is_refunded_recorded_and_not_held_against_the_budget(self):
+        project = self.blocked_repair('sprite_fit --coverage opaque still returned opaque 0.03 on the floor band')
+        self.assertEqual(self.used(), (0, 0))  # the product charge was given back
+        self.assertEqual(len(project['work']['tool_defect_refunds']), 1)
+        self.assertIn('opaque 0.03', project['work']['tool_defect_refunds'][0]['defect'])
+        self.assertTrue(any(l['kind'] == 'tool_defect_refund' for l in project['orchestration_log']))
+        self.assertIn('Tool defect reported by fixer', project['terminal']['reason'])
+        self.assertIn('not held against the product repair budget', project['terminal']['reason'])
+        self.assertTrue(self.conn.execute("SELECT 1 FROM factory_workflow_events WHERE kind='project_repair_refunded'").fetchone())
+
+    def test_a_blocked_repair_without_a_tool_defect_keeps_its_charge(self):
+        project = self.blocked_repair(None)
+        self.assertEqual(self.used(), (1, 0))
+        self.assertNotIn('tool_defect_refunds', project['work'])
+        self.assertTrue(project['terminal']['reason'].startswith('Stage blocked'))
+
+    def test_tool_defect_refunds_are_bounded_so_one_fault_cannot_loop_forever(self):
+        project = self.blocked_repair('the same tool defect again', prior_refunds=2)
+        self.assertEqual(self.used(), (1, 0))   # the cap is spent: the charge stays and a human decides
+        self.assertEqual(len(project['work']['tool_defect_refunds']), 2)
+
     # --- the independent plan review is off by default ---
     def review_off(self):
         from unittest import mock

@@ -132,6 +132,12 @@ Do not open a copy of an approved image: a copy in a frozen snapshot (src-<sha12
 REVIEW_SCOPE = '''Scope of this review: only the requirement ids in this task's visual list ({ids}). Write {kind} findings and one comparison.json criterion per requirement, and declare required tool incidents, only for those ids (the HOLISTIC criterion and holistic judgement stay). The other approved requirements belong to other tasks
 and to the final integration, which reviews all of them with in-engine Game-view screenshots; an in-engine render of them is not required of this stage, so it is not a tool incident. Still inspect the whole reference image.'''
 
+ART_FIT = '''Fit mode (required for every asset you fit): choose it from the asset's own criterion. Full-bleed art (a wall, floor, backdrop, band, tile, or anything its criterion requires to cover an area) is fitted with
+`sprite_fit.py ... --coverage opaque`: every pixel is kept and the target is covered exactly (no background removal, no padding). An isolated sprite (character, prop, door, platform, glyph, effect) keeps the default
+`--coverage cutout`. If unsure use `--coverage auto --hint "<asset name and its criterion>"`. After the fit read its JSON (`opaque` must be 1.0 for an opaque asset, and the size the class size) and look at the result with vision_analyze.
+A fit that erased or padded a required property is a TOOL-MODE error, never a failed generation: use the supported option the tool names (it exits 3 with the fix) and do not finish BLOCKED for it. Before you say a tool cannot do something run it with
+--help and try its supported options. Only if a tool still destroys a required property after its supported options, finish BLOCKED with metadata.tool_defect set to one sentence naming the tool, the exact command and flags tried and the property measured.'''
+
 PLAN_BLOCKED = '''If the task plan or an acceptance criterion is wrong, contradictory or untestable, or the available tools cannot express it, do not work around it and do not weaken the criterion:
 finish VERDICT=BLOCKED with blocked_reason naming the criterion and why. The project then stops for a human, who decides. Nothing is sent back to the architect.'''
 

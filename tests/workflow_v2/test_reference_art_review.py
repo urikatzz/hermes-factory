@@ -52,6 +52,14 @@ class ArtReviewFlow(ReferenceFlow):
 
 
 class ArtReviewerTests(ArtReviewFlow):
+    def test_artist_cards_carry_the_fit_mode_rules(self):
+        self.approved_director()
+        self.architect([self.visual_task(owner='artist')])
+        self.finish(self.only('claude-reviewer'), 'Plan reviewed against the reference.', document='PLAN-REVIEW.md')
+        card = self.board.cards[self.only('artist')['task_id']]['body']
+        for text in ('Fit mode (required for every asset you fit)', '--coverage opaque', 'Full-bleed art', 'TOOL-MODE error', 'metadata.tool_defect', 'run it with'):
+            self.assertIn(text, card)
+
     def test_the_art_reviewer_card_is_scoped_to_the_tasks_own_requirements(self):
         stage = self.reach_art_review()
         body = self.board.cards[stage['task_id']]['body']

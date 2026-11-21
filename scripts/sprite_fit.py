@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Fit a generated image to a sprite class: flat background to alpha, nearest-neighbour fit, palette quantize."""
+"""Fit a generated image to an asset class: nearest-neighbour fit, palette quantize, and for cut-out sprites flat background to alpha.
+
+--coverage opaque keeps every pixel (walls, floors, backdrops, bands, tiles: anything required to cover an area); --coverage cutout (default) makes the flat
+background transparent (isolated sprites); --coverage auto --hint TEXT chooses from the asset's name or criterion. The result is verified; exit 3 prints the diagnosis."""
 import argparse
 import json
 from pathlib import Path
@@ -7,7 +10,7 @@ import re
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from art_production.sprite_fit import make_sprite
+from art_production.sprite_fit import COVERAGES, FitError, choose_coverage, fit_asset, make_sprite
 from factory_art.png import PngError, read_png, write_png
 from factory_art.style_bible import load_palette
 
@@ -26,21 +29,29 @@ def main():
     parser.add_argument('--size', type=size, required=True, help='class size, WIDTHxHEIGHT')
     parser.add_argument('--palette', help='GIMP .gpl palette from art/style (quantize to it)')
     parser.add_argument('--keep-background', action='store_true', help='do not turn the flat background into alpha')
+    parser.add_argument('--coverage', choices=('auto',) + COVERAGES, default='cutout', help='opaque: keep every pixel; cutout: flat background to alpha; auto: choose from --hint')
+    parser.add_argument('--hint', default='', help='the asset name or its acceptance criterion text, used by --coverage auto')
+    parser.add_argument('--allow-mostly-transparent', action='store_true', help='accept a cut-out that erases almost the whole image (a small sprite on a large flat background)')
     parser.add_argument('--tolerance', type=int, default=24, help='background colour tolerance per channel')
     args = parser.parse_args()
+    coverage = 'opaque' if args.keep_background else (choose_coverage(args.hint) if args.coverage == 'auto' else args.coverage)
     try:
         palette = load_palette(args.palette) if args.palette else None
         if args.palette and not palette:
             raise ValueError(f'{args.palette} has no colours')
-        sprite = make_sprite(read_png(args.source), *args.size, palette, args.keep_background, args.tolerance)
+        sprite, report = fit_asset(read_png(args.source), *args.size, palette, coverage, args.tolerance, args.allow_mostly_transparent)
+    except FitError as error:
+        print(json.dumps(dict(ok=False, **error.diagnosis)))
+        print(f'sprite_fit: {error.diagnosis["defect"]} defect: {error}. {error.diagnosis["fix"]}', file=sys.stderr)
+        return 3
     except (OSError, ValueError) as error:
         parser.exit(1, f'sprite_fit: {error}\n')
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     write_png(out, sprite)
-    print(json.dumps({'out': str(out), 'width': sprite.width, 'height': sprite.height,
+    print(json.dumps({'ok': True, 'out': str(out), 'width': sprite.width, 'height': sprite.height,
                       'transparent': sum(1 for pixel in sprite.pixels if not pixel[3]),
-                      'palette': len(palette or [])}))
+                      'coverage': report['coverage'], 'opaque': report['opaque'], 'palette': len(palette or [])}))
     return 0
 
 

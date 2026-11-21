@@ -8,7 +8,7 @@ description: Procedure and scripts for the Factory artist - Codex concept images
 Tools (run each as its own terminal command, never through `bash -c` or a pipe):
 
 - `IMAGE` = `sh ${HERMES_SKILL_DIR}/scripts/codex_image.sh <prompt-file> <out.png>`: one Codex image (up to 5 minutes). Exit 0 means `out.png` exists and decodes.
-- `FIT` = `python3 ${HERMES_SKILL_DIR}/scripts/sprite_fit.py <in.png> <out.png> --size WxH [--palette <art/style/palette file>]`: flat background to alpha, nearest-neighbour fit to the class size, palette quantize.
+- `FIT` = `python3 ${HERMES_SKILL_DIR}/scripts/sprite_fit.py <in.png> <out.png> --size WxH [--palette <art/style/palette file>]` plus `--coverage opaque|cutout|auto [--hint "<asset name and its criterion>"]`: nearest-neighbour fit to the class size, palette quantize, and the coverage mode below. It verifies its own result; exit 3 prints a JSON diagnosis and the supported fix.
 - `TRIPO` = `python3 ${HERMES_SKILL_DIR}/scripts/tripo_model.py <concept.png> <out.glb>`: Tripo image-to-model, up to 10 minutes. Exit 0 done, 3 fallback (no key, no credits, API down; nothing was charged), 1 failed (any failure once the create request was sent, including a lost reply: possibly charged). It prints JSON with `tripo_tasks`; copy those IDs into your metadata every time, including failures. `unknown-create` in `tripo_tasks` means a task may have been created and charged without an ID coming back.
 - `BLENDER` = `sh ${HERMES_SKILL_DIR}/scripts/blender_run.sh`:
   - `cleanup <in.glb> <out.glb> --height <m> --origin bottom_center|center`
@@ -28,7 +28,7 @@ Write one prompt file per asset in the imagegen schema: `Use case:` (stylized-co
 ## Sprite
 
 1. `IMAGE` to `.factory/tmp/raw/<name>.png`.
-2. `FIT` to the target path with the class size and, when the class has one, its palette file.
+2. `FIT` to the target path with the class size and, when the class has one, its palette file, in the coverage mode the asset requires (see "Choosing the fit mode").
 3. Look at the result with `vision_analyze`, then `LINT` the file.
 4. If lint has a BLOCKER or HIGH finding for it, or it plainly breaks a cited STYLE rule, rewrite the prompt once (one targeted change) and repeat steps 1-3 once. Then stop and report what is left.
 
@@ -57,10 +57,24 @@ Only when the plan is a style task: write `art/style/STYLE.md`, `art/style/style
 
 ## Repair
 
-Regenerate or refit only the assets named in SCOPE findings, by the same route, except: once an asset has a recorded Tripo task ID or `unknown-create` in `tripo_tasks` (from any run in this job), never call TRIPO for it again, whatever the finding; fix it with `BLENDER cleanup` on the existing GLB or with the blockout route.
+Regenerate or refit only the assets named in SCOPE findings, by the same route and the same fit-mode rules, except: once an asset has a recorded Tripo task ID or `unknown-create` in `tripo_tasks` (from any run in this job), never call TRIPO for it again, whatever the finding; fix it with `BLENDER cleanup` on the existing GLB or with the blockout route.
 
 ## Rules
 
 - An asset task never writes `art/style/`. Only a style task does.
 - Never edit lint or bible files to make lint pass. Never fake a route: `route` says how the file was really made.
 - `TRIPO_API_KEY` reaches the script through the environment. Never print, read or copy `.env` files or the key.
+
+## Choosing the fit mode (every asset, every project)
+
+A fit step must never destroy a property the asset requires. Decide the mode from the asset's own requirement, before you fit:
+
+- `--coverage opaque`: full-bleed art. Walls, floors, backdrops, bands, tiles, skies, and anything whose criterion says it covers an area, is full-bleed, edge-to-edge or opaque. Every pixel is kept and the target is covered exactly: no background is removed and nothing is padded, so a differing aspect ratio is cropped evenly instead of leaving transparent bars.
+- `--coverage cutout` (the default): isolated sprites. Characters, props, doors, platforms, glyphs, effects. The flat background touching the border becomes transparent and the content is centred on a transparent canvas.
+- Unsure: `--coverage auto --hint "<asset name and its criterion text>"` picks from the requirement. Say it in your report.
+
+After every fit, read its JSON: for an opaque asset `opaque` must be `1.0` and `width`/`height` the class size; for a cut-out the background must be transparent and the figure intact. Look at the result with vision_analyze; a file that merely exists is not a pass.
+
+If `sprite_fit` exits 3 it names the transformation and whose defect it is. `defect: tool_mode` means the mode was wrong: re-run with the mode it names. That is not a failed generation, not a reason to regenerate, and not a reason to finish BLOCKED. `defect: generation` means the generated image itself lacks the property: regenerate it.
+
+Before you say a tool cannot do something, run it with `--help` and use its supported options first. If a tool still destroys a required property after its supported options, finish `VERDICT=BLOCKED` with `metadata.tool_defect` set to one sentence naming the tool, the exact command and flags you tried, and the property you measured (for example "opaque 0.03"). Never retry the same command unchanged.

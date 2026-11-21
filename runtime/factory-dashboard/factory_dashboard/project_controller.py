@@ -7,7 +7,7 @@ import re
 import time
 
 from .model_policy import ConfigurationError
-from .project_cards import (ART_PLAN, ROLE_FINDINGS, APPROVED_COMPARISON, APPROVED_REFERENCES, INSPECTION, REFERENCE_AUDIT, VISUAL_TRACE, ARCHITECT, COMPARISON, CONFLICT_CHECK, SIMILARITY, DIRECTOR, PLAN_CORRECTION, PLAN_CORRECTION_REVIEW, CONTINUES, INSPECT_PATHS, PLAN_BLOCKED, REVIEW_SCOPE, PLAN_FINDING, STYLE_CHANGED, SUPERSEDED, WRITER_GATES,
+from .project_cards import (ART_PLAN, ROLE_FINDINGS, APPROVED_COMPARISON, APPROVED_REFERENCES, INSPECTION, REFERENCE_AUDIT, VISUAL_TRACE, ARCHITECT, COMPARISON, CONFLICT_CHECK, SIMILARITY, DIRECTOR, PLAN_CORRECTION, PLAN_CORRECTION_REVIEW, ART_FIT, CONTINUES, INSPECT_PATHS, PLAN_BLOCKED, REVIEW_SCOPE, PLAN_FINDING, STYLE_CHANGED, SUPERSEDED, WRITER_GATES,
                             PLAN_REVIEW, REPLAN, RETRO, SCOPE, SPEC_CONSTRAINTS, TOOL_INCIDENTS, project_card)
 from .project_decisions import (MAX_STAGE_RETRIES, constraint_view, constraints_of, normalize_decisions, preserved_conflict, record_applied, relevant_constraints,
                                 validate_plan_constraints, validate_spec_conflicts)
@@ -21,6 +21,8 @@ REPAIR_LIMIT = 'Captured repair limit reached'
 MAX_HANDOFF_RETRIES = 2
 # Scan candidates in plan prose have their own budget: a keyword match is not a worker slip and must not exhaust the retries meant for malformed handoffs.
 MAX_SCAN_RETRIES = 3
+# A repair that ends BLOCKED with a declared tool defect is not a product repair: its charge is refunded, a few times, so one tooling fault cannot spend the budget.
+MAX_TOOL_DEFECT_REFUNDS = 2
 # A plan that fails structural validation (missing fields, no numbered criteria, bad graph) is corrected by the architect with the exact
 # errors; this never spends an architectural replan. Past the bound a human decides.
 MAX_PLAN_VALIDATION_RETRIES = 2
@@ -183,9 +185,14 @@ class ProjectController:
             if not any(h.get('task_id') == row['task_id'] and h.get('run_id') == result.run_id for h in project['history']):
                 project['history'].append(blocked)
                 self._state.event(conn, root['root_id'], 'project_stage_blocked', blocked)
+                self._refund_tool_defect(conn, root, project, kind, key, row, result)
             if result.metadata.get('spec_conflicts'):
                 raise ProjectBlocked('Specification conflict reported by ' + profile + ': ' + result.metadata.get('blocked_reason', key)
                                      + ' [' + ', '.join(c['constraint'] for c in result.metadata['spec_conflicts']) + ']. A human must decide.')
+            defect = result.metadata.get('tool_defect')
+            if isinstance(defect, str) and defect.strip():
+                raise ProjectBlocked('Tool defect reported by ' + profile + ': ' + defect.strip() + '. This is a tooling or workflow defect, not a failed repair: it is not held against the product repair budget. '
+                                     'Fix the tool or its instruction, then resume. (' + result.metadata.get('blocked_reason', key) + ')')
             raise ProjectBlocked('Stage blocked: ' + result.metadata.get('blocked_reason', key))
         self._controller._accept(conn, row, result)
         project['active_keys'].remove(token)
@@ -697,6 +704,8 @@ class ProjectController:
                 # Workers have mistyped the board folder (run-t_... with a hyphen) and then blocked on a file that was there.
                 instructions += '\nApproved plan files, read exactly these absolute paths (copy them, never retype them): ' + '; '.join(plan_files)
             instructions += '\n' + SPEC_CONSTRAINTS + '\n' + PLAN_BLOCKED + self._style_note(conn, project)
+            if profile == 'artist':
+                instructions += '\n' + ART_FIT
             node = self._node(conn, root, definition, context, project, key, 'repair' if repair else 'implement', profile,
                               instructions, work['writer_inputs'], task=task, cycle=cycle)
             if not node:
@@ -1027,6 +1036,20 @@ class ProjectController:
             if changed:
                 return '\n' + STYLE_CHANGED.format(id=done['id'])
         return ''
+
+    def _refund_tool_defect(self, conn, root, project, kind, key, row, result):
+        """A repair that ends BLOCKED with `metadata.tool_defect` did not fail as a repair: give its product charge back (bounded) and record why."""
+        defect = result.metadata.get('tool_defect')
+        work = project.get('work')
+        if kind != 'repair' or not work or not isinstance(defect, str) or not defect.strip():
+            return
+        refunds = work.setdefault('tool_defect_refunds', [])
+        charges = work.get('charges') or []
+        if len(refunds) >= MAX_TOOL_DEFECT_REFUNDS or not charges or charges[-1].get('kind') != 'product':
+            return
+        refunds.append(dict(key=key, task_id=row['task_id'], defect=defect.strip()[:300], charge=charges.pop(), at=int(time.time())))
+        project.setdefault('orchestration_log', []).append(dict(kind='tool_defect_refund', key=key, defect=defect.strip()[:300], used=list(budget_used(work)), at=int(time.time())))
+        self._state.event(conn, root['root_id'], 'project_repair_refunded', dict(key=key, task_id=row['task_id'], defect=defect.strip()[:300], used=list(budget_used(work))))
 
     @staticmethod
     def _repair_limit_reason(task, work, decision):
