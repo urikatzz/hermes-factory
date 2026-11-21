@@ -16,13 +16,7 @@ DIAGNOSIS = 'The wall and the floor carry most of the difference; the door and p
 
 class SceneFlow(ArtReviewFlow):
     def reach_integration_review(self):
-        self.review(self.reach_art_review())                       # the asset task passes without any similarity score
-        self.board.complete(self.only('developer')); self.tick()   # final integration
-        self.board.complete(self.only('verifier')); self.tick()
-        for row in self.board.ready():
-            if row['profile'] != 'art-reviewer':
-                self.board.complete(row)
-        return self.only('art-reviewer')
+        return self.reach_art_review()                               # the single art review is the final integration one
 
     def scene_files(self, name='scene', score=85, status=None, differences=None, tamper=None, blocked=False, diagnosis=DIAGNOSIS):
         folder = Path(self.temp.name) / 'scene'
@@ -51,30 +45,17 @@ class SceneFlow(ArtReviewFlow):
 
 
 class SceneGateCardTests(SceneFlow):
-    def test_the_integration_reviewer_is_told_to_score_the_complete_scene_and_an_asset_reviewer_is_not(self):
-        asset = self.board.cards[self.reach_art_review()['task_id']]['body']
-        self.assertNotIn('Full-scene similarity gate', asset)
-        self.assertIn('never compare an isolated sprite with the approved reference scene', asset)
-        self.review(self.only('art-reviewer'))
-        integration = self.board.cards[self.reach_integration_review_after_asset()['task_id']]['body']
+    def test_the_final_reviewer_is_told_to_score_the_complete_scene(self):
+        integration = self.board.cards[self.reach_art_review()['task_id']]['body']
         for text in ('Full-scene similarity gate', 'COMPLETE assembled scene against the COMPLETE approved reference', 'never an isolated sprite', 'SCENE_SCORE --reference',
                      'never an image you generated', 'pass is 80/100', 'Never estimate or invent the score', 'unity_scene_capture.py --project PROJECT_DIR', '--required V1,V2',
                      'never trust the writer', 'preliminary composition', 'cannot be accepted'):
             self.assertIn(text, integration)
-        self.assertNotIn('never compare an isolated sprite with the approved reference scene', integration)
-
-    def reach_integration_review_after_asset(self):
-        self.board.complete(self.only('developer')); self.tick()
-        self.board.complete(self.only('verifier')); self.tick()
-        for row in self.board.ready():
-            if row['profile'] != 'art-reviewer':
-                self.board.complete(row)
-        return self.only('art-reviewer')
 
 
 class IntegrationWriterCardTests(SceneFlow):
     def test_the_integration_writer_is_told_to_assemble_a_layout_and_capture_the_scene(self):
-        self.review(self.reach_art_review())
+        self.finish_asset_task()
         card = self.board.cards[self.only('developer')['task_id']]['body']
         for text in ('Scene assembly (final integration with an approved reference)', 'art/scene/scene-layout.json', 'factory-scene-layout/v1', 'covers = the approved requirement ids',
                      'unity_scene_capture.py --project PROJECT_DIR', '--required V1,V2', 'a missing element is reported as missing', 'Never claim coverage for an asset that does not exist'):
@@ -114,7 +95,7 @@ class SceneGateEvaluationTests(SceneFlow):
         self.assertNotIn('scene', self.document())
 
     def test_a_scene_review_with_no_scene_similarity_record_at_all_blocks(self):
-        self.review(self.reach_integration_review(), mode='rendered_in_engine')
+        self.review(self.reach_integration_review(), scene=False)          # no scene record at all
         self.assertIn('scene-similarity.json', self.terminal()['reason'])
 
     def test_a_score_for_a_screenshot_that_is_not_the_retained_render_is_refused(self):
@@ -165,6 +146,62 @@ class SceneCompletenessTests(SceneFlow):
     def test_a_complete_attested_scene_at_80_is_delivered(self):
         self.integration_review(self.reach_integration_review(), score=80)
         self.assertEqual(self.document()['terminal']['phase'], 'delivered')
+
+
+class FinalGateOwnsTheWholeGameTests(SceneFlow):
+    MISSING = dict(required=['V1', 'V2'], present=['V1'], missing=['V2'], deferred=[], complete=False)
+
+    def set_task_visual(self, ids):
+        doc = self.document()
+        doc['tasks'][0]['visual'] = ids
+        self.conn.execute('UPDATE factory_project_execution SET document=?', (json.dumps(doc),)); self.conn.commit()
+
+    def test_a_required_element_that_no_task_owns_sends_the_project_back_to_planning_not_to_a_repair(self):
+        stage = self.reach_integration_review()
+        self.set_task_visual(['V1'])                                        # nobody owns V2
+        self.integration_review(stage, score=92, tamper=dict(render_completeness=self.MISSING), failing=True)
+        self.assertEqual(self.document()['mode'], 'planning')
+        self.assertIn('Required reference elements have no task: V2', self.document()['replan']['reason'])
+        self.assertIn('not owned by any task', self.document()['replan']['findings'][0])
+        self.assertEqual([r['profile'] for r in self.board.ready()], ['architect'])      # the legitimate planning workflow creates the task
+        self.assertEqual(self.document()['replans'], 1)
+
+    def test_when_the_replan_limit_is_reached_it_stops_for_a_human_and_does_not_extend_anything(self):
+        stage = self.reach_integration_review()
+        self.set_task_visual(['V1'])
+        doc = self.document(); doc['replans'] = 2; doc.pop('replan_grants', None)
+        self.conn.execute('UPDATE factory_project_execution SET document=?', (json.dumps(doc),)); self.conn.commit()
+        self.integration_review(stage, score=92, tamper=dict(render_completeness=self.MISSING), failing=True)
+        self.assertIn('replan limit is reached', self.terminal()['reason'])
+        self.assertEqual(self.document()['replans'], 2)
+
+    def test_a_missing_element_that_a_task_owns_is_repaired_not_replanned(self):
+        self.integration_review(self.reach_integration_review(), score=92, tamper=dict(render_completeness=self.MISSING), failing=True)
+        self.assertNotEqual(self.document().get('mode'), 'planning')
+        self.assertEqual([r['profile'] for r in self.board.ready()], ['artist'])
+
+
+class NoIntermediateArtReviewTests(SceneFlow):
+    def test_the_panel_never_includes_the_art_reviewer_for_any_task_and_always_for_final_integration(self):
+        from factory_dashboard.project_controller import ProjectController
+        needs = dict(art=True, audio=False, ui=False, ux=False)
+        for risk in ('normal', 'high'):
+            panel = ProjectController._panel(['claude-reviewer', 'art-reviewer'], dict(id='sprites', needs=needs, risk=risk), {})
+            self.assertNotIn('art-reviewer', panel, risk)
+        self.assertIn('art-reviewer', ProjectController._panel(['claude-reviewer', 'art-reviewer'], dict(id='integration', needs=needs, risk='normal'), {}))
+
+    def test_an_asset_task_with_a_failing_look_still_completes_and_the_game_moves_on(self):
+        # Nothing visual can block a task: its technical checks passed, so it completes and the dependent integration starts.
+        self.finish_asset_task()
+        self.assertEqual([r['profile'] for r in self.board.ready()], ['developer'])
+        self.assertIn('sprites' if False else self.document()['tasks'][0]['id'], [t['id'] for t in self.document()['completed']])
+
+    def test_the_architect_is_told_the_only_art_review_is_the_final_one_and_that_every_requirement_needs_an_owner(self):
+        self.approved_director()
+        card = next(c for c in self.board.cards.values() if c['assignee'] == 'architect')['body']
+        self.assertIn('ONE final gate on the complete, assembled and engine-rendered game', card)
+        self.assertIn('no individual task is visually reviewed', card)
+        self.assertIn('Every approved requirement must therefore be owned by a task', card)
 
 
 class SceneLoopTests(unittest.TestCase):

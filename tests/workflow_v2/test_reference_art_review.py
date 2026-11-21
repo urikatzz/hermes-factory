@@ -17,11 +17,25 @@ class ArtReviewFlow(ReferenceFlow):
     REFERENCES = [REFERENCE]
     EXTRA = dict(milestone=1)
 
-    def reach_art_review(self):
+    def finish_asset_task(self):
+        """The asset task passes its technical checks and completes. No art reviewer is ever scheduled for it: nobody visually reviews an individual asset."""
         self.approved_director()
         self.architect([self.visual_task(owner='artist')])
         self.finish(self.only('claude-reviewer'), 'Plan reviewed against the reference.', document='PLAN-REVIEW.md')
         self.board.complete(self.only('artist'))
+        self.tick()
+        self.board.complete(self.only('verifier'))
+        self.tick()
+        profiles = [r['profile'] for r in self.board.ready()]
+        assert 'art-reviewer' not in profiles, profiles
+        for row in self.board.ready():
+            self.board.complete(row)
+        self.tick()
+
+    def reach_art_review(self):
+        """The only art review: final integration of the complete game."""
+        self.finish_asset_task()
+        self.board.complete(self.only('developer'))
         self.tick()
         self.board.complete(self.only('verifier'))
         self.tick()
@@ -30,7 +44,7 @@ class ArtReviewFlow(ReferenceFlow):
                 self.board.complete(row)
         return self.only('art-reviewer')
 
-    def review(self, stage, holistic='accept', outcome=None, verdict='NO_BLOCKING_FINDINGS', findings=(), viewed_shots=True, per_requirement=None, dimensions=None, whole_outcome=None, viewed_as=None, mode='rendered_asset', extra=()):
+    def review(self, stage, holistic='accept', outcome=None, verdict='NO_BLOCKING_FINDINGS', findings=(), viewed_shots=True, per_requirement=None, dimensions=None, whole_outcome=None, viewed_as=None, mode='rendered_in_engine', extra=(), scene=True):
         folder = Path(self.temp.name) / 'review'
         folder.mkdir(exist_ok=True)
         shot = folder / 'game-view.png'
@@ -47,8 +61,28 @@ class ArtReviewFlow(ReferenceFlow):
                       holistic=dict(verdict=holistic, summary='Whole screenshot against the whole approved image: composition, proportions, density and atmosphere compared side by side. ' * 2,
                                     dimensions=dimensions or {t: ('matches' if holistic == 'accept' else 'differs') for t in TOPICS}, screenshots=['game-view.png']))
         comparison = self.write(stage, 'comparison.json', record)
-        self.finish(stage, 'Art review report.', document='report.md', extra=[comparison, str(shot), *extra], screenshots=['game-view.png'], per_requirement=per_requirement,
+        scene_files = self.default_scene_files(stage, holistic) if (scene and not extra) else []
+        self.finish(stage, 'Art review report.', document='report.md', extra=[comparison, str(shot), *extra, *scene_files], screenshots=['game-view.png'], per_requirement=per_requirement,
                     shots_viewed=viewed_as if viewed_as is not None else ([shot] if viewed_shots else []), verdict=verdict, findings=list(findings))
+
+
+    def default_scene_files(self, stage, holistic='accept'):
+        """A real-looking engine capture of a complete scene, scored 85 (or 40 when the holistic judgement rejects), as the final reviewer would retain it."""
+        import hashlib
+        folder = Path(self.temp.name) / 'scene-default'
+        folder.mkdir(exist_ok=True)
+        shot = folder / 'scene.png'; shot.write_bytes(png(size=30000))
+        digest = hashlib.sha256(shot.read_bytes()).hexdigest()
+        required = [r['id'] for r in refs.required_requirements(self.loaded['references'])]
+        passing = holistic == 'accept'
+        render = dict(schema='factory-scene-render/v1', renderer='unity-universalrp', command=['capture'], exit_code=0, scene='Assets/Scenes/S.unity', project_dir=self.temp.name, screenshot='scene.png',
+                      screenshot_sha256=digest, width=1280, height=720, captured_at=1, engine=dict(engine='Unity', engine_version='6000.4.11f1', graphics_device='Apple M1 Max', screenshot_sha256=digest),
+                      completeness=dict(required=required, present=required, missing=[], deferred=[], complete=True))
+        diffs = [] if passing else [dict(aspect='color', description='the whole is far too dark', impact=5, responsible='room01-wall.png', repair='lighten the panels')]
+        record = dict(schema='factory-scene-similarity/v1', model='m', threshold=80, reference=dict(path='docs/look/reference.png', sha256=self.loaded['references'][0]['sha256']),
+                      screenshot=dict(path=str(shot), sha256=digest), score=85 if passing else 40, differences=diffs, diagnosis='' if passing else 'The scene is far too dark overall and the wall drives the gap.',
+                      status='pass' if passing else 'fail', problems=[])
+        return [self.write(stage, 'scene-render.json', render), self.write(stage, 'scene-similarity.json', record), str(shot)]
 
 
 class ArtReviewerTests(ArtReviewFlow):
@@ -57,14 +91,22 @@ class ArtReviewerTests(ArtReviewFlow):
         self.architect([self.visual_task(owner='artist')])
         self.finish(self.only('claude-reviewer'), 'Plan reviewed against the reference.', document='PLAN-REVIEW.md')
         card = self.board.cards[self.only('artist')['task_id']]['body']
-        for text in ('Fit mode (required for every asset you fit)', '--coverage opaque', 'Full-bleed art', 'TOOL-MODE error', 'metadata.tool_defect', 'run it with'):
+        for text in ('Fit mode (required for every asset you fit)', '--coverage opaque', 'Full-bleed art', 'TOOL-MODE error', 'metadata.tool_defect', 'run it with',
+                     'No one reviews or scores an individual asset visually', 'nothing here is blocked because an asset looks different', 'one final review of the complete'):
             self.assertIn(text, card)
 
-    def test_the_art_reviewer_card_is_scoped_to_the_tasks_own_requirements(self):
-        stage = self.reach_art_review()
-        body = self.board.cards[stage['task_id']]['body']
-        self.assertIn("Scope of this review: only the requirement ids in this task's visual list (", body)
-        self.assertIn('an in-engine render of them is not required of this stage', body)
+    def test_no_art_reviewer_is_scheduled_for_an_asset_task_and_the_final_one_answers_for_every_requirement(self):
+        self.finish_asset_task()                                        # asserts that no art reviewer was ready after the asset task's verifier
+        self.assertEqual([r['profile'] for r in self.board.ready()], ['developer'])   # straight on to final integration: nothing waits for a visual review
+        self.board.complete(self.only('developer')); self.tick()
+        self.board.complete(self.only('verifier')); self.tick()
+        for row in self.board.ready():
+            if row['profile'] != 'art-reviewer':
+                self.board.complete(row)
+        body = self.board.cards[self.only('art-reviewer')['task_id']]['body']
+        self.assertNotIn('Scope of this review', body)                   # no per-task scoping: the final review judges every approved requirement
+        self.assertNotIn('only the requirement ids in this task', body)
+        self.assertIn('Full-scene similarity gate', body)
 
     def test_a_reviewer_who_never_opened_the_rendered_screenshots_is_sent_back(self):
         self.review(self.reach_art_review(), viewed_shots=False)
@@ -75,7 +117,7 @@ class ArtReviewerTests(ArtReviewFlow):
         # The retained screenshot is game-view.png; the reviewer looked at the lint's grey-backdrop render of that very asset.
         render = Path(self.temp.name) / 'ws' / 'lint' / 'views' / 'Assets__Art__Room01__game-view.png' / 'grey.png'
         self.review(self.reach_art_review(), viewed_as=[render])
-        self.assertEqual([r['profile'] for r in self.board.ready()], ['developer'])  # accepted, not sent back
+        self.assertEqual(self.document()['terminal']['phase'], 'delivered')   # accepted, not sent back
 
     def test_a_lint_render_of_a_different_asset_does_not_count(self):
         render = Path(self.temp.name) / 'ws' / 'lint' / 'views' / 'Assets__Art__Room01__some-other-asset.png' / 'grey.png'
@@ -85,7 +127,7 @@ class ArtReviewerTests(ArtReviewFlow):
 
     def test_a_reviewer_who_opened_the_reference_and_the_screenshots_and_judged_the_whole_can_accept(self):
         self.review(self.reach_art_review())
-        self.assertEqual([r['profile'] for r in self.board.ready()], ['developer'])  # on to final integration, nothing sent back
+        self.assertEqual(self.document()['terminal']['phase'], 'delivered')   # the single final review accepts the complete game
 
     def test_a_scene_that_passes_every_requirement_but_differs_as_a_whole_goes_back_to_the_artist(self):
         stage = self.reach_art_review()
@@ -110,14 +152,14 @@ class ArtReviewerTests(ArtReviewFlow):
         _, context = self.rejection('art-reviewer')
         self.assertIn('differs V1 needs a BLOCKER/HIGH finding', context['previous_handoff_rejected']['reason'])
 
-    def test_the_reviewer_card_asks_for_the_holistic_judgement_and_never_for_a_similarity_score(self):
+    def test_the_final_reviewer_card_asks_for_the_holistic_judgement_and_only_the_full_scene_score(self):
         body = self.board.cards[self.reach_art_review()['task_id']]['body']
         self.assertIn('"holistic"', body)
         self.assertIn('Every requirement passing does not make the result acceptable', body)
         self.assertIn('Role findings (art reviewer)', body)
-        self.assertNotIn('similarity gate', body)
-        self.assertIn('never compare an isolated sprite with the approved reference scene', body)   # an asset task is told the opposite of the old per-asset score
-        self.assertNotIn('Full-scene similarity gate', body)                                     # the full-scene gate belongs to final integration only
+        self.assertIn('Full-scene similarity gate', body)               # the one similarity score is the full-scene one
+        self.assertIn('never an isolated sprite', body)
+        self.assertNotIn('per-asset', body.lower().replace('no per-asset similarity score exists here', ''))
 
 
 class ReferenceExposureTests(ArtReviewFlow):

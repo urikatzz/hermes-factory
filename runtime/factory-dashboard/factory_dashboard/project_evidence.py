@@ -59,34 +59,6 @@ def plan_evidence(profile, task_id, metadata):
 SIMILARITY_THRESHOLD = 80
 
 
-def validate_similarity(result):
-    """The cheap model score gates the detailed art review. Returns True when every asset reached the threshold."""
-    record = retained_json(result.metadata['artifacts'], 'similarity.json')
-    if not isinstance(record, dict) or record.get('schema') != 'factory-similarity/v1' or not isinstance(record.get('assets'), list):
-        raise ConfigurationError('Invalid similarity record')
-    threshold = record.get('threshold')
-    if type(threshold) is not int or not SIMILARITY_THRESHOLD <= threshold <= 100:
-        raise ConfigurationError('Similarity threshold is below the required 80%')
-    passed = True
-    for asset in record['assets']:
-        if not isinstance(asset, dict) or not isinstance(asset.get('file'), str):
-            raise ConfigurationError('Invalid similarity record')
-        score, status = asset.get('score'), asset.get('status')
-        if status == 'no_reference' and score is None:
-            passed = False
-        elif status in ('pass', 'fail') and type(score) is int and 0 <= score <= 100 and (status == 'pass') == (score >= threshold):
-            passed = passed and status == 'pass'
-        elif status == 'unverified':
-            raise ConfigurationError('Similarity pre-check did not run for every asset')
-        else:
-            raise ConfigurationError('Contradictory similarity score')
-    if not passed:
-        blocking = [f for f in result.metadata.get('findings', []) if f.split('|', 4)[1] in ('BLOCKER', 'HIGH')]
-        if not blocking or result.metadata['verdict'] != 'CHANGES_REQUIRED':
-            raise ConfigurationError('A similarity score below 80% requires a blocking finding and CHANGES_REQUIRED')
-    return passed
-
-
 def validate_comparison(profile, result, plans, integration, approved=False):
     """A linter success is never perceptual approval. Missing evidence stops the run."""
     if profile != 'art-reviewer':

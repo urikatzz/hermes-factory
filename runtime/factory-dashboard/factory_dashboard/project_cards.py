@@ -17,6 +17,7 @@ The JSON document top level must be exactly {"tasks":[...]} with no other keys (
 Keep each task title under 120 characters; put detail in acceptance.
 risk is optional (default normal). Use high only for security-sensitive, concurrency, data-migration or cross-cutting changes: those tasks get the second selected code reviewer.
 If the work needs art, audio, UI or UX that PROJECT_CONTEXT scope marks false, set metadata.scope_additions to those domains, e.g. ["art"]. Added art/audio first runs the missing director, then this stage again with its plan; do not plan around a missing director.
+The only art review is ONE final gate on the complete, assembled and engine-rendered game: no individual task is visually reviewed, so nothing waits for or is blocked by how an asset looks. Every approved requirement must therefore be owned by a task (its `visual` list) and delivered completely there; a required element that no task owns sends the project back to planning when the final review finds it missing.
 Before writing tasks, load the task-writing skill and follow it: the engine no longer rejects plans for coverage, wording or length, so you check those yourself.
 Every PLAN.md AC must be covered by at least one task; use the same AC IDs in task acceptance.
 Asset tasks precede code tasks that integrate their output: declare those dependencies explicitly.
@@ -205,13 +206,9 @@ matches the reference's framing (same aspect and resolution, orthographic size f
 --layout art/scene/scene-layout.json --out <your workspace>/scene --required {required}` and look at scene.png with vision_analyze next to the reference. The reviewer captures the scene again independently. Every required requirement must be covered by an object that
 really delivers it: a missing element is reported as missing and the scene cannot be accepted, whatever it scores. Never claim coverage for an asset that does not exist.'''
 
-NO_SPRITE_SCORE = '''Never compute or report a similarity score for a single asset, and never compare an isolated sprite with the approved reference scene: the reference is one composed frame, so such a score is meaningless. Judge each requirement this task
-owns against the original reference with vision (comparison.json). The full-scene score is taken on the assembled scene at final integration.'''
-
-SIMILARITY = '''Before any detailed judgement run the art-review similarity gate: the Jev model scores each rendered asset against its
-reference images. Retain similarity.json as a completion artifact. If any asset scores below 80% or has no reference image, stop there:
-report those scores as blocking findings with CHANGES_REQUIRED and skip comparison.json. Only when every asset reaches 80% do the
-detailed comparison to find what is still missing. If the model is unavailable record an unresolved required tool incident (blocked_tools); never estimate the score yourself.'''
+ART_NO_INTERMEDIATE_REVIEW = '''No one reviews or scores an individual asset visually, and nothing here is blocked because an asset looks different from the reference. Build every asset to match the approved reference and its requirement ids
+(open the reference with vision_analyze and compare your own result as you work), then continue. The only visual gate is one final review of the complete, assembled and engine-rendered game against the whole reference. Technical checks still apply: valid files,
+opacity and coverage, integrity, build and tests.'''
 
 RETRO = '''Analyze the retained project/task history: verification failures, review findings, repair cycles, missing tools,
 stage outcomes and final integration. Retain RETRO.md with evidence references, root causes, and prioritized Factory improvements.

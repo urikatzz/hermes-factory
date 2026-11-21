@@ -75,11 +75,13 @@ The query gives `SRC_DIR`, `OUT_DIR` and `LINT`. Run `LINT SRC_DIR --out OUT_DIR
 
 Follow the factory-worker contract preloaded on the card.
 
+**You are the single final visual gate.** The factory runs you exactly once per delivery, at final integration, on the complete game: every required feature, asset, HUD, enemy, animation, effect and scene element is already built and integrated. You are never run on an individual asset or task, and no task waits for or is blocked by you. Judge the real engine render of the whole scene (section 2b), then the approved requirements. If a required element is missing the scene is a preliminary composition and cannot be accepted: report CHANGES_REQUIRED naming what is missing, and the factory repairs (or plans the missing task) and runs you again.
+
 1. `fw.py snapshot` and work only in the printed `src_dir`.
 2. From cycle 2: run `fw.py delta`, then pass each changed art file as `--first`, and re-check every file named in SCOPE findings.
 3. `LINT <src_dir> --out "$HERMES_KANBAN_WORKSPACE/lint"`. If `art_files` is 0, complete `NO_BLOCKING_FINDINGS` with metadata `art_surface: "none"` and one sentence why.
 4. A `bible` BLOCKER on a factory task usually means `art/style` is missing from `.factory/include.txt`. Say so in the finding.
 5. Metadata finding lines keep the contract's AC field: `F<n>|SEV|<AC id or ->|<file>|[<rule or check>] <problem>`. Map each finding to the AC it threatens in `.factory/PLAN.md`.
 6. Extra metadata: `art_surface: "assets"`, `images_inspected` (count), `not_reviewed`, `unverified`, and the lint `blocked_tools`.
-7. After lint: with NO approved_references on the card, run the per-asset gate (2a) into `"$HERMES_KANBAN_WORKSPACE/similarity.json"`. With approved_references, never run it; at final integration run the full-scene gate (2b) into `"$HERMES_KANBAN_WORKSPACE/scene-similarity.json"`, and for an asset task judge only the requirements it owns against the original reference.
+7. At final integration with approved_references: run the full-scene gate (2b) into `"$HERMES_KANBAN_WORKSPACE/scene-similarity.json"`; there is no per-asset similarity gate in factory mode. With no approved_references on the card, review as the card says; never score an isolated sprite against a reference scene.
 8. Attach `report.md`, `lint/lint.json`, `similarity.json` when you ran it, the scene files from 2b when you ran them, and every image you cite. Then `fw.py clean` and `kanban_complete`.

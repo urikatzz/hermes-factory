@@ -10,12 +10,12 @@ import re
 import time
 
 from .model_policy import ConfigurationError
-from .project_cards import (ART_PLAN, ROLE_FINDINGS, APPROVED_COMPARISON, APPROVED_REFERENCES, INSPECTION, REFERENCE_AUDIT, VISUAL_TRACE, ARCHITECT, COMPARISON, CONFLICT_CHECK, SIMILARITY, DIRECTOR, PLAN_CORRECTION, PLAN_CORRECTION_REVIEW, ART_FIT, INTEGRATION_SCENE, NO_SPRITE_SCORE, OWNED_CHECK, SCENE_GATE, CONTINUES, INSPECT_PATHS, PLAN_BLOCKED, REVIEW_SCOPE, PLAN_FINDING, STYLE_CHANGED, SUPERSEDED, WRITER_GATES,
+from .project_cards import (ART_PLAN, ROLE_FINDINGS, APPROVED_COMPARISON, APPROVED_REFERENCES, INSPECTION, REFERENCE_AUDIT, VISUAL_TRACE, ARCHITECT, COMPARISON, CONFLICT_CHECK, DIRECTOR, PLAN_CORRECTION, PLAN_CORRECTION_REVIEW, ART_FIT, ART_NO_INTERMEDIATE_REVIEW, INTEGRATION_SCENE, OWNED_CHECK, SCENE_GATE, CONTINUES, INSPECT_PATHS, PLAN_BLOCKED, PLAN_FINDING, STYLE_CHANGED, SUPERSEDED, WRITER_GATES,
                             PLAN_REVIEW, REPLAN, RETRO, SCOPE, SPEC_CONSTRAINTS, TOOL_INCIDENTS, project_card)
 from .project_decisions import (MAX_STAGE_RETRIES, constraint_view, constraints_of, normalize_decisions, preserved_conflict, record_applied, relevant_constraints,
                                 validate_plan_constraints, validate_spec_conflicts)
 from . import scene_loop
-from .project_evidence import dedupe_artifacts, plan_evidence, retained_json, validate_comparison, validate_scene_similarity, validate_similarity
+from .project_evidence import dedupe_artifacts, plan_evidence, retained_json, validate_comparison, validate_scene_similarity
 from . import project_references as refs
 from .project_policy import (MAX_ORCHESTRATION_RECOVERIES, MAX_PLAN_CORRECTIONS, MAX_REPLANS, blocking_findings, budget_used, finding_id,
                              missing_baseline_tokens, plan_architecture_diff, repair_origin, finding_ac, planning_profiles, route_findings, rereview_profiles,
@@ -156,8 +156,6 @@ class ProjectController:
             instructions += '\n' + APPROVED_REFERENCES
             if refs.must_inspect(profile, key):
                 instructions += '\n' + INSPECTION + '\n' + ROLE_FINDINGS[refs.role_kind(profile, key)]
-                if profile == 'art-reviewer' and task and task.get('id') != 'integration' and task.get('visual'):
-                    instructions += '\n' + REVIEW_SCOPE.format(ids=', '.join(task['visual']), kind=refs.role_kind(profile, key))
                 if context.get('project_dir'):
                     instructions += '\n' + INSPECT_PATHS.format(paths='; '.join(str(Path(context['project_dir']) / r['path']) for r in approved))
             if profile == 'art-director':
@@ -334,7 +332,7 @@ class ProjectController:
             elif kind == 'plan_check':
                 tasks = project.get('tasks', [])
             current = self._current(project) if project.get('work') or project.get('mode') == 'integration' else None
-            owned = set(current['visual']) if profile == 'art-reviewer' and current and current.get('id') != 'integration' and current.get('visual') else None
+            owned = None   # the only art review is the final one: it answers for every approved requirement
             try:
                 refs.validate_role_findings(inspection, records, kind, tasks, [p.name for p in images], result.metadata.get('findings', []), result.metadata.get('verdict'), only=owned)
             except ConfigurationError as exc:
@@ -436,8 +434,9 @@ class ProjectController:
         """Reviewers for this cycle. Final integration always gets the complete panel on the delivered manifest."""
         integration = task['id'] == 'integration'
         profiles = review_profiles(task['needs'], selected, integration or task.get('risk') == 'high')
-        if work.get('style_only') and not integration:
-            # The art-reviewer compares rendered output with the approved image; a task that changed only the style bible has none.
+        if not integration:
+            # The art reviewer is ONE final visual gate on the complete, assembled and engine-rendered game. No individual task is visually reviewed or blocked on how an asset
+            # looks: its technical checks (files, opacity, integrity, build, tests) stay with the verifier.
             profiles = [p for p in profiles if p != 'art-reviewer']
         scoped = None if integration else work.get('panel')
         return [p for p in profiles if p in scoped] if scoped else profiles
@@ -751,7 +750,7 @@ class ProjectController:
                 instructions += '\nApproved plan files, read exactly these absolute paths (copy them, never retype them): ' + '; '.join(plan_files)
             instructions += '\n' + SPEC_CONSTRAINTS + '\n' + PLAN_BLOCKED + self._style_note(conn, project)
             if profile == 'artist':
-                instructions += '\n' + ART_FIT
+                instructions += '\n' + ART_FIT + '\n' + ART_NO_INTERMEDIATE_REVIEW
             if task['id'] == 'integration' and refs.authoritative(project.get('reference_records', [])):
                 instructions += '\n' + INTEGRATION_SCENE.format(required=','.join(r['id'] for r in refs.required_requirements(project['reference_records'])))
             if repair and project.get('scene'):
@@ -827,10 +826,8 @@ class ProjectController:
             scene_gate = profile == 'art-reviewer' and human_approved and task['id'] == 'integration'
             if profile == 'art-reviewer':
                 instructions += '\n' + COMPARISON + ('\n' + APPROVED_COMPARISON if human_approved else '')
-                if human_approved:
-                    instructions += '\n' + (SCENE_GATE.format(brief=scene_loop.brief(project.get('scene')), required=','.join(r['id'] for r in refs.required_requirements(project['reference_records']))) if scene_gate else NO_SPRITE_SCORE)
-            if profile == 'art-reviewer' and task['id'] != 'integration' and not human_approved:
-                instructions += '\n' + SIMILARITY
+                if scene_gate:
+                    instructions += '\n' + SCENE_GATE.format(brief=scene_loop.brief(project.get('scene')), required=','.join(r['id'] for r in refs.required_requirements(project['reference_records'])))
             selected = next((r.instructions for r in definition.reviewers if r.profile == profile), '')
             instructions += '\n' + selected
             node = self._node(conn, root, definition, context, project, prefix + '-' + profile, 'review', profile, instructions,
@@ -844,16 +841,22 @@ class ProjectController:
                 raise ProjectBlocked('Review requires unavailable tools: ' + profile + ': ' + '; '.join(review_blockers))
             # Below 80% the reviewer stops at the score, so there is no detailed comparison to validate.
             # With a human-approved reference no score substitutes for the requirement-by-requirement judgement against the original image.
-            close_enough = profile != 'art-reviewer' or task['id'] == 'integration' or human_approved or validate_similarity(result)
-            if profile == 'art-reviewer' and close_enough:
+            if profile == 'art-reviewer':
                 record = validate_comparison(profile, result, project['plans'], task['id'] == 'integration', human_approved)
                 if human_approved:
-                    owned = set(task['visual']) if task['id'] != 'integration' and task.get('visual') else None  # an asset task answers for the requirements it owns
-                    refs.validate_reference_comparison(record, project['reference_records'], only=owned)
+                    refs.validate_reference_comparison(record, project['reference_records'])      # the final review answers for every approved requirement
             if scene_gate:
                 required = [r['id'] for r in refs.required_requirements(project['reference_records'])]
                 scene_record, render_record, incomplete = validate_scene_similarity(result, project['reference_records'], required)
                 self._record_scene(project, row, result, scene_record, work, context.get('project_dir', ''), incomplete)
+                owned = {v for t in project.get('tasks', []) for v in t.get('visual', [])}
+                unowned = [m for m in incomplete if m not in owned]
+                if unowned:
+                    # A required element that no task owns cannot be repaired by repairing: it needs a task, so it goes back to planning (bounded; completed tasks stay frozen).
+                    findings = [f'F{i}|BLOCKER|-|art/scene/scene-layout.json|required reference element {m} is not owned by any task; plan the task that delivers it' for i, m in enumerate(unowned, 1)]
+                    if not self._replan(conn, root, project, None, 'Required reference elements have no task: ' + ', '.join(unowned), findings, []):
+                        raise ConfigurationError('Required reference elements have no task (' + ', '.join(unowned) + ') and the replan limit is reached: a human decides')
+                    return True
             readers.append(result)
             rows.append(row)
         if waiting:

@@ -59,7 +59,7 @@ A task that exhausts its repair limit stops for a human; it never goes back to t
 
 Asset lint remains required, but it cannot establish perceptual approval. The art reviewer retains `comparison.json`, bound to the director PLAN's SHA256 and the reviewed implementation manifest, with expected/observed criteria, outcomes and retained evidence paths.
 
-- Without human-approved references, art tasks start with a per-asset similarity gate against the assets' own style-bible references. With human-approved references this per-asset gate never runs (see "Full-scene similarity gate"). `art_similarity.py` sends each rendered asset and its style-bible reference images to the Jev model on OpenRouter (`typesafe/jev-router`, `OPENROUTER_API_KEY` in the art-reviewer profile) and retains `similarity.json` with a 0-100 score per asset. Below 80%, or with no reference image for the asset class, the reviewer stops there: the score becomes a blocking finding, the artist repairs, and no detailed comparison is spent. A missing reference is also reported as a plan defect. Only at 80% or above does the reviewer do the detailed comparison to find what is still missing. The controller requires the record, refuses an approval that contradicts a score, and treats an unavailable model as a blocked tool, never a pass. The score is a model's judgement, not a pixel measurement. Final integration is exempt: in-engine screenshots are not comparable to per-asset references.
+- The art reviewer never reviews an individual asset or task (see "Art review only at the end").
 - Art tasks require rendered asset images (`rendered_asset`); final integration requires actual in-engine images (`rendered_in_engine`).
 - Audio has no perceptual comparison. The audio lint gate measures files; nobody in the workflow listens to them.
 - A director mismatch requires a blocking finding and `CHANGES_REQUIRED`, which routes repair to the asset producer. Conflicting or insufficient plans require human review, not a silent change to intended style or sound.
@@ -101,9 +101,15 @@ Integration failures have an owner. A failing acceptance criterion is attributed
 
 `factory-retro` runs after a successful or unsuccessful project outcome. It writes retained `RETRO.md` with evidence, root causes, prioritized improvements, tradeoffs and validation steps. It has a scratch workspace and cannot apply improvements, modify Factory configuration, change outcomes, or publish. A missing retro report cannot silently become success.
 
-## Review panel for style-only tasks
+## Art review only at the end
 
-The art-reviewer compares rendered output with the approved image. A task whose writer changed only files under `art/style/` (the style bible: `STYLE.md`, `style.json`, reference images) has nothing to render, so the panel leaves the art-reviewer out for that task (`work.style_only`); the other reviewers it needs still review it, and bible fidelity is still checked by the verifier's criteria and the deterministic contradiction scan. A task with real art, or a writer that reports no changed-file list, keeps the art-reviewer, and the final integration always gets the complete panel with in-engine screenshots.
+The art reviewer is **one final visual quality gate on the complete game**, not an intermediate approval stage. Permanent rules:
+
+1. **No intermediate visual review.** `ProjectController._panel` never puts the art reviewer in a task's review panel, whatever the task changed or its risk; no asset or task is visually scored, approved or blocked, and a dependent task does not wait for one. Each task still passes its technical checks with the verifier and the code reviewers: valid files, opacity and coverage, integrity, build and tests. Artists build to the approved reference and its requirement ids, compare their own result with vision as they work, and continue.
+2. **Everything is built first.** The final integration task starts only after every planned task has completed; it assembles the complete game (and builds `art/scene/scene-layout.json`, see the capture section). The architect owns completeness: every approved requirement must be owned by a task's `visual` list. A required element that no task owns, found missing by the final review, sends the project back to planning (a bounded replan, completed tasks frozen) so the legitimate planning workflow creates the task; when the replan limit is reached it stops for a human.
+3. **One final full-scene review.** The final art reviewer captures the actual game with Unity, scores the whole rendered screenshot against the whole human-approved reference (minimum 80), and checks every approved requirement and the holistic judgement. A scene that still misses required elements is a preliminary composition and can never be accepted.
+4. **Autonomous visual repair loop, inside the existing budget.** Below 80 (or incomplete) the reviewer ranks the differences, names the responsible assets or scene settings, and the matching workers repair (assets to the artist, scene settings to the developer); Unity captures again and the reviewer scores again. The scene ledger preserves the best verified result and rejects blind or repeated repairs. It ends at a score of 80 or more with every requirement passing, or at the existing repair budget, never extended.
+5. **Unchanged.** Security checks, repair and replan budgets, approvals, guards and the 80 threshold.
 
 ## Full-scene similarity gate
 
@@ -135,10 +141,6 @@ A repair task must be able to start when the files it is assigned to repair alre
 ## Fit modes for art assets
 
 `scripts/sprite_fit.py` has two coverage modes and verifies its own result. `--coverage opaque` is for full-bleed art (walls, floors, backdrops, bands, tiles, anything its criterion requires to cover an area): it keeps every pixel and covers the target exactly, with no background removal and no transparent padding when the aspect ratios differ (a plain fit pads, which once left a floor band opaque only in its middle). `--coverage cutout` (the default) is for isolated sprites: the flat background becomes transparent and the content is centred on a transparent canvas. `--coverage auto --hint "<asset name and criterion>"` chooses from the requirement. A fit that would erase an opaque image exits 3 with a JSON diagnosis naming the transformation, whether it is a `tool_mode` or a `generation` defect, and the supported fix, so a wrong mode is never reported as a failed generation. The artist skill and every artist card state the rule; a repair that ends `BLOCKED` with `metadata.tool_defect` is refunded from the product repair budget (at most twice per task) and recorded as `tool_defect_refund`.
-
-## Scope of the art review
-
-For a task other than the final integration, the art-reviewer writes `render_check` findings, and may declare required tool incidents, only for the requirement ids in that task's `visual` list (the controller validates the findings against that list). Every approved requirement is still owned by some task, and the final integration reviews all of them with in-engine Game-view screenshots, so an environment-sprite review is no longer blocked for lacking an in-engine render of the characters or the HUD.
 
 ## Hermes patches and updates
 

@@ -67,6 +67,8 @@ Both commands produce `lint.json` and review images in the output directory. Pas
 
 Art checks inspect assets outside the game engine. Model-backed art review is a separate step; see the [art verifier guide](docs/art-verifier.md).
 
+In a Factory run the art reviewer is one final gate: it runs once, on the complete game rendered by Unity, and scores the whole screenshot against the approved reference (minimum 80). It is never run on an individual asset or task; see [Art review only at the end](docs/project-workflows.md#art-review-only-at-the-end).
+
 ### Produce audio
 
 Render a sound-effect recipe to a WAV file:

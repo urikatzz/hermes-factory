@@ -170,7 +170,7 @@ class ProjectControllerTests(unittest.TestCase):
                 return
         self.fail('the final integration card was never created')
 
-    def test_director_plans_reach_architect_and_dependent_code_waits_for_asset_review(self):
+    def test_director_plans_reach_architect_and_dependent_code_does_not_wait_for_a_visual_review(self):
         tasks = [
             dict(id='sprites', title='Make sprites', owner='artist', dependencies=[], acceptance={'AC1':'Sprite'},
                  needs=dict(art=True,audio=False,ui=False,ux=False)),
@@ -183,8 +183,13 @@ class ProjectControllerTests(unittest.TestCase):
         self.assertIn('art-director',architect['body'])
         self.board.complete(self.only('artist'));self.tick()
         self.board.complete(self.only('verifier'));self.tick()
-        self.assertIn('art-reviewer',[r['profile'] for r in self.board.ready()])
-        self.assertNotIn('developer',[r['profile'] for r in self.board.ready()])
+        ready=[r['profile'] for r in self.board.ready()]
+        self.assertNotIn('art-reviewer',ready)                # no visual review of an individual asset task...
+        self.board.complete(next(r for r in self.board.ready() if r['profile']=='claude-reviewer'))
+        for row in self.board.ready():
+            self.board.complete(row)
+        self.tick()
+        self.assertIn('developer',[r['profile'] for r in self.board.ready()])   # ...so the dependent code task starts as soon as the asset task's technical checks pass
 
     def test_stale_verifier_manifest_never_launches_review(self):
         self.plan();self.board.complete(self.only('developer'));self.tick()
@@ -477,7 +482,7 @@ class ProjectControllerTests(unittest.TestCase):
         stage=self.only('artist')
         self.assertIn('"repair_attribution": {"AC1": ["sprites"]}',self.board.cards[stage['task_id']]['body'])
 
-    def complete_review(self,row,mode='rendered_asset'):
+    def complete_review(self,row,mode='rendered_in_engine'):
         if row['profile']!='art-reviewer':
             return self.board.complete(row)
         director=next(p for p in self.project()['plans'] if p['profile']=='art-director')
@@ -497,25 +502,6 @@ class ProjectControllerTests(unittest.TestCase):
         folder=Path(self.temp.name)/'gate';folder.mkdir()
         return self.only('art-reviewer'),folder
 
-    def test_low_similarity_returns_to_artist_without_a_detailed_comparison(self):
-        row,folder=self.art_review()
-        self.board.complete(row,verdict='CHANGES_REQUIRED',findings=['F1|HIGH|AC1|sprite.png|[similarity] 61% match, below 80%: palette'],
-                            artifacts=[self.similarity(folder,61)])
-        self.tick()
-        self.only('artist')
-
-    def test_low_similarity_cannot_be_approved(self):
-        row,folder=self.art_review()
-        self.board.complete(row,artifacts=[self.similarity(folder,61)])
-        self.tick()
-        self.only('factory-retro')
-
-    def test_similarity_score_is_required_before_art_approval(self):
-        row,folder=self.art_review()
-        self.board.complete(row,artifacts=[self.similarity(folder,None,'unverified')])
-        self.tick()
-        self.only('factory-retro')
-
     def test_resume_during_plan_review_retries_the_plan_reviewer(self):
         self.tick()
         self.board.complete(self.only('factory-orchestrator'),project_scope=NEEDS);self.tick()
@@ -533,8 +519,13 @@ class ProjectControllerTests(unittest.TestCase):
         self.plan(art=True,tasks=tasks)
         self.board.complete(self.only('artist'));self.tick()
         self.board.complete(self.only('verifier'));self.tick()
+        for row in self.board.ready():
+            self.board.complete(row)
+        self.tick()
+        self.board.complete(self.only('developer'));self.tick()        # final integration: the only place the art reviewer runs
+        self.board.complete(self.only('verifier'));self.tick()
         art=next(r for r in self.board.ready() if r['profile']=='art-reviewer')
-        self.board.complete(art);self.tick()
+        self.board.complete(art);self.tick()                           # no comparison evidence at all
         self.only('factory-retro')
 
     def test_environment_block_can_resume_with_fresh_verification_after_human_recovery(self):
@@ -626,15 +617,28 @@ class ProjectControllerTests(unittest.TestCase):
         self.architect([task])
         self.board.complete(self.only('claude-reviewer')); self.tick()
         self.board.complete(self.only('developer')); self.tick()
+        self.board.complete(self.only('verifier')); self.tick()
+        # The task passes its own review panel (there is no art reviewer in it: the single art review is the final one), then final integration is reached.
+        assert 'art-reviewer' not in [r['profile'] for r in self.board.ready()]
+        for row in self.board.ready():
+            self.complete_review(row)
+        self.tick()
+        self.board.complete(self.only('developer')); self.tick()
         self.board.complete(self.only('verifier'), **verify); self.tick()
 
     def review_round(self, art=True, ui=True, ui_extra=None):
+        """The panel of the FINAL INTEGRATION: the only place the art reviewer runs."""
         folder = Path(self.temp.name) / f'gate-{len(list(Path(self.temp.name).iterdir()))}'
         folder.mkdir()
         for row in self.board.ready():
             if row['profile'] == 'art-reviewer' and art:
-                self.board.complete(row, verdict='CHANGES_REQUIRED', artifacts=[self.similarity(folder, 5)],
-                                    findings=['F2|HIGH|AC1|sprite.png|[similarity] 5% match to the reference, below 80%'])
+                director = next(p for p in self.project()['plans'] if p['profile'] == 'art-director')
+                image = folder / 'render.png'; image.write_bytes(b'render')
+                report = folder / 'comparison.json'
+                report.write_text(json.dumps(dict(schema='factory-comparison/v1', plan_sha256=director['sha256'], manifest_sha12='abcdef123456', mode='rendered_in_engine', source='tool', outcome='fail',
+                                                  criteria=[dict(rule='S1', expected='Round', observed='Square', outcome='fail')], evidence=[str(image)])))
+                self.board.complete(row, verdict='CHANGES_REQUIRED', artifacts=[str(report), str(image)],
+                                    findings=['F2|HIGH|AC1|sprite.png|[visual] the sprite is square where the reference is round'])
             elif row['profile'] == 'ui-reviewer' and ui:
                 self.board.complete(row, verdict='CHANGES_REQUIRED', findings=['F1|MEDIUM|AC1|Assets/Scripts/Builder.cs:HealthBar|Bar inside the ceiling band'], **(ui_extra or {}))
             else:
@@ -683,7 +687,7 @@ class ProjectControllerTests(unittest.TestCase):
         self.assertEqual(self.conn.execute('SELECT COUNT(*) FROM factory_workflow_stages').fetchone()[0], before + 1)  # no re-verify or re-review
         stored = self.project()['waivers'][0]
         self.assertEqual(stored['applied'][0]['finding'].split('|')[0], 'art-reviewer:F2')
-        self.assertIn('5% match', stored['applied'][0]['finding'])  # the original result stays in the audit trail
+        self.assertIn('square where the reference is round', stored['applied'][0]['finding'])  # the original result stays in the audit trail
         self.assertEqual(self.project()['constraints'][0]['preserve'], ['sprite.png'])
         self.assertTrue(any('waived by human decision' in w for h in self.project()['history'] for w in h.get('waived', [])))
 
@@ -692,11 +696,11 @@ class ProjectControllerTests(unittest.TestCase):
         self.controller.resume(self.conn, self.root, 'Waive AC1 for sprite.png: runtime-tinted primitive', self.DECISION)
         self.board.complete(self.only('fixer')); self.tick()
         self.board.complete(self.only('verifier')); self.tick()
-        self.assertNotIn('mixed', [c['id'] for c in self.project()['completed']])
+        self.assertNotEqual(self.project().get('terminal', {}).get('phase'), 'delivered')
         for row in self.board.ready():
             self.complete_review(row)
         self.tick()
-        self.assertIn('mixed', [c['id'] for c in self.project()['completed']])
+        self.assertEqual(self.project()['terminal']['phase'], 'delivered')
         self.assertTrue(self.project()['waivers'][0]['applied'])
 
     def test_a_decision_after_one_recorded_before_constraint_ids_existed_keeps_the_old_constraint(self):
@@ -722,7 +726,7 @@ class ProjectControllerTests(unittest.TestCase):
         self.controller.resume(self.conn, self.root, 'Waive the contrast concern', waive, True)
         self.assertEqual(count(), before)  # nothing was verified or reviewed again
         self.assertIn('mixed', [t['id'] for t in self.project()['completed']])
-        self.assertEqual([r['profile'] for r in self.board.ready()], ['developer'])  # on to final integration
+        self.assertEqual(self.project()['terminal']['phase'], 'delivered')  # re-judged at final integration: delivered
 
     def test_an_invalid_decision_changes_nothing(self):
         self.stalled_artist()
@@ -1142,12 +1146,12 @@ class ProjectControllerTests(unittest.TestCase):
         self.assertIn('ui-reviewer', panel)  # every other reviewer the task needs still reviews it
         self.assertTrue(self.project()['work']['style_only'])
 
-    def test_a_task_with_real_art_or_no_file_list_keeps_the_art_reviewer(self):
-        self.assertIn('art-reviewer', self.style_task_reviewers(['art/style/STYLE.md', 'Assets/Art/Room01/wall.png']))
-        self.assertFalse(self.project()['work']['style_only'])
-
-    def test_without_a_changed_file_list_the_art_reviewer_stays(self):
-        self.assertIn('art-reviewer', self.style_task_reviewers(None))
+    def test_no_task_panel_ever_contains_the_art_reviewer_whatever_the_task_changed(self):
+        # Art review is ONE final gate on the assembled, engine-rendered game: nothing visual blocks an individual task.
+        for changed in (['art/style/STYLE.md', 'Assets/Art/Room01/wall.png'], None):
+            with self.subTest(changed=changed):
+                self.setUp()
+                self.assertNotIn('art-reviewer', self.style_task_reviewers(changed))
 
     def test_the_panel_never_drops_the_art_reviewer_from_the_final_integration(self):
         from factory_dashboard.project_controller import ProjectController
@@ -1637,29 +1641,6 @@ class ProjectControllerTests(unittest.TestCase):
         self.board.complete(self.only('claude-reviewer'), findings=self.LOCAL, finding_classes={'F1': 'maybe'}); self.tick()
         self.assertEqual(self.project()['handoff_retries'], {'project-plan-review:0': 1})
 
-    def test_visual_mismatch_calls_artist_then_verifier_not_developer(self):
-        tasks=[dict(id='sprites',title='Make sprites',owner='artist',dependencies=[],acceptance={'AC1':'Sprite'},
-                    needs=dict(art=True,audio=False,ui=False,ux=False))]
-        self.plan(art=True,tasks=tasks)
-        self.board.complete(self.only('artist'));self.tick()
-        self.board.complete(self.only('verifier'));self.tick()
-        project=json.loads(self.conn.execute('SELECT document FROM factory_project_execution').fetchone()[0])
-        director=next(p for p in project['plans'] if p['profile']=='art-director')
-        for row in self.board.ready():
-            if row['profile']!='art-reviewer':
-                self.board.complete(row)
-                continue
-            folder=Path(self.temp.name)/'comparison';folder.mkdir()
-            image=folder/'render.png';image.write_bytes(b'render')
-            report=folder/'comparison.json'
-            report.write_text(json.dumps(dict(schema='factory-comparison/v1',plan_sha256=director['sha256'],manifest_sha12='abcdef123456',
-                mode='rendered_asset',source='tool',outcome='fail',criteria=[dict(rule='S1',expected='Round',observed='Square',outcome='fail')],evidence=[str(image)])))
-            self.board.complete(row,verdict='CHANGES_REQUIRED',findings=['F1|HIGH|AC1|sprite.png|Silhouette differs from director plan'],artifacts=[str(report),str(image),self.similarity(folder)])
-        self.tick();self.only('artist')
-        self.board.complete(self.only('artist'));self.tick()
-        self.board.complete(self.only('verifier'));self.tick()
-        self.only('art-reviewer')
-
     def test_new_project_director_plans_missing_bible_instead_of_requiring_preexisting_assets(self):
         self.definition={**_preset('art'),'execution_version':2}
         self.definition['prepare']['instructions']+='\nKeep the mascot green.'
@@ -1676,6 +1657,11 @@ class ProjectControllerTests(unittest.TestCase):
         tasks=[dict(id='sprites',title='Make sprites',owner='artist',dependencies=[],acceptance={'AC1':'Sprite'},
                     needs=dict(art=True,audio=False,ui=False,ux=False))]
         self.plan(art=True,tasks=tasks);self.board.complete(self.only('artist'));self.tick()
+        self.board.complete(self.only('verifier'));self.tick()
+        for row in self.board.ready():
+            self.board.complete(row)
+        self.tick()
+        self.board.complete(self.only('developer'));self.tick()        # final integration
         self.board.complete(self.only('verifier'));self.tick()
         siblings=[r for r in self.board.ready() if r['profile']!='art-reviewer']
         for row in siblings:self.conn.execute("UPDATE tasks SET status='running' WHERE id=?",(row['task_id'],))
