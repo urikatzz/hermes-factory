@@ -1224,6 +1224,57 @@ class ProjectControllerTests(unittest.TestCase):
         self.board.complete(self.only('verifier'), verdict='FAIL', ac_results={'AC1': 'fail'}, findings=[finding], repair_domains=['code']); self.tick()
         return self.only('fixer')
 
+    def visual_opinion_flow(self, severity, path='Assets/Art/Room01/room01-wall-backdrop.png'):
+        self.plan(art=True, tasks=[dict(SPRITES, id='sprites')])
+        self.board.complete(self.only('artist')); self.tick()
+        self.board.complete(self.only('verifier')); self.tick()
+        for row in self.board.ready():
+            if row['profile'] == 'claude-reviewer':
+                self.board.complete(row, verdict='CHANGES_REQUIRED' if severity in ('HIGH', 'BLOCKER') else 'NO_BLOCKING_FINDINGS',
+                                    findings=['F1|%s|AC1|%s|the texture is too gritty and the look differs from the reference' % (severity, path)])
+            else:
+                self.complete_review(row)
+        self.tick()
+
+    def test_another_reviewers_visual_opinion_of_an_image_asset_never_blocks_a_task_or_spends_a_repair(self):
+        self.visual_opinion_flow('MEDIUM')
+        self.assertEqual(self.used(), (0, 0))                                        # no repair was charged
+        self.assertNotEqual([r['profile'] for r in self.board.ready()], ['artist'])  # and no artist repair was scheduled
+        self.assertIn('sprites', [c['id'] for c in self.project()['completed']])      # the task completed on its technical checks
+
+    def test_a_high_finding_on_an_image_asset_is_still_a_blocking_technical_problem(self):
+        self.visual_opinion_flow('HIGH')
+        self.assertEqual(self.used(), (1, 0))                                        # a corrupt or wrongly sized file would be reported like this and still blocks
+        self.assertIn('fixer', [r['profile'] for r in self.board.ready()])           # another reviewer's blocking finding goes to the fixer
+
+    def test_a_medium_finding_on_a_code_file_still_blocks(self):
+        self.visual_opinion_flow('MEDIUM', path='Assets/Scripts/Builder.cs')
+        self.assertEqual(self.used(), (1, 0))
+
+    def test_non_art_reviewer_cards_forbid_visual_judgement_and_the_art_reviewer_is_not_told_that(self):
+        self.plan(art=True, tasks=[dict(SPRITES, id='sprites')])
+        self.board.complete(self.only('artist')); self.tick()
+        self.board.complete(self.only('verifier')); self.tick()
+        cards = {r['profile']: self.board.cards[r['task_id']]['body'] for r in self.board.ready()}
+        self.assertNotIn('art-reviewer', cards)
+        for profile, body in cards.items():
+            self.assertIn('Do not judge how an art asset looks', body, profile)
+            self.assertIn('your opinion of it is never a finding at any severity', body, profile)
+
+    def test_the_gate_waives_only_medium_visual_findings_of_non_art_reviewers_on_image_files(self):
+        from factory_dashboard.workflow_gate import evaluate_cycle
+        from types import SimpleNamespace
+        def writer(): return SimpleNamespace(valid=True, metadata=dict(verdict='DONE', manifest_sha12='m', ac_ids=['AC1']))
+        def reader(profile, finding): return SimpleNamespace(valid=True, kind='review', metadata=dict(manifest_sha12='m', source_profile=profile, findings=[finding], verdict='CHANGES_REQUIRED' if '|HIGH|' in finding or profile == 'art-reviewer' else 'NO_BLOCKING_FINDINGS', tool_incidents=[], blocked_tools=[]))
+        png = lambda sev: f'F1|{sev}|AC1|Assets/a.png|looks off'
+        verifier = lambda: SimpleNamespace(valid=True, kind='verify', metadata=dict(manifest_sha12='m', source_profile='verifier', ac_results={'AC1': 'pass'}, failed_checks=[], checks_failed=0,
+                                                                              release_audit='PASS', verdict='PASS', findings=[], tool_incidents=[], blocked_tools=[]))
+        for profile, sev, blocks in (('claude-reviewer', 'MEDIUM', False), ('security-reviewer', 'MEDIUM', False), ('claude-reviewer', 'HIGH', True), ('art-reviewer', 'MEDIUM', True)):
+            decision = evaluate_cycle(writer(), [verifier(), reader(profile, png(sev))], None, 5, 0, dict(visual_final_only=True))
+            self.assertEqual(decision.decision == 'repair', blocks, (profile, sev))
+        off = evaluate_cycle(writer(), [verifier(), reader('claude-reviewer', png('MEDIUM'))], None, 5, 0, dict())
+        self.assertEqual(off.decision, 'repair')                                   # without the flag the old behaviour is unchanged
+
     def test_owned_paths_come_only_from_explicit_finding_files_and_fail_closed(self):
         from factory_dashboard.project_controller import owned_paths
         self.assertEqual(owned_paths(['verifier:F1|HIGH|AC2|Assets/Art/a.png|x', 'F2|LOW|AC2|Assets/Art/a.png|dup', 'F3|LOW|AC2|b/c d.txt|x']), ['Assets/Art/a.png', 'b/c d.txt'])

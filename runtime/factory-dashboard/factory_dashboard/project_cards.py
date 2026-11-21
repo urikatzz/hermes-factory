@@ -206,6 +206,9 @@ matches the reference's framing (same aspect and resolution, orthographic size f
 --layout art/scene/scene-layout.json --out <your workspace>/scene --required {required}` and look at scene.png with vision_analyze next to the reference. The reviewer captures the scene again independently. Every required requirement must be covered by an object that
 really delivers it: a missing element is reported as missing and the scene cannot be accepted, whatever it scores. Never claim coverage for an asset that does not exist.'''
 
+NO_VISUAL_JUDGEMENT = '''Do not judge how an art asset looks: its style, texture, palette, composition, level of detail or likeness to a reference. That is judged once, by the final art review of the complete game, and your opinion of it is never a finding at any severity. Review only technical correctness:
+code, data, file validity, import settings, security and what the acceptance criteria require functionally (for an asset: that it exists, loads, has the required size, coverage and opacity). A technical defect in an asset file (corrupt, wrong size, wrong import) is still a finding.'''
+
 ART_NO_INTERMEDIATE_REVIEW = '''No one reviews or scores an individual asset visually, and nothing here is blocked because an asset looks different from the reference. Build every asset to match the approved reference and its requirement ids
 (open the reference with vision_analyze and compare your own result as you work), then continue. The only visual gate is one final review of the complete, assembled and engine-rendered game against the whole reference. Technical checks still apply: valid files,
 opacity and coverage, integrity, build and tests.'''

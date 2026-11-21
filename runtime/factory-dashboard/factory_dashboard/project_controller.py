@@ -10,7 +10,7 @@ import re
 import time
 
 from .model_policy import ConfigurationError
-from .project_cards import (ART_PLAN, ROLE_FINDINGS, APPROVED_COMPARISON, APPROVED_REFERENCES, INSPECTION, REFERENCE_AUDIT, VISUAL_TRACE, ARCHITECT, COMPARISON, CONFLICT_CHECK, DIRECTOR, PLAN_CORRECTION, PLAN_CORRECTION_REVIEW, ART_FIT, ART_NO_INTERMEDIATE_REVIEW, INTEGRATION_SCENE, OWNED_CHECK, SCENE_GATE, CONTINUES, INSPECT_PATHS, PLAN_BLOCKED, PLAN_FINDING, STYLE_CHANGED, SUPERSEDED, WRITER_GATES,
+from .project_cards import (ART_PLAN, ROLE_FINDINGS, APPROVED_COMPARISON, APPROVED_REFERENCES, INSPECTION, REFERENCE_AUDIT, VISUAL_TRACE, ARCHITECT, COMPARISON, CONFLICT_CHECK, DIRECTOR, PLAN_CORRECTION, PLAN_CORRECTION_REVIEW, ART_FIT, ART_NO_INTERMEDIATE_REVIEW, INTEGRATION_SCENE, NO_VISUAL_JUDGEMENT, OWNED_CHECK, SCENE_GATE, CONTINUES, INSPECT_PATHS, PLAN_BLOCKED, PLAN_FINDING, STYLE_CHANGED, SUPERSEDED, WRITER_GATES,
                             PLAN_REVIEW, REPLAN, RETRO, SCOPE, SPEC_CONSTRAINTS, TOOL_INCIDENTS, project_card)
 from .project_decisions import (MAX_STAGE_RETRIES, constraint_view, constraints_of, normalize_decisions, preserved_conflict, record_applied, relevant_constraints,
                                 validate_plan_constraints, validate_spec_conflicts)
@@ -821,7 +821,7 @@ class ProjectController:
         profiles = self._panel([s.profile for s in definition.reviewers], task, work)
         readers, rows, waiting = [verifier], [verifier_row], False
         for profile in profiles:
-            instructions = 'Review only your discipline against TASK acceptance and the inherited plans; report actionable findings.\n' + TOOL_INCIDENTS + '\n' + SPEC_CONSTRAINTS + '\n' + PLAN_FINDING
+            instructions = 'Review only your discipline against TASK acceptance and the inherited plans; report actionable findings.\n' + (NO_VISUAL_JUDGEMENT + '\n' if profile != 'art-reviewer' else '') + TOOL_INCIDENTS + '\n' + SPEC_CONSTRAINTS + '\n' + PLAN_FINDING
             human_approved = bool(refs.authoritative(project.get('reference_records', [])))
             scene_gate = profile == 'art-reviewer' and human_approved and task['id'] == 'integration'
             if profile == 'art-reviewer':
@@ -871,7 +871,7 @@ class ProjectController:
         """The gate decision with the product repair budget only: orchestration recoveries never count against it."""
         product_used, _ = budget_used(work)
         limit = definition.max_repairs + work.get('extra_repairs', 0)
-        args = dict(context={**context, 'unity_ci': False, 'waivers': project.get('waivers', [])})
+        args = dict(context={**context, 'unity_ci': False, 'waivers': project.get('waivers', []), 'visual_final_only': True})
         decision = evaluate_cycle(writer, readers, work.get('last_gate'), limit, product_used, **args)
         if decision.decision == 'human_review' and decision.reason == REPAIR_LIMIT and repair_origin(decision.blocking) == 'orchestration':
             decision = evaluate_cycle(writer, readers, work.get('last_gate'), 10 ** 6, 0, **args)  # not a product defect: the product budget does not apply

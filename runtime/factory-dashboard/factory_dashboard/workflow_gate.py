@@ -13,6 +13,9 @@ class GateDecision:
     waived: tuple = ()
 
 
+VISUAL_ASSET_SUFFIXES = ('.png', '.jpg', '.jpeg', '.webp', '.tga', '.psd', '.exr', '.bmp', '.gif')
+
+
 def evaluate_cycle(writer, readers, previous_cycle, max_repairs, repairs_used, context):
     if not writer.valid:
         return GateDecision('human_review',writer.reason)
@@ -55,7 +58,11 @@ def evaluate_cycle(writer, readers, previous_cycle, max_repairs, repairs_used, c
         for finding in data.get('findings',[]):
             finding=data['source_profile']+':'+finding
             _,severity,ac,_,_ = finding.split('|',4)
-            if severity in ('BLOCKER','HIGH') or (severity=='MEDIUM' and ac!='-'):
+            path=finding.split('|',4)[3].split(':',1)[0].strip().lower()
+            if (context.get('visual_final_only') and severity=='MEDIUM' and data['source_profile']!='art-reviewer' and path.endswith(VISUAL_ASSET_SUFFIXES)):
+                # How an image asset looks is judged once, by the final art review of the complete game, never by another reviewer and never per asset.
+                waived.append(finding+': non-blocking, visual quality of an asset is judged only by the final art review')
+            elif severity in ('BLOCKER','HIGH') or (severity=='MEDIUM' and ac!='-'):
                 waiver=waiver_for(finding,context.get('waivers'))
                 if waiver:
                     # A scoped human waiver: the finding keeps its original text and is never counted as passed.
