@@ -560,6 +560,33 @@ def _viewed(profile, session_id, home):
     return viewed
 
 
+def tool_events(profile, session_id, home):
+    """Every tool call of a worker session with what it was asked and what came back: [{'name', 'arguments', 'output'}], from the profile's own state.db."""
+    if not isinstance(session_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]{6,128}', session_id):
+        raise ConfigurationError('The stage reported no worker session')
+    database = Path(home) / 'profiles' / profile / 'state.db'
+    try:
+        connection = sqlite3.connect('file:' + quote(str(database)) + '?mode=ro', uri=True)
+        try:
+            rows = connection.execute('SELECT role,tool_calls,tool_call_id,tool_name,content FROM messages WHERE session_id=? ORDER BY id', (session_id,)).fetchall()
+        finally:
+            connection.close()
+    except sqlite3.Error as exc:
+        raise ConfigurationError('The worker session log is unreadable: ' + str(exc)) from exc
+    calls, events = {}, []
+    for role, tool_calls, call_id, tool_name, content in rows:
+        if role == 'assistant' and tool_calls:
+            try:
+                for call in json.loads(tool_calls):
+                    calls[call.get('id') or call.get('call_id')] = (call.get('function', {}).get('name', ''), call.get('function', {}).get('arguments') or '')
+            except (ValueError, AttributeError, TypeError):
+                continue
+        elif role == 'tool':
+            name, arguments = calls.get(call_id, (tool_name or '', ''))
+            events.append(dict(name=name or tool_name or '', arguments=arguments, output=content or ''))
+    return events
+
+
 # What each visual role must say after looking, beyond describing the image: findings that only someone who looked and did that role's job can write.
 ROLE_KINDS = {'art-director': 'achieve', 'architect': 'carry', 'plan-review': 'plan_check', 'art-reviewer': 'render_check'}
 ROLE_VERDICTS = {'plan_check': ('faithful', 'weakened', 'missing'), 'render_check': ('matches', 'differs')}

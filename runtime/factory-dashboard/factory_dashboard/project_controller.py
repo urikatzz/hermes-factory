@@ -10,7 +10,7 @@ import re
 import time
 
 from .model_policy import ConfigurationError
-from .project_cards import (ART_PLAN, ROLE_FINDINGS, APPROVED_COMPARISON, APPROVED_REFERENCES, INSPECTION, REFERENCE_AUDIT, VISUAL_TRACE, ARCHITECT, COMPARISON, CONFLICT_CHECK, DIRECTOR, PLAN_CORRECTION, PLAN_CORRECTION_REVIEW, ART_FIT, ART_NO_INTERMEDIATE_REVIEW, ART_SIZING, INTEGRATION_SCENE, NO_VISUAL_JUDGEMENT, OWNED_CHECK, SCENE_GATE, CONTINUES, INSPECT_PATHS, PLAN_BLOCKED, PLAN_FINDING, STYLE_CHANGED, SUPERSEDED, WRITER_GATES,
+from .project_cards import (ART_PLAN, ROLE_FINDINGS, APPROVED_COMPARISON, APPROVED_REFERENCES, INSPECTION, REFERENCE_AUDIT, VISUAL_TRACE, ARCHITECT, COMPARISON, CONFLICT_CHECK, DIRECTOR, PLAN_CORRECTION, PLAN_CORRECTION_REVIEW, ART_FIT, ART_NO_INTERMEDIATE_REVIEW, ART_SIZING, BLOCKED_NEEDS_EVIDENCE, INTEGRATION_SCENE, NO_VISUAL_JUDGEMENT, OWNED_CHECK, SCENE_GATE, CONTINUES, INSPECT_PATHS, PLAN_BLOCKED, PLAN_FINDING, STYLE_CHANGED, SUPERSEDED, WRITER_GATES,
                             PLAN_REVIEW, REPLAN, RETRO, SCOPE, SPEC_CONSTRAINTS, TOOL_INCIDENTS, project_card)
 from .project_decisions import (MAX_STAGE_RETRIES, constraint_view, constraints_of, normalize_decisions, preserved_conflict, record_applied, relevant_constraints,
                                 validate_plan_constraints, validate_spec_conflicts)
@@ -207,7 +207,7 @@ class ProjectController:
             return None
         if result.valid and isinstance(result.metadata.get('artifacts'), list):
             result.metadata['artifacts'] = dedupe_artifacts(result.metadata['artifacts'])
-        reason = None if not result.valid else self._inspection_problem(conn, project, profile, key, result, context)
+        reason = None if not result.valid else (self._unsupported_block(conn, kind, profile, result) or self._inspection_problem(conn, project, profile, key, result, context))
         if not result.valid or reason:
             reason = reason or result.reason
             scan = 'Scan candidates' in reason
@@ -285,6 +285,33 @@ class ProjectController:
     @staticmethod
     def _describe(findings):
         return '; '.join(f"{c['requirement']} [{c['kind']}: '{c['keyword']}'] {c['document']}:{c['line']}: {c['text']}" for c in findings[:5])
+
+    def _unsupported_block(self, conn, kind, profile, result):
+        """A writer that finishes BLOCKED must show the failure it hit: `blocked_evidence` = [{"command": ..., "output": ...}], each output a real excerpt (at least 15 characters) found in the
+        tool output of its own session log. Missing or unverifiable evidence is a worker slip, not a stop for a human: the worker is sent back through the bounded handoff retry (no repair budget).
+        A specification conflict and a declared tool defect carry their own account and are exempt."""
+        meta = result.metadata
+        if kind not in ('implement', 'repair') or meta.get('verdict') != 'BLOCKED' or meta.get('spec_conflicts') or (isinstance(meta.get('tool_defect'), str) and meta['tool_defect'].strip()):
+            return None
+        evidence = meta.get('blocked_evidence')
+        how = ('Finishing BLOCKED needs metadata.blocked_evidence: [{"command": "<the exact command or file you tried>", "output": "<an excerpt of what it printed, at least 15 characters>"}]. '
+               'BLOCKED is a last resort after a real attempt. These are never blockers because you do them yourself: a missing include-list entry (add it), a plan not staged in .factory (copy it from the card paths), '
+               'an unspecified pixel size (derive it), a path named in the acceptance text. Make the real attempt, then either finish the work or report the exact failure.')
+        if not isinstance(evidence, list) or not evidence or len(evidence) > 10 or any(not isinstance(e, dict) or not str(e.get('command', '')).strip() or len(str(e.get('output', '')).strip()) < 15 for e in evidence):
+            return 'Unsupported BLOCKED: no evidence of an attempt. ' + how
+        try:
+            run = self._board.get_run(conn, result.run_id)
+            session = (getattr(run, 'metadata', None) or {}).get('worker_session_id')
+            events = refs.tool_events(profile, session, self._hermes_home())
+        except Exception as exc:
+            return 'Unsupported BLOCKED: the worker session log could not be read to confirm the evidence (' + str(exc)[:120] + '). ' + how
+        squash = lambda text: ' '.join(str(text).split())
+        outputs = squash(' '.join(e['output'] for e in events))
+        calls = squash(' '.join(e['arguments'] for e in events))
+        missing = [e for e in evidence if squash(e['output']) not in outputs or squash(e['command'])[:60] not in calls]
+        if missing:
+            return 'Unsupported BLOCKED: the evidence does not match the tool calls and outputs of your session (' + str(len(missing)) + ' of ' + str(len(evidence)) + ' items were never run or never printed that). ' + how
+        return None
 
     def _inspection_problem(self, conn, project, profile, key, result, context):
         """A stage that decides or judges visuals must prove it opened each approved reference image. None when satisfied or not required.
@@ -748,7 +775,7 @@ class ProjectController:
             if plan_files:
                 # Workers have mistyped the board folder (run-t_... with a hyphen) and then blocked on a file that was there.
                 instructions += '\nApproved plan files, read exactly these absolute paths (copy them, never retype them): ' + '; '.join(plan_files)
-            instructions += '\n' + SPEC_CONSTRAINTS + '\n' + PLAN_BLOCKED + self._style_note(conn, project)
+            instructions += '\n' + SPEC_CONSTRAINTS + '\n' + PLAN_BLOCKED + '\n' + BLOCKED_NEEDS_EVIDENCE + self._style_note(conn, project)
             if profile == 'artist':
                 instructions += '\n' + ART_FIT + '\n' + ART_SIZING + '\n' + ART_NO_INTERMEDIATE_REVIEW
             if task['id'] == 'integration' and refs.authoritative(project.get('reference_records', [])):

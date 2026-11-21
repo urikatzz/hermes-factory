@@ -18,7 +18,7 @@ Start-of-stage check (skipped on a retry of this card, see the contract's "Write
 
 # Repair (FIX card)
 
-Start-of-stage check (skipped on a retry of this card): `fw.py check PROJECT_DIR --expect <BASELINE>` must pass; otherwise `VERDICT=BLOCKED` with its output. When the card gives OWNED_PATHS (a repair), run that check exactly as the card says with --owned: a file you are assigned to repair may already differ from the baseline, and that is accepted and recorded; any other difference still blocks. Copy fw's start_check object into metadata.start_check. Then regenerate or refit only the assets named in SCOPE findings, rerun the lint gate and clean up `.factory/tmp/` as in step 4. Keep everything else byte-identical.
+Start-of-stage check (skipped on a retry of this card): `fw.py check PROJECT_DIR --expect <BASELINE>` must pass; otherwise `VERDICT=BLOCKED` with its output. When the card gives OWNED_PATHS (a repair), run that check exactly as the card says with --owned: a file you are assigned to repair may already differ from the baseline, and that is accepted and recorded; any other difference still blocks. Copy fw's start_check object into metadata.start_check. BLOCKED is a last resort and needs proof: finish BLOCKED only after a real attempt, with metadata.blocked_evidence ([{command, output}] copied from your own tool calls). A missing include-list entry, an unstaged plan, an unspecified pixel size or a path named in the acceptance text is never a blocker: you do it. Then regenerate or refit only the assets named in SCOPE findings, rerun the lint gate and clean up `.factory/tmp/` as in step 4. Keep everything else byte-identical.
 
 # Always
 

@@ -50,6 +50,13 @@ class InstallTests(unittest.TestCase):
 class SoulTextTests(unittest.TestCase):
     SOULS = ROOT / 'art_production/install'
 
+    def test_the_artist_soul_and_skill_say_blocked_needs_proof_of_an_attempt(self):
+        soul = (ROOT / 'art_production/install/artist.SOUL.md').read_text()
+        skill = (ROOT / 'art_production/install/SKILL.md').read_text()
+        for text in (soul, skill):
+            for fragment in ('BLOCKED is a last resort', 'blocked_evidence', 'include-list entry' if text is soul else 'include.txt', 'pixel size'):
+                self.assertIn(fragment, text)
+
     def test_the_artist_soul_runs_the_start_check_with_owned_paths_when_the_card_gives_them(self):
         text = (ROOT / 'art_production/install/artist.SOUL.md').read_text()
         for clause in ('OWNED_PATHS', '--owned', 'start_check', 'any other difference still blocks'):

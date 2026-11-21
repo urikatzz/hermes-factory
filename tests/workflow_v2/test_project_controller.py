@@ -1,10 +1,12 @@
 from dataclasses import asdict
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
 
 from board_fixture import Board, enable_plan_review
+from reference_fixture import record_tool_session
 from factory_dashboard.model_policy import ConfigurationError
 from factory_dashboard.project_decisions import normalize_constraint
 from factory_dashboard.project_policy import budget_used
@@ -34,6 +36,20 @@ class ProjectControllerTests(unittest.TestCase):
                           (self.root, 'snapshot', json.dumps(self.definition), 'preparing'))
         self.conn.commit()
         self.controller = WorkflowController(self.board, self.state, self.temp.name)
+        self.home = Path(self.temp.name) / 'hermes-home'
+        previous = os.environ.get('FACTORY_HERMES_HOME')
+        os.environ['FACTORY_HERMES_HOME'] = str(self.home)
+        self.addCleanup(lambda: os.environ.pop('FACTORY_HERMES_HOME') if previous is None else os.environ.__setitem__('FACTORY_HERMES_HOME', previous))
+
+    def block(self, row, reason='Cannot continue', **extra):
+        """Finish a writer BLOCKED the way a worker that really tried does: evidence that matches its own session log."""
+        session = 'blocksession' + row['task_id'].replace('_', '')
+        command, output = 'python3 build.py --all', 'build.py: error: the engine binary is missing'
+        record_tool_session(self.home, row['profile'], session, command, output)
+        self.board.complete(row, verdict='BLOCKED', blocked_reason=reason, blocked_evidence=[dict(command=command, output=output)], **extra)
+        run = self.conn.execute('SELECT id,metadata FROM task_runs WHERE task_id=? ORDER BY id DESC', (row['task_id'],)).fetchone()
+        metadata = json.loads(run[1]); metadata['worker_session_id'] = session
+        self.conn.execute('UPDATE task_runs SET metadata=? WHERE id=?', (json.dumps(metadata), run[0])); self.conn.commit()
 
     def tick(self):
         return self.controller.reconcile(self.conn, self.root)
@@ -984,8 +1000,8 @@ class ProjectControllerTests(unittest.TestCase):
 
     def test_a_blocked_writer_that_declares_a_plan_defect_stops_for_a_human_and_is_not_replanned(self):
         self.plan()
-        self.board.complete(self.only('developer'), verdict='BLOCKED', blocked_reason='Task acceptance conflict',
-                            plan_defect='The acceptance criteria contradict each other; the architect must clarify them')
+        self.block(self.only('developer'), 'Task acceptance conflict',
+                   plan_defect='The acceptance criteria contradict each other; the architect must clarify them')
         self.tick()
         self.assertEqual(self.project()['terminal']['phase'], 'blocked')
         self.assertIn('Task acceptance conflict', self.project()['terminal']['reason'])
@@ -993,14 +1009,14 @@ class ProjectControllerTests(unittest.TestCase):
 
     def test_a_blocked_writer_without_a_plan_defect_still_stops_for_a_human(self):
         self.plan()
-        self.board.complete(self.only('developer'), verdict='BLOCKED', blocked_reason='The Unity editor is not installed')
+        self.block(self.only('developer'), 'The Unity editor is not installed')
         self.tick()
         self.assertEqual(self.project()['terminal']['phase'], 'blocked')
         self.assertIn('Stage blocked', self.project()['terminal']['reason'])
 
     def test_reevaluating_a_blocked_writer_stop_keeps_it_blocked_and_does_not_rerun_the_writer(self):
         self.plan()
-        self.board.complete(self.only('developer'), verdict='BLOCKED', blocked_reason='Task acceptance conflict', plan_defect='Contradictory criteria need clarification')
+        self.block(self.only('developer'), 'Task acceptance conflict', plan_defect='Contradictory criteria need clarification')
         developers = lambda: self.conn.execute("SELECT COUNT(*) FROM factory_workflow_stages WHERE profile='developer'").fetchone()[0]
         self.tick()
         self.assertEqual(self.project()['terminal']['phase'], 'blocked')
@@ -1068,7 +1084,7 @@ class ProjectControllerTests(unittest.TestCase):
         self.plan()
         first = self.only('developer')
         self.assertIn('BASELINE none', self.board.cards[first['task_id']]['body'])
-        self.board.complete(first, verdict='BLOCKED', blocked_reason='Could not finish', manifest_sha12='fedcba654321')  # it edited files and rebuilt the manifest
+        self.block(first, 'Could not finish', manifest_sha12='fedcba654321')  # it edited files and rebuilt the manifest
         self.tick(); self.board.complete(self.only('factory-retro')); self.tick()
         self.controller.resume(self.conn, self.root, 'Retry the writer', dict(retry_stage=True))
         self.tick()
@@ -1079,7 +1095,7 @@ class ProjectControllerTests(unittest.TestCase):
     def test_a_retried_writer_whose_predecessor_reported_no_new_manifest_keeps_the_card_baseline(self):
         self.plan()
         first = self.only('developer')
-        self.board.complete(first, verdict='BLOCKED', blocked_reason='Could not finish', manifest_sha12='none')
+        self.block(first, 'Could not finish', manifest_sha12='none')
         self.tick(); self.board.complete(self.only('factory-retro')); self.tick()
         self.controller.resume(self.conn, self.root, 'Retry the writer', dict(retry_stage=True)); self.tick()
         card = self.board.cards[self.only('developer')['task_id']]['body']
@@ -1194,7 +1210,7 @@ class ProjectControllerTests(unittest.TestCase):
             project = self.project(); project['work']['tool_defect_refunds'] = [dict(key='x')] * prior_refunds
             self.conn.execute('UPDATE factory_project_execution SET document=?', (json.dumps(project),)); self.conn.commit()
         extra = dict(tool_defect=defect) if defect else {}
-        self.board.complete(self.only('fixer'), verdict='BLOCKED', blocked_reason='Cannot continue', **extra)
+        self.block(self.only('fixer'), 'Cannot continue', **extra)
         self.tick()
         return self.project()
 
@@ -1300,7 +1316,7 @@ class ProjectControllerTests(unittest.TestCase):
         original = pc.baseline_snapshot
         pc.baseline_snapshot = lambda manifest, hint: snap   # content verification of real archives is covered by its own test
         self.addCleanup(lambda: setattr(pc, 'baseline_snapshot', original))
-        self.board.complete(row, verdict='BLOCKED', blocked_reason='start check failed', manifest_sha12='2a733f8c645d'); self.tick()
+        self.block(row, 'start check failed', manifest_sha12='2a733f8c645d'); self.tick()
         self.conn.execute("UPDATE factory_workflow_roots SET phase='blocked'"); self.conn.commit()
         self.controller.resume(self.conn, self.root, 'Fresh attempt after a blocked one'); self.tick()
         fixer = next(r for r in self.board.ready() if r['profile'] == 'fixer')
@@ -1314,7 +1330,7 @@ class ProjectControllerTests(unittest.TestCase):
         authoritative = self.project()['work']['manifest'][:12]
         mutated = '2a733f8c645d'   # run 212: the blocked worker ran `fw.py manifest` and reported the rebuilt manifest
         self.assertNotEqual(authoritative, mutated)
-        self.board.complete(row, verdict='BLOCKED', blocked_reason='start check failed', manifest_sha12=mutated); self.tick()
+        self.block(row, 'start check failed', manifest_sha12=mutated); self.tick()
         self.conn.execute("UPDATE factory_workflow_roots SET phase='blocked'"); self.conn.commit()
         self.controller.resume(self.conn, self.root, 'Fresh attempt after a blocked one'); self.tick()
         fixer = next(r for r in self.board.ready() if r['profile'] == 'fixer')   # the retro of the stopped attempt is ready too
@@ -1403,6 +1419,76 @@ class ProjectControllerTests(unittest.TestCase):
         base = self.project()['work']['manifest']
         self.finish_repair(row, dict(baseline_sha12=base[:12], owned=['code.py'], differed=['code.py'], accepted_owned=['code.py'], rejected_outside_scope=[]))
         self.assertFalse(any(e['kind'] == 'start_check_owned' for e in self.project().get('orchestration_log', [])))
+
+    # --- BLOCKED is a last resort and needs proof of a real attempt ---
+    def blocked_plain(self, row, **extra):
+        self.board.complete(row, verdict='BLOCKED', blocked_reason='The plan is not staged', **extra)
+
+    def test_a_writer_that_finishes_blocked_with_no_evidence_is_sent_back_not_stopped_and_costs_no_budget(self):
+        self.plan()
+        row = self.only('developer')
+        self.blocked_plain(row); self.tick()
+        project = self.project()
+        self.assertNotIn('terminal', project)                                        # the project did not stop for a human
+        self.assertEqual(project['handoff_retries'], {'task-code-implement:0': 1})   # a bounded handoff retry...
+        self.assertEqual(self.used(), (0, 0))                                        # ...that spends no repair budget
+        self.assertTrue(any(e['kind'] == 'handoff_retry' and 'Unsupported BLOCKED' in e['reason'] for e in project['orchestration_log']))
+        again = self.only('developer')
+        self.assertNotEqual(again['task_id'], row['task_id'])                        # a fresh card for the same stage
+        body = self.board.cards[again['task_id']]['body']
+        self.assertIn('Unsupported BLOCKED: no evidence of an attempt', json.dumps(self.board.get_task(self.conn, again['task_id']).__dict__, default=str) + body)
+
+    def test_evidence_that_the_session_never_produced_is_refused_as_invented(self):
+        self.plan()
+        row = self.only('developer')
+        record_tool_session(self.home, 'developer', 'inventedsession1', 'ls', 'total 8 drwxr-xr-x something real')
+        self.board.complete(row, verdict='BLOCKED', blocked_reason='Blocked by the approvals guard',
+                            blocked_evidence=[dict(command='sh tool.sh', output='the approvals guard refused this command outright')])
+        run = self.conn.execute('SELECT id,metadata FROM task_runs WHERE task_id=? ORDER BY id DESC', (row['task_id'],)).fetchone()
+        meta = json.loads(run[1]); meta['worker_session_id'] = 'inventedsession1'
+        self.conn.execute('UPDATE task_runs SET metadata=? WHERE id=?', (json.dumps(meta), run[0])); self.conn.commit()
+        self.tick()
+        self.assertNotIn('terminal', self.project())
+        self.assertTrue(any('does not match the tool calls and outputs of your session' in e['reason'] for e in self.project()['orchestration_log'] if e['kind'] == 'handoff_retry'))
+
+    def test_evidence_that_matches_the_session_is_a_genuine_block_and_still_stops_for_a_human(self):
+        self.plan()
+        self.block(self.only('developer'), 'The compiler is missing'); self.tick()
+        self.assertEqual(self.project()['terminal']['phase'], 'blocked')
+        self.assertIn('The compiler is missing', self.project()['terminal']['reason'])
+        self.assertEqual(self.project().get('handoff_retries', {}), {})
+
+    def test_the_bounded_retry_ends_at_its_limit_with_the_stop_the_worker_earned(self):
+        self.plan()
+        for attempt in range(1, 4):
+            self.blocked_plain(self.only('developer')); self.tick()
+            if attempt < 3:
+                self.assertNotIn('terminal', self.project(), attempt)
+        self.assertEqual(self.project()['handoff_retries']['task-code-implement:0'], 2)
+        self.assertEqual(self.project()['terminal']['phase'], 'human_review')       # an exhausted handoff budget is a stop for a human, never an unlimited loop
+
+    def test_a_specification_conflict_and_a_declared_tool_defect_carry_their_own_account_and_are_exempt(self):
+        self.plan()
+        self.blocked_plain(self.only('developer'), tool_defect='sprite_fit --coverage opaque still returned opaque 0.03'); self.tick()
+        self.assertEqual(self.project()['terminal']['phase'], 'blocked')
+        self.assertIn('Tool defect reported', self.project()['terminal']['reason'])
+
+    def test_a_non_writer_blocked_is_not_subject_to_the_evidence_rule(self):
+        from factory_dashboard.project_controller import ProjectController
+        for kind in ('prepare', 'review', 'verify'):
+            result = type('R', (), dict(metadata=dict(verdict='BLOCKED')))()
+            self.assertIsNone(ProjectController._unsupported_block(self, self.conn, kind, 'x', result))
+
+    def test_writer_cards_carry_the_blocked_needs_evidence_rule_and_reviewer_cards_do_not(self):
+        self.plan()
+        body = self.board.cards[self.only('developer')['task_id']]['body']
+        for text in ('BLOCKED is a last resort', 'metadata.blocked_evidence', 'a missing .factory/include.txt entry (add the path)', 'an unspecified pixel size (derive it)',
+                     'a path or filename named in the acceptance text (create it)', 'costs no repair budget'):
+            self.assertIn(text, body)
+        self.board.complete(self.only('developer')); self.tick()
+        self.board.complete(self.only('verifier')); self.tick()
+        for row in self.board.ready():
+            self.assertNotIn('metadata.blocked_evidence', self.board.cards[row['task_id']]['body'], row['profile'])
 
     def test_a_non_artist_writer_card_has_no_fit_mode_text(self):
         self.plan()
@@ -1500,7 +1586,7 @@ class ProjectControllerTests(unittest.TestCase):
     # --- stage retry: re-run only the stopped stage, keep history ---
     def stopped_on_a_blocked_writer(self):
         self.plan()
-        self.board.complete(self.only('developer'), verdict='BLOCKED', blocked_reason='The linter cannot express the plan')
+        self.block(self.only('developer'), 'The linter cannot express the plan')
         self.tick(); self.board.complete(self.only('factory-retro'))
         self.assertEqual(self.tick()['phase'], 'blocked')
 
@@ -1534,7 +1620,7 @@ class ProjectControllerTests(unittest.TestCase):
         self.stopped_on_a_blocked_writer()
         for attempt in range(2):
             self.controller.resume(self.conn, self.root, 'Tooling corrected', dict(retry_stage=True)); self.tick()
-            self.board.complete(self.only('developer'), verdict='BLOCKED', blocked_reason='Still blocked')
+            self.block(self.only('developer'), 'Still blocked')
             self.tick(); self.board.complete(self.only('factory-retro'))
             self.assertEqual(self.tick()['phase'], 'blocked')
         with self.assertRaisesRegex(ConfigurationError, 'human stage retries'):

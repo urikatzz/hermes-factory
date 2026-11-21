@@ -99,6 +99,19 @@ def record_session(home, profile, session, viewed=(), succeeded=True):
     connection.close()
 
 
+def record_tool_session(home, profile, session, command, output, name='terminal'):
+    """A worker session log with one real tool call: what the worker ran and what came back (the evidence a BLOCKED hand-off must match)."""
+    path = Path(home) / 'profiles' / profile / 'state.db'
+    path.parent.mkdir(parents=True, exist_ok=True)
+    connection = sqlite3.connect(path)
+    connection.execute('CREATE TABLE IF NOT EXISTS messages(id INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT, role TEXT, content TEXT, tool_call_id TEXT, tool_calls TEXT, tool_name TEXT)')
+    call = f'call_{session}'
+    connection.execute('INSERT INTO messages(session_id,role,tool_calls) VALUES(?,?,?)', (session, 'assistant', json.dumps([dict(id=call, type='function', function=dict(name=name, arguments=json.dumps(dict(command=command))))])))
+    connection.execute('INSERT INTO messages(session_id,role,tool_call_id,tool_name,content) VALUES(?,?,?,?,?)', (session, 'tool', call, name, json.dumps(dict(output=output, exit_code=1))))
+    connection.commit()
+    connection.close()
+
+
 class ReferenceFlow(unittest.TestCase):
     """Subclasses set REFERENCES (the references file content) and may adjust files in prepare()."""
     REFERENCES = []
