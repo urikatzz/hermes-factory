@@ -99,6 +99,13 @@ class ArtReviewerTests(ArtReviewFlow):
                      'never one image per item', 'sprite_sheet.py <sheet.png> <out_dir> --grid CxR', 'not having a one-image-per-item route is never a blocker'):
             self.assertIn(text, card)
 
+    def test_developer_cards_say_that_broken_source_in_the_checkout_is_theirs_and_no_editor_is_needed(self):
+        self.finish_asset_task()
+        card = self.board.cards[self.only('developer')['task_id']]['body']
+        for text in ('Source already in the checkout is yours to repair', 'a half-finished edit from an earlier attempt', 'it is never a blocker',
+                     'A running Unity Editor is NOT needed for C# work', 'unity_gate.sh . EditMode .', 'concern live-Editor operations'):
+            self.assertIn(text, card)
+
     def test_no_art_reviewer_is_scheduled_for_an_asset_task_and_the_final_one_answers_for_every_requirement(self):
         self.finish_asset_task()                                        # asserts that no art reviewer was ready after the asset task's verifier
         self.assertEqual([r['profile'] for r in self.board.ready()], ['developer'])   # straight on to final integration: nothing waits for a visual review

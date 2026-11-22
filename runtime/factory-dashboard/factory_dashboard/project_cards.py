@@ -222,6 +222,11 @@ detached fragments, import settings, art lint. Do not fail a criterion because t
 and say which stylistic parts are left to the final review. A cropped sprite, stray fragments, a wrong size or lost transparency are technical defects and still fail.
 Engine import settings (sprite pivot, pixels per unit, filter mode, the .meta files Unity writes when it imports an asset) are applied by the scene assembly at final integration, not by an asset task: a missing .meta or an import setting that no asset-task file can carry is never an unverified-harness failure or a finding for the asset task; note it as left to final integration.'''
 
+SOURCE_IS_YOURS = '''Source already in the checkout is yours to repair. If a compile or test gate fails because of code that was there when you started (a half-finished edit from an earlier attempt, minified or
+single-line files, a renamed method whose callers were not updated), reading the failure, repairing that code and re-running the gate IS the task: it is never a blocker, and "the source is hard to read" is not a
+reason to stop (reformat it, or rewrite the affected part). A running Unity Editor is NOT needed for C# work: edit the source as text and verify with `sh $HOME/.hermes/scripts/unity_gate.sh . EditMode .`, which compiles and
+tests in batch mode. The "not authorable blind" rules in other Unity skills concern live-Editor operations (audio mixers, render-pipeline migration), not editing C# files.'''
+
 ART_SHEETS = '''A set of many items (a glyph alphabet, tiles, icons, frames) is made from sheets, never one image per item: generate one sheet with IMAGE (an evenly spaced COLUMNSxROWS grid on a flat plain background, one item per cell in a stated order), then
 slice it with `python3 $HOME/.hermes/factory-skills/worker/art-production/scripts/sprite_sheet.py <sheet.png> <out_dir> --grid CxR --names "<one name per cell>" --size WxH --prefix <prefix> --metadata <file>.json`. It cuts out and fits every cell, names the files and writes the set's metadata; read its needs_attention list. The
 standard route CAN produce a large set: not having a one-image-per-item route is never a blocker.'''
