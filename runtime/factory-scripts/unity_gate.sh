@@ -42,6 +42,14 @@ if [ ! -d "$PROJ/Library" ]; then
     mkdir -p "$PROJ/Library"
   fi
 fi
+# A Library cloned from another checkout carries that checkout's Library/EditorInstance.json (the running Editor's pid and path); Unity's CLI reads it and reports this project as "already open in
+# a running Editor". Keep the marker only when its process really has THIS project open.
+if [ -f "$PROJ/Library/EditorInstance.json" ]; then
+  EPID=$(sed -n 's/.*"process_id" *: *\([0-9][0-9]*\).*/\1/p' "$PROJ/Library/EditorInstance.json" | head -1)
+  ECMD=$([ -n "$EPID" ] && ps -p "$EPID" -o command= 2>/dev/null || true)
+  PLOG=$(cd "$PROJ" && pwd); PPHYS=$(cd "$PROJ" && pwd -P)    # the Editor's command line may name the project by either spelling
+  case "$ECMD" in *"$PLOG"*|*"$PPHYS"*) ;; *) rm -f "$PROJ/Library/EditorInstance.json" ;; esac
+fi
 OUT="$HOME/.hermes/state/factory/unity-runs/$(basename "$WT")"; mkdir -p "$OUT"; XML="$OUT/unity-$(echo "$MODE" | tr 'A-Z' 'a-z').xml"; rm -f "$XML"  # outside the worktree: nothing to clean up in the job folder
 # Known-hanging test classes (one name per line) are excluded; see state/factory/unity_exclude.txt.
 EXCL="$HOME/.hermes/state/factory/unity_exclude.txt"; FILTER=""

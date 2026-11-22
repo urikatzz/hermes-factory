@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -74,6 +75,31 @@ class UnityGateProjectDetectionTests(unittest.TestCase):
         stub.write_text('#!/bin/sh\nwhile [ $# -gt 0 ]; do [ "$1" = "--output" ] && out="$2"; shift; done\necho \'<test-run result="Passed" total="3" passed="3" failed="0" skipped="0"></test-run>\' > "$out"\nexit 0\n')
         done = self.run_gate('EditMode')
         self.assertEqual(done.returncode, 0, done.stdout); self.assertIn('UNITY_GATE PASS', done.stdout); self.assertIn('passed="3"', done.stdout)
+
+    def editor_marker(self, pid):
+        folder = self.wt / 'Library'; folder.mkdir(exist_ok=True)
+        (folder / 'EditorInstance.json').write_text('{\n\t"process_id" : %d,\n\t"version" : "6000.4.11f1"\n}' % pid)
+        return folder / 'EditorInstance.json'
+
+    def test_a_marker_copied_from_another_checkouts_library_is_removed_so_unity_does_not_think_the_project_is_open(self):
+        self.project('.')
+        marker = self.editor_marker(os.getpid())                                   # a live process, but one that does not have this project open
+        self.run_gate('EditMode')
+        self.assertFalse(marker.exists())
+
+    def test_a_marker_whose_process_really_has_this_project_open_is_kept(self):
+        self.project('.')
+        holder = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)', str((self.wt / '.').resolve())])   # a live process whose command line names this project
+        self.addCleanup(holder.kill)
+        marker = self.editor_marker(holder.pid)
+        self.run_gate('EditMode')
+        self.assertTrue(marker.exists())
+
+    def test_a_marker_for_a_dead_process_is_removed(self):
+        self.project('.')
+        marker = self.editor_marker(2 ** 22 + 12345)
+        self.run_gate('EditMode')
+        self.assertFalse(marker.exists())
 
     def test_no_game_specific_default_remains(self):
         self.assertNotIn('BouncingGems', GATE.read_text())

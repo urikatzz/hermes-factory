@@ -1533,6 +1533,20 @@ class ProjectControllerTests(unittest.TestCase):
         self.assertNotIn('terminal', self.project())
         self.assertTrue(any('does not match the tool calls and outputs of your session' in e['reason'] for e in self.project()['orchestration_log'] if e['kind'] == 'handoff_retry'))
 
+    def test_evidence_with_quotes_and_newlines_matches_the_json_encoded_session_log(self):
+        self.plan()
+        row = self.only('developer')
+        command = 'sh $HOME/.hermes/scripts/unity_gate.sh . EditMode .'
+        output = 'UNITY_GATE FAIL EditMode (exit 6)\nError: The project at "/Users/me/worktree" is already open in a running Editor (PID 93915).'
+        record_tool_session(self.home, 'developer', 'quotedsession1', command, output)           # stored as {"output": "...\\"..."} in the log
+        self.board.complete(row, verdict='BLOCKED', blocked_reason='The Unity gate cannot run', blocked_evidence=[dict(command=command, output=output)])
+        run = self.conn.execute('SELECT id,metadata FROM task_runs WHERE task_id=? ORDER BY id DESC', (row['task_id'],)).fetchone()
+        meta = json.loads(run[1]); meta['worker_session_id'] = 'quotedsession1'
+        self.conn.execute('UPDATE task_runs SET metadata=? WHERE id=?', (json.dumps(meta), run[0])); self.conn.commit()
+        self.tick()
+        self.assertEqual(self.project()['terminal']['phase'], 'blocked')                          # genuine evidence is accepted: the stop is the worker's earned stop
+        self.assertEqual(self.project().get('handoff_retries', {}), {})
+
     def test_evidence_that_matches_the_session_is_a_genuine_block_and_still_stops_for_a_human(self):
         self.plan()
         self.block(self.only('developer'), 'The compiler is missing'); self.tick()

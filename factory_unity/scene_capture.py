@@ -83,6 +83,7 @@ def prepare_clone(project, scratch, library_from=None, run=subprocess.run):
         cloned = run(['cp', '-cR', str(source), str(clone / 'Library')], capture_output=True, text=True, timeout=1800)
         if cloned.returncode != 0:                       # not APFS: a plain copy is slower but equivalent
             shutil.copytree(source, clone / 'Library', symlinks=True, ignore_dangling_symlinks=True)
+    (clone / 'Library' / 'EditorInstance.json').unlink(missing_ok=True)   # the cloned Library names the source project's running Editor; the clone is not open anywhere
     target = clone / 'Assets/Editor/FactoryScene'
     target.mkdir(parents=True, exist_ok=True)
     shutil.copy2(EDITOR_SCRIPT, target / EDITOR_SCRIPT.name)

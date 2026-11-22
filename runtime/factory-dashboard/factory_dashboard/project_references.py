@@ -583,8 +583,28 @@ def tool_events(profile, session_id, home):
                 continue
         elif role == 'tool':
             name, arguments = calls.get(call_id, (tool_name or '', ''))
-            events.append(dict(name=name or tool_name or '', arguments=arguments, output=content or ''))
+            events.append(dict(name=name or tool_name or '', arguments=_plain(arguments), output=_plain(content or '')))
     return events
+
+
+def _plain(text):
+    """A session log stores tool arguments and results JSON-encoded ({"command": "..."}, {"output": "..."}), which escapes quotes and newlines. Return the text a worker would quote: the string values
+    of such an object joined together, or the text itself when it is not JSON."""
+    try:
+        value = json.loads(text)
+    except (TypeError, ValueError):
+        return str(text)
+    def strings(item):
+        if isinstance(item, str):
+            yield item
+        elif isinstance(item, dict):
+            for part in item.values():
+                yield from strings(part)
+        elif isinstance(item, list):
+            for part in item:
+                yield from strings(part)
+    found = list(strings(value))
+    return ' '.join(found) if found else str(text)
 
 
 # What each visual role must say after looking, beyond describing the image: findings that only someone who looked and did that role's job can write.
