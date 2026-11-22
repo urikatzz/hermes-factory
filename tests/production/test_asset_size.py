@@ -84,7 +84,7 @@ class SizingInstructionTests(unittest.TestCase):
 
     def test_the_artist_skill_explains_how_to_make_a_set_from_one_sheet(self):
         text = (ROOT / 'art_production/install/SKILL.md').read_text()
-        for fragment in ('Sets made from one sheet', 'ONE sheet', 'sprite_sheet.py', '--grid CxR', 'needs_attention', '`-` is `hyphen`', 'metadata file named in the acceptance text'):
+        for fragment in ('Sets made from one sheet', 'ONE sheet', 'sprite_sheet.py', '--grid CxR', 'needs_attention', '--align detect', '--gap', '`-` is `hyphen`', 'metadata file named in the acceptance text'):
             self.assertIn(fragment, text)
         self.assertIn('sprite_sheet.py', (ROOT / 'scripts/install_art_production.sh').read_text())
 

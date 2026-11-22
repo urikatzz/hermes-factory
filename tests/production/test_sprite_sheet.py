@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 from production_fixtures import ROOT
-from art_production.sheet import SheetError, cell, item_filename, slice_sheet
+from art_production.sheet import SheetError, cell, detect_items, item_filename, slice_by_detection, slice_sheet
 from factory_art.png import Image, read_png, write_png
 
 WHITE, RED, BLUE, GREEN = (255, 255, 255, 255), (220, 30, 30, 255), (30, 30, 220, 255), (30, 200, 30, 255)
@@ -81,6 +81,85 @@ class SheetSlicingTests(unittest.TestCase):
         _, _, cleared, clean_report = slice_sheet(marked, 3, 2, list('ABCDEF'), (64, 64), inset=0.0, drop_fragments_below=400)[0]
         self.assertEqual(clean_report['fragment_count'], 0)
         self.assertGreater(sum(1 for p in cleared.pixels if p[3]), 100)
+
+
+def scattered_sheet(placements, width=400, height=300):
+    """A flat white sheet with coloured blocks at arbitrary places (not on grid lines): placements = [(x, y, w, h, colour)]."""
+    pixels = [WHITE] * (width * height)
+    for x, y, w, h, colour in placements:
+        for j in range(y, y + h):
+            for i in range(x, x + w):
+                pixels[j * width + i] = colour
+    return Image(width, height, pixels)
+
+
+# Items on two rows with uneven spacing and a slight vertical drift: what an image model really draws.
+UNEVEN = [(12, 20, 40, 50, RED), (90, 28, 44, 46, BLUE), (200, 18, 38, 52, GREEN), (310, 24, 42, 48, RED),
+          (30, 150, 44, 50, BLUE), (130, 158, 40, 46, GREEN), (260, 146, 46, 54, RED)]
+
+
+class DetectionTests(unittest.TestCase):
+    def test_items_are_found_where_they_are_and_ordered_in_rows_then_left_to_right(self):
+        boxes = detect_items(scattered_sheet(UNEVEN), 4, 7)
+        self.assertEqual([b[0] for b in boxes], [12, 90, 200, 310, 30, 130, 260])                         # row one left to right, then row two
+        self.assertEqual(len(boxes), 7)
+
+    def test_a_grid_cutter_would_cut_these_cells_wrongly_but_detection_does_not(self):
+        sheet_image = scattered_sheet(UNEVEN)
+        done = slice_by_detection(sheet_image, 4, list('ABCDEFG'), (32, 32))
+        colours = [next(p for p in sprite.pixels if p[3])[:3] for _, _, sprite, _ in done]
+        self.assertEqual(colours, [RED[:3], BLUE[:3], GREEN[:3], RED[:3], BLUE[:3], GREEN[:3], RED[:3]])
+        self.assertTrue(all(not any(r['edge_contact'].values()) for _, _, _, r in done))
+
+    def test_the_parts_of_one_item_are_merged_by_the_gap_and_neighbours_are_not(self):
+        parts = [(20, 40, 16, 40, RED), (20, 24, 16, 10, RED), (120, 40, 30, 40, BLUE)]                  # an i-like item: a stem and a dot 6 px above it
+        with self.assertRaises(SheetError):
+            detect_items(scattered_sheet(parts, 300, 150), 2, 2)                                        # the default gap of a small sheet is 2 px: the dot stays separate
+        boxes = detect_items(scattered_sheet(parts, 300, 150), 2, 2, gap=8)
+        self.assertEqual(len(boxes), 2); self.assertEqual(boxes[0][1], 24)                              # the dot joined the stem
+        self.assertEqual(boxes[1][0], 120)
+
+    def test_a_blank_name_needs_no_item_and_becomes_a_transparent_sprite(self):
+        sheet_image = scattered_sheet(UNEVEN[:3], 400, 100)
+        done = slice_by_detection(sheet_image, 3, ['A', ' ', 'B', 'C'], (24, 24), prefix='g-')
+        self.assertEqual([f for _, f, _, _ in done], ['g-A.png', 'g-space.png', 'g-B.png', 'g-C.png'])
+        self.assertTrue(done[1][3]['blank']); self.assertTrue(all(p[3] == 0 for p in done[1][2].pixels))
+        self.assertTrue(any(p[3] for p in done[2][2].pixels))
+
+    def test_a_wrong_item_count_lists_what_was_found_so_the_sheet_can_be_fixed(self):
+        with self.assertRaises(SheetError) as caught:
+            slice_by_detection(scattered_sheet(UNEVEN), 4, list('ABCDEFGH'), (32, 32))
+        self.assertIn('found 7 separate items on the sheet but 8 were expected', str(caught.exception)); self.assertIn('(12,20)', str(caught.exception))
+        with self.assertRaises(SheetError):
+            detect_items(scattered_sheet(UNEVEN), 4, 6)
+
+    def test_touching_neighbours_merge_into_one_item_and_the_error_says_so(self):
+        touching = [(20, 20, 40, 40, RED), (60, 20, 40, 40, BLUE), (150, 20, 40, 40, GREEN)]
+        with self.assertRaises(SheetError) as caught:
+            detect_items(scattered_sheet(touching, 300, 100), 3, 3)
+        self.assertIn('found 2 separate items', str(caught.exception))
+        self.assertEqual(len(detect_items(scattered_sheet(touching, 300, 100), 3, 2)), 2)
+
+
+class DetectionCommandLineTests(unittest.TestCase):
+    def run_cli(self, placements, *arguments, width=400, height=300):
+        folder = Path(tempfile.mkdtemp())
+        write_png(folder / 'sheet.png', scattered_sheet(placements, width, height))
+        done = subprocess.run([sys.executable, str(ROOT / 'scripts/sprite_sheet.py'), str(folder / 'sheet.png'), str(folder / 'out'), *arguments], capture_output=True, text=True)
+        return done, folder
+
+    def test_the_cli_slices_an_uneven_sheet_by_default(self):
+        done, folder = self.run_cli(UNEVEN, '--grid', '4x2', '--names', 'A,B,C,D,E,F,G', '--size', '32x32')
+        report = json.loads(done.stdout)
+        self.assertEqual((done.returncode, report['count'], report['needs_attention']), (0, 7, []), done.stderr)
+        self.assertEqual(sorted(p.name for p in (folder / 'out').iterdir()), [f'{c}.png' for c in 'ABCDEFG'])
+
+    def test_auto_falls_back_to_the_grid_for_an_even_sheet_and_the_error_names_both_attempts(self):
+        done, _ = self.run_cli(UNEVEN, '--grid', '4x2', '--names', 'A,B,C', '--size', '32x32')
+        self.assertEqual(done.returncode, 3)
+        self.assertIn('detect:', done.stderr); self.assertIn('grid:', done.stderr)
+        done, _ = self.run_cli([(15 + 100 * (i % 4), 15 + 150 * (i // 4), 40, 40, RED) for i in range(8)], '--grid', '4x2', '--names', 'A,B,C,D,E,F,G,H', '--size', '32x32', '--align', 'grid')
+        self.assertEqual(done.returncode, 0, done.stderr)
 
 
 class SheetCommandLineTests(unittest.TestCase):

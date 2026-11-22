@@ -3,7 +3,7 @@
 
   sprite_sheet.py sheet.png OUT_DIR --grid 7x6 --names "A,B,C,...,Z,0,1,...,9,-, ,." --size 128x128 [--prefix stencil-glyph-] [--metadata OUT_DIR/stencil-glyphs.json]
 
-The grid is COLUMNSxROWS, read left to right then top to bottom, with exactly one name per cell (a cell that is meant to be empty may be named `space`). Names may also
+Items are found wherever they are on the sheet (--align detect, the default tries it first): the sheet holds only the visible items, COLUMNS per row read left to right then top to bottom, and a name that is meant to be blank (`space`) needs no item. If detection finds the wrong number of items the error lists what it found; --align grid cuts at exact COLUMNSxROWS cell boundaries instead, with exactly one name per cell. Names may also
 come from --names-file (one per line; a line holding a single space is the space glyph). Each cell is cut out and fitted like a single sprite (--margin, --drop-fragments-below),
 and the JSON printed per item reports edge contact and detached fragments, so the set can be checked before it is delivered. Exit 0 sliced; 3 the sheet cannot be sliced as asked
 (item count, a cell without content, a name that cannot be a file name); 2 bad arguments."""
@@ -13,7 +13,7 @@ from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from art_production.sheet import SheetError, slice_sheet
+from art_production.sheet import SheetError, SPECIAL_NAMES, slice_by_detection, slice_sheet
 from factory_art.png import PngError, read_png, write_png
 from factory_art.style_bible import load_palette
 
@@ -35,6 +35,8 @@ def main():
     group.add_argument('--names-file', help='one name per line in grid order')
     parser.add_argument('--size', type=lambda t: pair(t, 'x'), required=True, help='WIDTHxHEIGHT of every sprite')
     parser.add_argument('--prefix', default='', help='file name prefix, for example stencil-glyph-')
+    parser.add_argument('--align', choices=('auto', 'detect', 'grid'), default='auto', help='detect: find the items wherever they are (rows of COLUMNS); grid: cut at exact cell boundaries; auto: detect, then grid')
+    parser.add_argument('--gap', type=int, default=None, help='detect: merge parts closer than this many pixels (default about 1.2%% of the sheet)')
     parser.add_argument('--margin', type=int, default=2); parser.add_argument('--drop-fragments-below', type=int, default=0, metavar='PX')
     parser.add_argument('--palette'); parser.add_argument('--metadata', help='write a factory-sprite-set/v1 JSON listing every sprite')
     args = parser.parse_args()
@@ -46,7 +48,21 @@ def main():
     names = [' ' if n.strip() == '' and n != '' else n for n in names]
     try:
         palette = load_palette(args.palette) if args.palette else None
-        done = slice_sheet(read_png(args.sheet), args.grid[0], args.grid[1], names, args.size, args.prefix, max(0, args.margin), max(0, args.drop_fragments_below), palette)
+        sheet_image = read_png(args.sheet)
+        options = dict(margin=max(0, args.margin), drop_fragments_below=max(0, args.drop_fragments_below), palette=palette)
+        done, problems = None, []
+        if args.align in ('auto', 'detect'):
+            try:
+                done = slice_by_detection(sheet_image, args.grid[0], names, args.size, args.prefix, gap=args.gap, **options)
+            except SheetError as error:
+                problems.append(f'detect: {error}')
+        if done is None and args.align in ('auto', 'grid'):
+            try:
+                done = slice_sheet(sheet_image, args.grid[0], args.grid[1], names, args.size, args.prefix, **options)
+            except SheetError as error:
+                problems.append(f'grid: {error}')
+        if done is None:
+            raise SheetError(' | '.join(problems))
     except SheetError as error:
         print(json.dumps(dict(ok=False, error=str(error)))); print(f'sprite_sheet: {error}', file=sys.stderr)
         return 3
