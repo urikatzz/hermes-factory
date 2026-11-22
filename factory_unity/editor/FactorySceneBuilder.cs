@@ -18,7 +18,7 @@ public static class FactoryScene
     [Serializable] public class Obj
     {
         public string id; public string name; public string asset; public float[] position = { 0, 0, 0 }; public float[] size_units; public float[] scale; public int sorting_order;
-        public float pixels_per_unit = 0f; public bool flip_x; public string[] covers;
+        public float pixels_per_unit = 0f; public bool flip_x; public string[] covers; public float[] pivot;
     }
     [Serializable] public class Layout { public string schema; public string scene; public string lighting = "unlit"; public Camera2 camera = new Camera2(); public Obj[] objects = new Obj[0]; }
 
@@ -61,6 +61,7 @@ public static class FactoryScene
             int w = 0, h = 0; importer.GetSourceTextureWidthAndHeight(out w, out h);
             float ppu = o.pixels_per_unit > 0 ? o.pixels_per_unit : (o.size_units != null && o.size_units.Length >= 1 && o.size_units[0] > 0 ? w / o.size_units[0] : 100f);
             importer.textureType = TextureImporterType.Sprite; importer.spriteImportMode = SpriteImportMode.Single; importer.spritePixelsPerUnit = ppu;
+            if (o.pivot != null && o.pivot.Length >= 2) { importer.spriteAlignment = (int)SpriteAlignment.Custom; importer.spritePivot = new Vector2(o.pivot[0], o.pivot[1]); }
             importer.mipmapEnabled = false; importer.alphaIsTransparency = true; importer.filterMode = FilterMode.Bilinear; importer.textureCompression = TextureImporterCompression.Uncompressed;
             importer.SaveAndReimport();
         }

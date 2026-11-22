@@ -1292,6 +1292,8 @@ class ProjectControllerTests(unittest.TestCase):
         for text in ('only through objective, measurable properties', 'cropping at the canvas edge', 'stray or\ndetached fragments', 'judged once, by the final art review of the complete game',
                      'A cropped sprite, stray fragments, a wrong size or lost transparency are technical defects and still fail'):
             self.assertIn(text, body)
+        self.assertIn('Engine import settings (sprite pivot, pixels per unit, filter mode', body)
+        self.assertIn('applied by the scene assembly at final integration', body)
         self.board.complete(self.only('verifier')); self.tick()
         for row in self.board.ready():
             self.assertNotIn('only through objective, measurable properties', self.board.cards[row['task_id']]['body'], row['profile'])   # reviewers have their own rule

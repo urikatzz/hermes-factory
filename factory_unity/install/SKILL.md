@@ -18,6 +18,7 @@ Use this at final integration of a game with a human-approved visual reference. 
 ```
 
 - One object per delivered asset. `asset` is an `Assets/` path inside the project; `position` is world units; `size_units` is the sprite's WIDTH in world units (height follows the image's aspect); `sorting_order` decides what draws on top.
+- `pivot` (optional, [x, y] as fractions of the sprite, for example `[0.5, 0]` for the feet) sets the sprite's import pivot, so a position names where the feet or base stand; engine import settings belong to this assembly step, not to asset tasks.
 - `covers` lists the approved-reference requirement ids the object supplies (`V3`, ...). An approved requirement that no object covers is **missing**: the scene can still be rendered and scored, but only as a preliminary composition test, never accepted.
 - The camera matches the reference: same aspect ratio and resolution, and the orthographic size from the plan's scale. `lighting` is `unlit` (assets as authored, default) or `project` (the project's own 2D lighting).
 - Place objects from the plan's coordinates, not by eye. Build the layout from every asset and requirement the plan names; do not leave something out because it is hard.

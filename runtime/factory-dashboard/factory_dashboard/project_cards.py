@@ -219,7 +219,8 @@ checks each item against the tool calls and outputs of your own session; a BLOCK
 
 VERIFIER_NO_STYLE_JUDGEMENT = '''Verify acceptance criteria that describe how an art asset looks (a palette, a rim light, a texture, a style rule, a likeness to the reference) only through objective, measurable properties: file validity, dimensions, opacity and coverage, cropping at the canvas edge, stray or
 detached fragments, import settings, art lint. Do not fail a criterion because the style or look seems off or because a stylistic effect is not demonstrated by pixel statistics: how the art looks is judged once, by the final art review of the complete game. When the objective parts pass, record the criterion as pass
-and say which stylistic parts are left to the final review. A cropped sprite, stray fragments, a wrong size or lost transparency are technical defects and still fail.'''
+and say which stylistic parts are left to the final review. A cropped sprite, stray fragments, a wrong size or lost transparency are technical defects and still fail.
+Engine import settings (sprite pivot, pixels per unit, filter mode, the .meta files Unity writes when it imports an asset) are applied by the scene assembly at final integration, not by an asset task: a missing .meta or an import setting that no asset-task file can carry is never an unverified-harness failure or a finding for the asset task; note it as left to final integration.'''
 
 ART_NO_INTERMEDIATE_REVIEW = '''No one reviews or scores an individual asset visually, and nothing here is blocked because an asset looks different from the reference. Build every asset to match the approved reference and its requirement ids
 (open the reference with vision_analyze and compare your own result as you work), then continue. The only visual gate is one final review of the complete, assembled and engine-rendered game against the whole reference. Technical checks still apply: valid files,

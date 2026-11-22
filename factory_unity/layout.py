@@ -59,6 +59,10 @@ def validate_layout(layout, project_dir=None):
         _numbers(item.get('position', [0, 0, 0]), 2, f'object {item["id"]} position')
         if 'size_units' in item:
             _numbers(item['size_units'], 1, f'object {item["id"]} size_units')
+        if 'pivot' in item:
+            _numbers(item['pivot'], 2, f'object {item["id"]} pivot')
+            if any(not 0 <= v <= 1 for v in item['pivot'][:2]):
+                raise LayoutError(f'object {item["id"]}: pivot must be fractions of the sprite between 0 and 1 (for example [0.5, 0] for the feet)')
         covers = item.get('covers', [])
         if not isinstance(covers, list) or any(not isinstance(c, str) or not REQUIREMENT.fullmatch(c) for c in covers):
             raise LayoutError(f'object {item["id"]}: covers must list requirement ids such as V3')

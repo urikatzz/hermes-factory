@@ -64,6 +64,18 @@ class LayoutTests(Project):
                 with self.assertRaises(LayoutError):
                     validate_layout(item, self.project)
 
+    def test_a_pivot_is_validated_as_fractions_of_the_sprite(self):
+        good = layout(); good['objects'][0]['pivot'] = [0.5, 0]
+        validate_layout(good, self.project)
+        for bad in ([0.5], [0.5, 1.5], [-0.1, 0], ['a', 0]):
+            broken = layout(); broken['objects'][0]['pivot'] = bad
+            with self.subTest(pivot=bad):
+                with self.assertRaises(LayoutError):
+                    validate_layout(broken, self.project)
+
+    def test_the_engine_script_applies_the_pivot(self):
+        self.assertIn('importer.spritePivot', (ROOT / 'factory_unity/editor/FactorySceneBuilder.cs').read_text())
+
     def test_completeness_names_the_required_elements_the_scene_does_not_cover(self):
         done = completeness(layout(), ['V1', 'V2', 'V3', 'V4'])
         self.assertEqual((done['present'], done['missing'], done['complete']), (['V1', 'V2'], ['V3', 'V4'], False))
