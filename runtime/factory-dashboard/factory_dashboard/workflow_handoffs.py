@@ -66,6 +66,16 @@ def normalize_handoff(task, run, expected_stage):
         retained = expected_stage.get('retained_artifacts')
         if retained is not None and any(path not in retained for path in artifacts):
             return invalid('Artifact is not a retained completion attachment')
+    if kind in ('implement','repair') and isinstance(metadata.get('findings'),list):
+        # A writer's findings are not what the gate decides on (reviewers' are), so a finished stage is never rejected over their format: well-formed ones stay,
+        # anything else (an art lint's own lines, free text) is kept as writer_notes.
+        def well_formed(f):
+            parts = f.split('|',4) if isinstance(f,str) else []
+            return len(parts)==5 and parts[1] in ('BLOCKER','HIGH','MEDIUM','LOW','NIT')
+        good = [f for f in metadata['findings'] if well_formed(f)]
+        notes = [str(f)[:300] for f in metadata['findings'] if not well_formed(f)]
+        if notes or len(good)>15:
+            metadata = dict(metadata, findings=good[:15], writer_notes=(notes + [str(f)[:300] for f in good[15:]])[:30])
     findings = metadata.get('findings',[])
     if not isinstance(findings,list) or len(findings)>15:
         return invalid('Invalid findings list')

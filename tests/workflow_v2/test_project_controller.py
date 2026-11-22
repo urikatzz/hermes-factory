@@ -1499,6 +1499,27 @@ class ProjectControllerTests(unittest.TestCase):
         self.assertEqual(self.project()['terminal']['phase'], 'blocked')                      # the retries are spent: a human decides
         self.assertIn('requires intervention', self.project()['terminal']['reason'])
 
+    def test_a_finished_writer_is_never_rejected_over_the_format_of_its_findings(self):
+        self.plan()
+        row = self.only('developer')
+        lint_lines = ['MEDIUM palette: Assets/Art/Room01/fx-vignette.png — 156 colours off palette, e.g. #282929', 'a note in free text']
+        self.board.complete(row, findings=lint_lines + ['F1|LOW|AC1|code.py|a well-formed finding'])
+        self.tick()
+        project = self.project()
+        self.assertNotIn('terminal', project)                                              # accepted and on to verification
+        self.assertEqual(project.get('handoff_retries', {}).get('task-code-implement:0', 0), 0)
+        self.assertEqual(self.project()['work']['step'], 'verifying')
+        history = next(h for h in project['history'] if h['key'] == 'task-code-implement')
+        self.assertEqual(history['findings'], ['F1|LOW|AC1|code.py|a well-formed finding'])  # the well-formed one stays
+
+    def test_a_reviewers_malformed_findings_are_still_rejected(self):
+        self.plan(); self.board.complete(self.only('developer')); self.tick()
+        self.board.complete(self.only('verifier')); self.tick()
+        reviewer = next(r for r in self.board.ready() if r['profile'] == 'claude-reviewer')
+        self.board.complete(reviewer, verdict='CHANGES_REQUIRED', findings=['MEDIUM palette: not the schema'])
+        self.tick()
+        self.assertTrue(any('Invalid finding schema' in e['reason'] for e in self.project().get('orchestration_log', []) if e['kind'] == 'handoff_retry'))
+
     def test_evidence_that_the_session_never_produced_is_refused_as_invented(self):
         self.plan()
         row = self.only('developer')
