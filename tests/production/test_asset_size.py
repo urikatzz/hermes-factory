@@ -82,6 +82,12 @@ class SizingInstructionTests(unittest.TestCase):
                          'world size from the plan', '32 to 2048 px per side', 'caps the long side at 1024', 'record the pixel size, the world size', 'SIZE', 'exits 3'):
             self.assertIn(fragment, text)
 
+    def test_the_artist_skill_explains_how_to_make_a_set_from_one_sheet(self):
+        text = (ROOT / 'art_production/install/SKILL.md').read_text()
+        for fragment in ('Sets made from one sheet', 'ONE sheet', 'sprite_sheet.py', '--grid CxR', 'needs_attention', '`-` is `hyphen`', 'metadata file named in the acceptance text'):
+            self.assertIn(fragment, text)
+        self.assertIn('sprite_sheet.py', (ROOT / 'scripts/install_art_production.sh').read_text())
+
     def test_the_artist_skill_explains_edge_contact_and_fragments(self):
         text = (ROOT / 'art_production/install/SKILL.md').read_text()
         for fragment in ('edge_contact', 'fragment_count', '--drop-fragments-below', '--margin 2', 'never removes the largest group', 'regenerate the image rather than deleting it'):

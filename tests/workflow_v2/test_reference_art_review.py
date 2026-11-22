@@ -95,7 +95,8 @@ class ArtReviewerTests(ArtReviewFlow):
                      'No one reviews or scores an individual asset visually', 'nothing here is blocked because an asset looks different', 'one final review of the complete',
                      'a missing pixel size is never a reason to block', 'an explicit size beats any estimate', "take its aspect ratio from that region", 'asset_size.py --aspect', 'caps the long side at 1024',
                      'record in your report the pixel size, the world size', 'constraints that contradict each other (the tool exits 3',
-                     'FIT\'s `edge_contact` (all false) and `fragment_count` (0)', '--drop-fragments-below <px>'):
+                     'FIT\'s `edge_contact` (all false) and `fragment_count` (0)', '--drop-fragments-below <px>',
+                     'never one image per item', 'sprite_sheet.py <sheet.png> <out_dir> --grid CxR', 'not having a one-image-per-item route is never a blocker'):
             self.assertIn(text, card)
 
     def test_no_art_reviewer_is_scheduled_for_an_asset_task_and_the_final_one_answers_for_every_requirement(self):

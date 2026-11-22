@@ -11,7 +11,7 @@ fi
 mkdir -p "$dest/scripts" "$dest/souls"
 rsync -a --exclude __pycache__ --exclude install "$root/factory_art/" "$dest/factory_art/"
 rsync -a --exclude __pycache__ --exclude install "$root/art_production/" "$dest/art_production/"
-for name in sprite_fit.py asset_size.py check_png.py tripo_model.py blender_model.py codex_image.sh blender_run.sh; do
+for name in sprite_fit.py sprite_sheet.py asset_size.py check_png.py tripo_model.py blender_model.py codex_image.sh blender_run.sh; do
   cp "$root/scripts/$name" "$dest/scripts/$name"
 done
 chmod +x "$dest"/scripts/*

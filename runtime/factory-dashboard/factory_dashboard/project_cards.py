@@ -222,6 +222,10 @@ detached fragments, import settings, art lint. Do not fail a criterion because t
 and say which stylistic parts are left to the final review. A cropped sprite, stray fragments, a wrong size or lost transparency are technical defects and still fail.
 Engine import settings (sprite pivot, pixels per unit, filter mode, the .meta files Unity writes when it imports an asset) are applied by the scene assembly at final integration, not by an asset task: a missing .meta or an import setting that no asset-task file can carry is never an unverified-harness failure or a finding for the asset task; note it as left to final integration.'''
 
+ART_SHEETS = '''A set of many items (a glyph alphabet, tiles, icons, frames) is made from sheets, never one image per item: generate one sheet with IMAGE (an evenly spaced COLUMNSxROWS grid on a flat plain background, one item per cell in a stated order), then
+slice it with `python3 $HOME/.hermes/factory-skills/worker/art-production/scripts/sprite_sheet.py <sheet.png> <out_dir> --grid CxR --names "<one name per cell>" --size WxH --prefix <prefix> --metadata <file>.json`. It cuts out and fits every cell, names the files and writes the set's metadata; read its needs_attention list. The
+standard route CAN produce a large set: not having a one-image-per-item route is never a blocker.'''
+
 ART_NO_INTERMEDIATE_REVIEW = '''No one reviews or scores an individual asset visually, and nothing here is blocked because an asset looks different from the reference. Build every asset to match the approved reference and its requirement ids
 (open the reference with vision_analyze and compare your own result as you work), then continue. The only visual gate is one final review of the complete, assembled and engine-rendered game against the whole reference. Technical checks still apply: valid files,
 opacity and coverage, integrity, build and tests.'''
