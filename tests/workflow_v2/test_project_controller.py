@@ -1482,6 +1482,37 @@ class ProjectControllerTests(unittest.TestCase):
         body = self.board.cards[again['task_id']]['body']
         self.assertIn('Unsupported BLOCKED: no evidence of an attempt', json.dumps(self.board.get_task(self.conn, again['task_id']).__dict__, default=str) + body)
 
+    def test_a_claim_that_no_file_writing_tool_exists_is_sent_back_when_the_session_never_called_one(self):
+        self.plan()
+        row = self.only('developer')
+        self.block(row, reason='AC3 cannot proceed: this run has no enabled file-writing tool; the inline python -c probe was refused by the safety guard')   # the evidence is a real, refused probe
+        self.tick()
+        project = self.project()
+        self.assertNotIn('terminal', project)
+        self.assertEqual(project['handoff_retries'], {'task-code-implement:0': 1}); self.assertEqual(self.used(), (0, 0))
+        entry = [e for e in project['orchestration_log'] if e['kind'] == 'handoff_retry'][-1]
+        self.assertIn('never called write_file or patch', entry['reason']); self.assertIn('always available', entry['reason'])
+
+    def test_a_missing_write_tool_claim_stands_when_the_worker_really_tried_the_file_tools(self):
+        self.plan()
+        row = self.only('developer')
+        session = 'writetried' + row['task_id'].replace('_', '')
+        record_tool_session(self.home, 'developer', session, 'Assets/Scripts/Editor/Room01SceneBuilder.cs', 'write_file failed: permission denied for the project directory', name='write_file')
+        self.board.complete(row, verdict='BLOCKED', blocked_reason='the project directory has no writable file tool: write_file was denied',
+                            blocked_evidence=[dict(command='Assets/Scripts/Editor/Room01SceneBuilder.cs', output='write_file failed: permission denied for the project directory')])
+        run = self.conn.execute('SELECT id,metadata FROM task_runs WHERE task_id=? ORDER BY id DESC', (row['task_id'],)).fetchone()
+        metadata = json.loads(run[1]); metadata['worker_session_id'] = session
+        self.conn.execute('UPDATE task_runs SET metadata=? WHERE id=?', (json.dumps(metadata), run[0])); self.conn.commit()
+        self.tick()
+        self.assertEqual(self.project()['terminal']['phase'], 'blocked')            # a genuine, earned stop is never turned into a retry
+        self.assertEqual(self.project().get('handoff_retries', {}), {})
+
+    def test_writer_cards_say_that_a_refused_inline_script_is_not_a_missing_tool(self):
+        self.plan()
+        body = self.board.cards[self.only('developer')['task_id']]['body']
+        for text in ('a refused `python3 -c` or heredoc is not a missing tool', 'write_file and patch tools, which are always available'):
+            self.assertIn(text, body)
+
     def test_a_writer_that_gives_up_through_kanban_block_is_sent_back_twice_then_the_stop_stands(self):
         self.plan()
         for attempt in (1, 2):

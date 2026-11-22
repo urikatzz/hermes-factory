@@ -332,6 +332,10 @@ class ProjectController:
         missing = [e for e in evidence if squash(e['output']) not in outputs or squash(e['command'])[:60] not in calls]
         if missing:
             return 'Unsupported BLOCKED: the evidence does not match the tool calls and outputs of your session (' + str(len(missing)) + ' of ' + str(len(evidence)) + ' items were never run or never printed that). ' + how
+        reason = str(meta.get('blocked_reason', '')) + ' ' + str(meta.get('blocked_summary', ''))
+        if re.search(r'(no|not|without|lack\w*|missing|unavailable|cannot (?:use|find))\W+(?:\w+\W+){0,6}?(?:file[- ]?writ\w*|write[_ ]file|patch)\b', reason, re.I) and not any(e['name'] in ('write_file', 'patch') for e in events):
+            return ('Unsupported BLOCKED: you say no file-writing tool is available, but your session never called write_file or patch. A refused inline interpreter or heredoc (python -c, cat >) is not a missing tool: '
+                    'the file tools write_file and patch are always available to you. Call write_file or patch on the file you need to change, then continue; report a tool failure only with the exact error those tools returned.')
         return None
 
     def _inspection_problem(self, conn, project, profile, key, result, context):
