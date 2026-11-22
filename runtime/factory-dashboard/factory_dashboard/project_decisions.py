@@ -122,11 +122,11 @@ def validate_plan_constraints(value):
 
 def normalize_decisions(decisions, note, now=None):
     """Validate a human decision document; return it ready to store."""
-    empty = dict(waivers=[], constraints=[], extra_repairs=0, extra_replans=0, extra_handoff_retries=0, on_exhaustion=None, plan_correction=[], retry_stage=False, model_overrides={})
+    empty = dict(waivers=[], constraints=[], extra_repairs=0, extra_replans=0, extra_handoff_retries=0, on_exhaustion=None, plan_correction=[], retry_stage=False, model_overrides={}, park=False, task=None)
     if decisions in (None, {}):
         return empty
-    if not isinstance(decisions, dict) or set(decisions) - {'waivers', 'constraints', 'extra_repairs', 'extra_replans', 'extra_handoff_retries', 'on_exhaustion', 'plan_correction', 'retry_stage', 'model_overrides'}:
-        raise ConfigurationError('A decision may only contain waivers, constraints, extra_repairs, extra_replans, extra_handoff_retries, on_exhaustion, plan_correction, retry_stage and model_overrides')
+    if not isinstance(decisions, dict) or set(decisions) - {'waivers', 'constraints', 'extra_repairs', 'extra_replans', 'extra_handoff_retries', 'on_exhaustion', 'plan_correction', 'retry_stage', 'model_overrides', 'park', 'task'}:
+        raise ConfigurationError('A decision may only contain waivers, constraints, extra_repairs, extra_replans, extra_handoff_retries, on_exhaustion, plan_correction, retry_stage, model_overrides, park and task')
     stamp = int(time.time() if now is None else now)
     waivers = []
     for item in decisions.get('waivers') or []:
@@ -175,9 +175,14 @@ def normalize_decisions(decisions, note, now=None):
     retry_stage = decisions.get('retry_stage', False)
     if type(retry_stage) is not bool:
         raise ConfigurationError('retry_stage must be true or false')
-    if (extra or extra_replans or extra_handoff or on_exhaustion or correction or retry_stage or model_overrides) and not note.strip():
+    park, task = decisions.get('park', False), decisions.get('task')
+    if type(park) is not bool:
+        raise ConfigurationError('park must be true or false')
+    if task is not None and (not isinstance(task, str) or not re.fullmatch(r'[a-z0-9][a-z0-9-]{0,63}', task)):
+        raise ConfigurationError('task must be the id of one parked task')
+    if (extra or extra_replans or extra_handoff or on_exhaustion or correction or retry_stage or model_overrides or park or task) and not note.strip():
         raise ConfigurationError('Granting repairs or changing exhaustion handling requires a recorded note')
-    return dict(waivers=waivers, constraints=constraints, extra_repairs=extra, extra_replans=extra_replans, extra_handoff_retries=extra_handoff, on_exhaustion=on_exhaustion, plan_correction=sorted(set(correction)), retry_stage=retry_stage, model_overrides=model_overrides)
+    return dict(waivers=waivers, constraints=constraints, extra_repairs=extra, extra_replans=extra_replans, extra_handoff_retries=extra_handoff, on_exhaustion=on_exhaustion, plan_correction=sorted(set(correction)), retry_stage=retry_stage, model_overrides=model_overrides, park=park, task=task)
 
 
 def finding_file(finding):

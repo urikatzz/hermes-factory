@@ -18,6 +18,8 @@ def main():
     parser.add_argument('--note',required=True)
     parser.add_argument('--reevaluate',action='store_true',help='re-judge the existing stage evidence under the current rules instead of retrying stages (also resumes a human_review stop)')
     parser.add_argument('--retry-stage',action='store_true',help='re-run only the stage the project stopped on (also resumes a human_review stop); earlier results stay as history, bounded per stage')
+    parser.add_argument('--park',action='store_true',help='park the stopped task (budgets and evidence kept exactly as they are) and continue with the tasks that do not depend on it')
+    parser.add_argument('--task',help='the parked task to resume (default: the first parked task in plan order)')
     parser.add_argument('--decision-file',type=Path,help='JSON human decision: {"waivers":[{"ac","path","source"?,"reason"}],"constraints":[{"preserve":[paths],"reason"}]}')
     args=parser.parse_args()
     sys.path.insert(0,str(args.hermes_source.resolve()))
@@ -46,6 +48,10 @@ def main():
         decisions=json.loads(args.decision_file.read_text()) if args.decision_file else None
         if args.retry_stage:
             decisions={**(decisions or {}),'retry_stage':True}
+        if args.park:
+            decisions={**(decisions or {}),'park':True}
+        if args.task:
+            decisions={**(decisions or {}),'task':args.task}
         state=controller.resume(conn,args.root,args.note,decisions,args.reevaluate)
     print(f"{args.root}: {state['phase']}")
 

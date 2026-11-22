@@ -101,6 +101,26 @@ Integration failures have an owner. A failing acceptance criterion is attributed
 
 `factory-retro` runs after a successful or unsuccessful project outcome. It writes retained `RETRO.md` with evidence, root causes, prioritized improvements, tradeoffs and validation steps. It has a scratch workspace and cannot apply improvements, modify Factory configuration, change outcomes, or publish. A missing retro report cannot silently become success.
 
+## A stopped task parks itself and its dependents, not the project
+
+The controller works on one task at a time, picking the first unfinished task, in plan order, whose dependencies have all passed (a plan that lists a task before the task it needs
+is still run in dependency order). When a task stops for a reason that concerns only that task (its stage is BLOCKED, a specification conflict, a tool defect, retries or repair budget
+exhausted) and some other task can run now, the task is **parked** and the run goes on:
+
+- The parked task keeps its whole work record (cycle, charges, extra repairs, findings, last stage) under `parked` in the project document; no budget is reset or spent, its cards stay
+  blocked, no card is deleted, and it is never marked complete. A task that depends on it, directly or through other tasks, never gets a card.
+- Only one task is ever worked at a time, so parking cannot create duplicate dispatches.
+- When nothing runnable is left, the project stops with the exact blocking graph in `terminal.graph` (and in the reason): the parked tasks with phase and reason, every waiting task with
+  what it needs and which parked task it traces back to, and how many tasks are complete. A dependency that can never be satisfied (missing or cyclic) is called out as such.
+- A stop with no independent task to run keeps the old whole-project shape (the task's work stays in place and its own reason is the reason), with the waiting tasks listed.
+- Stops that concern the whole project (references changed, an unavailable environment or visual capability, an infrastructure fault, the transition limit) still end the run, and so do
+  failures in the final integration.
+
+Resume is explicit. `resume_factory_workflow.py --task <id>` (decision `{"task": "<id>"}`) restores one parked task with its work record exactly as it was, and a resume from a
+nothing-runnable stop restores the first parked task in plan order; the usual `--retry-stage`, `--reevaluate` and grants then apply to it, with the same limits as always. `--park` (decision
+`{"park": true}`) parks the stopped task in progress of an older whole-project stop and continues with the independent tasks; it cannot be combined with a retry or a grant. A plain resume
+of any other stop leaves parked tasks parked. A replan drops parked work (it belongs to the replaced generation), and the drop is recorded in the orchestration log.
+
 ## Art review only at the end
 
 The art reviewer is **one final visual quality gate on the complete game**, not an intermediate approval stage. Permanent rules:

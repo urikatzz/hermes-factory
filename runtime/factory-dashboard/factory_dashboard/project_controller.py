@@ -120,16 +120,21 @@ class ProjectController:
             return self._controller._stop(conn, root, 'blocked', 'Project requires an absolute directory')
         conn.execute("UPDATE factory_workflow_roots SET phase='project' WHERE root_id=?", (root['root_id'],))
         root['phase'] = 'project'
-        try:
-            # Advance completed nodes within this transaction; never launch providers here.
-            for _ in range(100):
-                if not self._advance(conn, root, definition, context, project):
-                    break
-            else:
-                raise ConfigurationError('Project transition limit exceeded')
-        except (ConfigurationError, OSError, ValueError) as exc:
-            self._terminal(conn, root, project, 'blocked' if isinstance(exc, ProjectBlocked) else 'human_review', str(exc))
-            self._retro(conn, root, definition, context, project)
+        for _round in range(100):
+            try:
+                # Advance completed nodes within this transaction; never launch providers here.
+                for _ in range(100):
+                    if not self._advance(conn, root, definition, context, project):
+                        break
+                else:
+                    raise ConfigurationError('Project transition limit exceeded')
+                break
+            except (ConfigurationError, OSError, ValueError) as exc:
+                self._terminal(conn, root, project, 'blocked' if isinstance(exc, ProjectBlocked) else 'human_review', str(exc))
+                if project.get('mode') != 'retro':
+                    continue   # a task-scoped stop parked that task: schedule the tasks that do not depend on it
+                self._retro(conn, root, definition, context, project)
+                break
         self._save(conn, root, project)
         self._state.mark_reconciled(conn, root['root_id'])
         if project.get('awaiting') and not project.get('terminal'):
@@ -473,7 +478,17 @@ class ProjectController:
         if project['mode'] == 'integration':
             return project['integration']
         done = {t['id'] for t in project['completed']}
-        return next((t for t in project['tasks'] if t['id'] not in done), None)
+        if project.get('work'):
+            # The task in progress, wherever it sits in the plan (a stop elsewhere may have parked an earlier task). A record from before parking existed has no active_task.
+            wanted = project.get('active_task')
+            return next((t for t in project['tasks'] if t['id'] == wanted), None) if wanted else next((t for t in project['tasks'] if t['id'] not in done), None)
+        parked = set(project.get('parked') or {})
+        return next((t for t in project['tasks'] if t['id'] not in done and t['id'] not in parked and set(t['dependencies']) <= done), None)
+
+    @staticmethod
+    def _incomplete(project):
+        done = {t['id'] for t in project['completed']}
+        return [t for t in project['tasks'] if t['id'] not in done]
 
     @staticmethod
     def _prefix(project, task):
@@ -592,6 +607,11 @@ class ProjectController:
                        replan=dict(reason=reason, task=task['id'] if task else None, findings=list(findings)[:15],
                                    inputs=list(dict.fromkeys(inputs))))
         project.pop('work', None)
+        project.pop('active_task', None)
+        if project.get('parked'):
+            # Parked work belongs to the generation being replaced (its stage keys carry it); the replanned tasks start fresh, and the drop is recorded.
+            project.setdefault('orchestration_log', []).append(dict(kind='parked_dropped_by_replan', tasks=sorted(project['parked']), at=int(time.time())))
+            project.pop('parked')
         project.pop('integration', None)
         self._state.event(conn, root['root_id'], 'project_replan', project['replan'])
         project['history'].append(dict(replan=project['replans'], **project['replan']))
@@ -747,6 +767,11 @@ class ProjectController:
             return self._plan_correction(conn, root, definition, context, project)
         if mode == 'tasks':
             task = self._current(project)
+            if task is None and self._incomplete(project):
+                # Nothing can run: every remaining task is parked or waits on one. Report the exact graph; nothing is skipped or marked complete.
+                graph = self._stall_graph(project)
+                self._terminal(conn, root, project, 'human_review' if any(p['phase'] == 'human_review' for p in graph['parked']) else 'blocked', self._stall_report(graph), graph=graph)
+                return True
             if task is None and refs.authoritative(project.get('reference_records', [])):
                 left = self._bible_contradictions(project, context)
                 if left:
@@ -767,6 +792,7 @@ class ProjectController:
                 raise ConfigurationError('Task dependencies have not passed their complete Factory cycles')
             project['work'] = dict(step='writing', cycle=0, blocking=[], writer_inputs=[*self._inputs(project),
                 *[t['evidence_task'] for t in project['completed'] if t['id'] in task['dependencies']]], repairs=[])
+            project['active_task'] = task['id']
         return self._work(conn, root, definition, context, project, task)
 
     def _work(self, conn, root, definition, context, project, task):
@@ -996,6 +1022,7 @@ class ProjectController:
                 self._terminal(conn, root, project, 'delivered', 'All tasks and final integration passed')
             else:
                 del project['work']
+                project.pop('active_task', None)
             return True
         if decision.decision == 'human_review' and decision.reason == REPAIR_LIMIT:
             # The repair limit stops the task for a human; it never goes back to the architect. A human reads the findings and resumes with
@@ -1057,20 +1084,91 @@ class ProjectController:
         self._terminal(conn, root, project, decision.decision, decision.reason)
         return True
 
-    def _terminal(self, conn, root, project, phase, reason):
-        if project.get('terminal'):
-            return
-        project['resume_mode'] = project['mode']
+    # A stop with one of these reasons concerns the whole project (references, environment, integrity), not one task: it ends the run.
+    PROJECT_LEVEL = ('Approved references', 'references changed', 'Visual capability missing', 'requires unavailable', 'Image inspection cannot be verified',
+                     'transition limit', 'Project root is unavailable', 'requires an absolute directory')
+
+    def _retire_active(self, conn, root, project, reason):
         for token in project['active_keys']:
             key, cycle = token.rsplit(':', 1)
             for stage in self._controller._rows(conn, root, key, int(cycle))[:1]:
                 task = self._board.get_task(conn, stage['task_id'])
                 if task and task.status in ('ready', 'running'):
                     with controller_scope(conn, root['root_id']):
-                        self._board.block_task(conn, task.id, reason='Project stopped: ' + reason,
-                                               kind='needs_input', expected_run_id=task.current_run_id)
-        project['terminal'] = dict(phase=phase, reason=reason)
+                        self._board.block_task(conn, task.id, reason=reason, kind='needs_input', expected_run_id=task.current_run_id)
         project['active_keys'] = []
+
+    def _park(self, conn, root, project, phase, reason):
+        """A task-scoped stop parks that task and nothing else: its work record (cycle, charges, extra repairs, findings) is kept exactly, no budget is reset, no card is
+        deleted, and the tasks that do not depend on it stay schedulable. The project stops only when nothing runnable is left."""
+        if phase not in ('blocked', 'human_review') or project.get('mode') != 'tasks' or not project.get('work') or any(marker in reason for marker in self.PROJECT_LEVEL):
+            return False
+        task = self._current(project)
+        if task is None:
+            return False
+        done = {t['id'] for t in project['completed']}
+        parked = set(project.get('parked') or {})
+        if not any(t['id'] not in done and t['id'] not in parked and t['id'] != task['id'] and set(t['dependencies']) <= done for t in project['tasks']):
+            return False   # no independent task can run now: parking would change nothing, so the stop keeps its whole-project shape (the task's work stays in place)
+        self._retire_active(conn, root, project, 'Task parked: ' + reason)
+        self._store_parked(conn, root, project, task['id'], phase, reason)
+        return True
+
+    def _store_parked(self, conn, root, project, task_id, phase, reason):
+        project.setdefault('parked', {})[task_id] = dict(phase=phase, reason=reason, work=project.pop('work'), last_node=project.get('last_node'), at=int(time.time()))
+        project.pop('active_task', None)
+        project.setdefault('orchestration_log', []).append(dict(kind='task_parked', task=task_id, phase=phase, reason=reason[:400], at=int(time.time())))
+        self._state.event(conn, root['root_id'], 'task_parked', dict(task=task_id, phase=phase, reason=reason[:1000]))
+
+    def _stall_graph(self, project, stopped=None):
+        """Why nothing can run: the parked tasks with their reasons, and every other unfinished task with what it waits on and which parked task it traces back to.
+        `stopped` = (task id, phase, reason) of a task stopped in place (its work record has not been moved to `parked`), reported as parked."""
+        done = {t['id'] for t in project['completed']}
+        parked = dict(project.get('parked') or {})
+        if stopped:
+            parked[stopped[0]] = dict(phase=stopped[1], reason=stopped[2], work=project.get('work') or {})
+        deps = {t['id']: list(t['dependencies']) for t in project['tasks']}
+
+        def causes(task_id, seen):
+            found = set()
+            for dep in deps.get(task_id, []):
+                if dep in done or dep in seen:
+                    continue
+                seen.add(dep)
+                found |= {dep} if dep in parked else causes(dep, seen)
+            return found
+        order = [t['id'] for t in project['tasks']]
+        return dict(total=len(order), completed=[t for t in order if t in done],
+                    parked=[dict(id=t, phase=parked[t]['phase'], reason=parked[t]['reason'][:600], step=parked[t]['work'].get('step'), cycle=parked[t]['work'].get('cycle'))
+                            for t in order if t in parked],
+                    waiting=[dict(id=t, waiting_on=[d for d in deps[t] if d not in done], parked_causes=sorted(causes(t, set())))
+                             for t in order if t not in done and t not in parked])
+
+    @staticmethod
+    def _stall_report(graph):
+        lines = [f"No runnable task remains: {len(graph['completed'])} of {graph['total']} tasks are complete."]
+        lines += [f"Parked, needs a human decision: {p['id']} ({p['phase']}: {p['reason'][:300]})" for p in graph['parked']]
+        for w in graph['waiting']:
+            why = ('traces back to parked ' + ', '.join(w['parked_causes'])) if w['parked_causes'] else 'its dependencies can never be satisfied (missing or cyclic)'
+            lines.append(f"Waiting: {w['id']} needs {', '.join(w['waiting_on'])} ({why})")
+        lines.append('Nothing was skipped or marked complete. Resume with a retry or a decision (optionally --task <parked id>) to continue.')
+        return ' | '.join(lines)
+
+    def _terminal(self, conn, root, project, phase, reason, graph=None):
+        if project.get('terminal'):
+            return
+        if self._park(conn, root, project, phase, reason):
+            return
+        if graph is None and project.get('mode') == 'tasks' and project.get('work') and len(self._incomplete(project)) > 1:
+            # The task in progress stops the run (nothing independent can go on): say which unfinished tasks wait on it, or are parked, so the report is the whole blocking graph.
+            task = self._current(project)
+            graph = self._stall_graph(project, (task['id'], phase, reason)) if task else None
+            if graph:
+                reason += ' | Unfinished because of it: ' + '; '.join(f"{w['id']} (needs {', '.join(w['waiting_on'])})" for w in graph['waiting']) \
+                          + ('; parked earlier: ' + ', '.join(p['id'] for p in graph['parked'] if p['id'] != task['id']) if len(graph['parked']) > 1 else '')
+        project['resume_mode'] = project['mode']
+        self._retire_active(conn, root, project, 'Project stopped: ' + reason)
+        project['terminal'] = dict(phase=phase, reason=reason, **({'graph': graph} if graph else {}))
         project['mode'] = 'retro'
         self._state.event(conn, root['root_id'], 'project_outcome', project['terminal'])
 
@@ -1266,11 +1364,38 @@ class ProjectController:
         project.setdefault('orchestration_log', []).append(dict(kind='human_stage_retry', stages=superseded, reason=note.strip()[:500], at=int(time.time())))
         self._state.event(conn, root['root_id'], 'human_stage_retry', dict(stages=superseded, note=note[:500], execution_version=2))
 
+    def _choose_task(self, conn, root, project, decided):
+        """Which task a resume is about when tasks are parked. `park` parks the stopped task in progress (no budget or evidence changes) so independent tasks continue; `task`, or a resume from a
+        'nothing runnable' stop, restores one parked task (the named one, else the first in plan order) with its work record exactly as it was. A plain resume of any other stop leaves parked tasks parked."""
+        parked = project.get('parked') or {}
+        if decided['park']:
+            terminal = project.get('terminal') or {}
+            if decided['retry_stage'] or decided['extra_repairs'] or decided['extra_handoff_retries'] or decided['on_exhaustion'] or decided['task']:
+                raise ConfigurationError('park keeps the stopped task parked; it cannot be combined with a retry, a grant or a task choice for it')
+            if not terminal or not project.get('work') or project.get('resume_mode') != 'tasks':
+                raise ConfigurationError('park applies to a stopped task in progress; there is none')
+            task = self._current(project)
+            self._store_parked(conn, root, project, task['id'], terminal['phase'], terminal['reason'])
+            return
+        wanted = decided['task']
+        if wanted and (wanted not in parked or project.get('work')):
+            raise ConfigurationError('Task ' + wanted + ' is not parked' + (' (parked: ' + ', '.join(sorted(parked)) + ')' if parked else '') + ('; a task is in progress' if project.get('work') else ''))
+        if not parked or project.get('work') or not (wanted or (project.get('terminal') or {}).get('graph')):
+            return
+        pick = wanted or next(t['id'] for t in project['tasks'] if t['id'] in parked)
+        entry = parked.pop(pick)
+        project.update(work=entry['work'], active_task=pick, last_node=entry.get('last_node'), resume_mode='tasks')
+        if not parked:
+            project.pop('parked')
+        project.setdefault('orchestration_log', []).append(dict(kind='task_unparked', task=pick, at=int(time.time())))
+        self._state.event(conn, root['root_id'], 'task_unparked', dict(task=pick))
+
     def resume(self, conn, root, note, decisions=None, reevaluate=False):
         # Validate a human decision before anything changes; an invalid one leaves the project exactly as it was.
         decided = normalize_decisions(decisions, note)
         row = conn.execute('SELECT document FROM factory_project_execution WHERE root_id=?', (root['root_id'],)).fetchone()
         project = json.loads(row[0]) if row else {}
+        self._choose_task(conn, root, project, decided)
         if decided['extra_repairs'] and 'work' not in project:
             raise ConfigurationError('extra_repairs applies to a task in progress; none is')
         if decided['plan_correction'] and 'plan_review' not in (project.get('mode'), project.get('resume_mode')):
@@ -1310,7 +1435,7 @@ class ProjectController:
         if decided['retry_stage'] and reevaluate:
             raise ConfigurationError('retry_stage re-runs the stopped stage; reevaluate judges its existing evidence. Choose one')
         stopped = ('blocked', 'human_review') if reevaluate or decided['extra_handoff_retries'] or decided['retry_stage'] \
-            or decided['extra_repairs'] or decided['model_overrides'] else ('blocked',)
+            or decided['extra_repairs'] or decided['model_overrides'] or decided['park'] or decided['task'] else ('blocked',)
         if root['phase'] not in stopped or project.get('terminal', {}).get('phase') not in stopped:
             raise ConfigurationError('Only an infrastructure-blocked project can resume; changed scope requires a new task')
         project.update(mode=project['resume_mode'], active_keys=[], recoveries=project.get('recoveries', 0)+1, recovery_note=note)
