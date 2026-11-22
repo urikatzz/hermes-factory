@@ -11,7 +11,7 @@
                                         (a worker's `fw.py manifest`); the on-disk manifest is never rewritten
   snapshot PROJECT_DIR WS [--expect S12]
                                         reader: WS/src-<sha12>.tgz (manifest files only) + WS/src-<sha12>/
-  delta    BASE_TGZ NEW_DIR OUT_DIFF    cycle>=2 reader: extract BASE_TGZ beside OUT_DIFF, diff -ruN
+  delta    BASE_TGZ NEW_DIR OUT_DIFF    cycle>=2 reader: extract BASE_TGZ beside OUT_DIFF, diff -ruN (BASE_TGZ `none`: no baseline, exit 0 and an explanatory OUT_DIFF)
   audit    DIR [--project-dir P]        verifier release audit of the manifest in DIR (read-only)
   publish-cmds PROJECT_DIR SLUG         text only: git/gh commands a HUMAN may run to publish
   clean    WS                           remove the src-*/base-* copies this script made in WS
@@ -388,6 +388,17 @@ def cmd_snapshot(a):
 
 def cmd_delta(a):
     new = abs_dir(a.new_dir, "NEW_DIR")
+    if a.base_tgz == "none":
+        # BASELINE_TGZ none on a card means there is no earlier snapshot: the whole manifest is the change. That is a normal answer, not a failure of the tool.
+        if not os.path.isabs(a.out_diff):
+            raise Refused("OUT_DIFF must be absolute", 2)
+        res, code = check(new)
+        if code:
+            emit(dict(res, error="NEW_DIR fails its manifest"), 4)
+        with open(a.out_diff, "w", encoding="utf-8") as f:
+            f.write("# no baseline snapshot (BASELINE_TGZ none): there is no earlier state to diff against, so every file of the manifest is new; review the whole manifest.\n")
+        emit(dict(baseline="none", files=res["files"], changed_files=[], diff=a.out_diff,
+                  note="no baseline: review the whole manifest"), 0)
     if not os.path.isabs(a.out_diff) or not os.path.isfile(a.base_tgz):
         raise Refused("OUT_DIFF must be absolute and BASE_TGZ must exist", 2)
     ws = abs_dir(os.path.dirname(a.out_diff), "OUT_DIFF directory")

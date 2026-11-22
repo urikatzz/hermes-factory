@@ -248,3 +248,34 @@ class OwnedStartCheckAgainstTheBaselineSnapshotTests(OwnedStartCheckTests):
         code, out, _ = self.run_fw('check', '--expect', self.baseline, '--baseline-tgz', str(self.tgz))
         self.assertEqual(code, 2)
 
+
+class DeltaWithoutABaselineTests(unittest.TestCase):
+    """BASELINE_TGZ none on a card means no earlier snapshot: delta answers with the whole manifest instead of failing and tricking a reviewer into a tool incident."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name) / 'src'; (self.root / '.factory').mkdir(parents=True)
+        (self.root / '.factory/PLAN.md').write_text('AC1: x\n'); (self.root / 'a.txt').write_text('a'); (self.root / '.factory/include.txt').write_text('a.txt\n')
+        subprocess.run([sys.executable, str(FW), 'manifest', str(self.root)], check=True, capture_output=True)
+        self.out = Path(self.temp.name) / 'delta.diff'
+
+    def delta(self, base):
+        run = subprocess.run([sys.executable, str(FW), 'delta', base, str(self.root), str(self.out)], capture_output=True, text=True)
+        return run.returncode, (json.loads(run.stdout) if run.stdout.strip() else {})
+
+    def test_none_is_a_normal_answer_with_an_explanatory_diff_file(self):
+        code, out = self.delta('none')
+        self.assertEqual((code, out['baseline'], out['changed_files']), (0, 'none', []))
+        self.assertIn('review the whole manifest', out['note'])
+        self.assertIn('no baseline snapshot', self.out.read_text())
+
+    def test_none_still_refuses_a_broken_manifest_and_a_relative_output_path(self):
+        (self.root / 'a.txt').write_text('tampered')
+        code, out = self.delta('none')
+        self.assertEqual(code, 4); self.assertIn('fails its manifest', out['error'])
+        run = subprocess.run([sys.executable, str(FW), 'delta', 'none', str(self.root), 'relative.diff'], capture_output=True, text=True)
+        self.assertEqual(run.returncode, 2)
+
+    def test_a_missing_baseline_file_that_is_not_none_still_fails(self):
+        self.assertEqual(self.delta(str(Path(self.temp.name) / 'absent.tgz'))[0], 2)
+
