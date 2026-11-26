@@ -27,8 +27,8 @@ class ParkingTests(unittest.TestCase):
         self.tick()
 
     def stop_for_good(self):
-        """The retro that follows a project stop runs and the root settles, which is when a human can resume."""
-        self.board.complete(self.only('factory-retro')); self.tick()
+        """The project stop settles the root (no retro: that runs only after delivery), which is when a human can resume."""
+        self.tick()
         self.assertIn(self.state.read_root(self.conn, self.root)['phase'], ('blocked', 'human_review'))
 
     def stages(self, task):

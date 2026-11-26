@@ -1175,6 +1175,11 @@ class ProjectController:
 
     def _retro(self, conn, root, definition, context, project):
         inputs = list(dict.fromkeys([h['task_id'] for h in project['history'] if 'task_id' in h]))
+        if project['terminal']['phase'] != 'delivered':
+            # A stop is not the end of the project: it waits for a human and resumes where it stopped. The retro runs once, after delivery.
+            self._controller._stop(conn, root, project['terminal']['phase'] if project['terminal']['phase'] in ('blocked', 'human_review') else 'human_review', project['terminal']['reason'])
+            project.update(mode='finished', active_keys=[])
+            return False
         try:
             key = 'project-retro' + ('-' + str(project['recoveries']) if project.get('recoveries') else '')
             node = self._node(conn, root, definition, context, project, key, 'prepare', 'factory-retro', RETRO, inputs)

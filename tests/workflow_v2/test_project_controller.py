@@ -64,6 +64,11 @@ class ProjectControllerTests(unittest.TestCase):
     def tick(self):
         return self.controller.reconcile(self.conn, self.root)
 
+    def no_retro(self):
+        """A stop waits for a human; the retro runs only after delivery."""
+        self.assertNotIn('factory-retro', [r['profile'] for r in self.board.ready()])
+        self.assertIn(self.state.read_root(self.conn, self.root)['phase'], ('blocked', 'human_review'))
+
     def only(self, profile):
         rows = self.board.ready()
         self.assertEqual([r['profile'] for r in rows], [profile])
@@ -222,7 +227,7 @@ class ProjectControllerTests(unittest.TestCase):
         for _ in range(3):  # the original handoff and its two bounded retries all carry the stale manifest
             self.board.complete(self.only('verifier'),manifest_sha12='111111111111')
             self.tick()
-        self.only('factory-retro')
+        self.no_retro()
         self.assertFalse(self.conn.execute("SELECT 1 FROM factory_workflow_stages WHERE kind='review'").fetchone())
 
     def fail_first_task(self):
@@ -240,7 +245,7 @@ class ProjectControllerTests(unittest.TestCase):
         self.assertIn('AC1: fail',terminal['reason'])
         self.assertIn('extra_repairs',terminal['reason']); self.assertIn('model_overrides',terminal['reason'])
         self.assertFalse([r for r in self.board.ready() if r['profile']=='architect'])
-        self.board.complete(self.only('factory-retro'))
+        self.no_retro()
         self.assertEqual(self.tick()['phase'],'human_review')
         self.assertEqual(self.board.get_task(self.conn,self.root).status,'blocked')
         self.assertEqual(self.project().get('replans',0),0)
@@ -268,7 +273,7 @@ class ProjectControllerTests(unittest.TestCase):
         self.assertTrue(controller._replan(self.conn,root,project,project['tasks'][1],'Task is too large',['F1|HIGH|AC1|more|too large'],[]))
         controller._save(self.conn,root,project); self.conn.commit(); self.tick()
         self.architect([dict(CODE,title='Rewritten history'),second])
-        self.only('factory-retro')
+        self.no_retro()
 
     def test_plan_review_findings_return_plan_to_architect_before_any_task(self):
         self.tick()
@@ -337,7 +342,7 @@ class ProjectControllerTests(unittest.TestCase):
         for _ in range(3):
             self.architect()
             self.board.complete(self.only('claude-reviewer'), findings=['F1|BLOCKER|-|code|Request requirement is missing']); self.tick()
-        self.board.complete(self.only('factory-retro')); self.tick()
+        self.no_retro(); self.tick()
         self.assertEqual(self.state.read_root(self.conn, self.root)['phase'], 'human_review')
 
     def test_a_human_granted_extra_replan_is_recorded_used_once_and_audited(self):
@@ -365,7 +370,7 @@ class ProjectControllerTests(unittest.TestCase):
         self.start_planning()
         for _ in range(3):
             self.architect(tasks=self.BAD_PLAN)
-        self.board.complete(self.only('factory-retro')); self.tick()
+        self.no_retro(); self.tick()
         architects = lambda: self.conn.execute("SELECT COUNT(*) FROM factory_workflow_stages WHERE profile='architect'").fetchone()[0]
         before = architects()
         self.controller.resume(self.conn, self.root, 'Re-judge the existing architect evidence', None, True)
@@ -378,7 +383,7 @@ class ProjectControllerTests(unittest.TestCase):
             self.architect()
             self.board.complete(self.only('claude-reviewer'),findings=['F1|BLOCKER|-|code|Request requirement is missing'])
             self.tick()
-        self.board.complete(self.only('factory-retro'))
+        self.no_retro()
         self.assertEqual(self.tick()['phase'],'human_review')
 
     def test_architect_can_request_a_director_the_orchestrator_skipped(self):
@@ -534,12 +539,12 @@ class ProjectControllerTests(unittest.TestCase):
         self.architect()
         reviewer=self.only('claude-reviewer')
         self.conn.execute("UPDATE tasks SET status='blocked' WHERE id=?",(reviewer['task_id'],));self.conn.commit()
-        self.tick();self.board.complete(self.only('factory-retro'));self.tick()
+        self.tick();self.no_retro();self.tick()
         self.controller.resume(self.conn,self.root,'Reviewer credentials restored')
         stage=self.only('claude-reviewer')
         self.assertEqual((stage['stage_key'],stage['evidence_retry']),('project-plan-review',1))
 
-    def test_missing_perceptual_evidence_stops_remaining_panel_and_runs_retro(self):
+    def test_missing_perceptual_evidence_stops_remaining_panel_without_a_retro(self):
         tasks=[dict(id='sprites',title='Make sprites',owner='artist',dependencies=[],acceptance={'AC1':'Sprite'},
                     needs=dict(art=True,audio=False,ui=False,ux=False))]
         self.plan(art=True,tasks=tasks)
@@ -552,12 +557,12 @@ class ProjectControllerTests(unittest.TestCase):
         self.board.complete(self.only('verifier'));self.tick()
         art=next(r for r in self.board.ready() if r['profile']=='art-reviewer')
         self.board.complete(art);self.tick()                           # no comparison evidence at all
-        self.only('factory-retro')
+        self.no_retro()
 
     def test_environment_block_can_resume_with_fresh_verification_after_human_recovery(self):
         self.plan();self.board.complete(self.only('developer'));self.tick()
         self.board.complete(self.only('verifier'),ac_results={'AC1':'unverified:environment'})
-        self.tick();self.board.complete(self.only('factory-retro'));self.tick()
+        self.tick();self.no_retro();self.tick()
         self.assertEqual(self.state.read_root(self.conn,self.root)['phase'],'blocked')
         self.controller.resume(self.conn,self.root,'Required test environment is now available')
         stage=self.only('verifier')
@@ -581,16 +586,16 @@ class ProjectControllerTests(unittest.TestCase):
     def test_unresolved_required_tool_still_blocks_the_project(self):
         needed=dict(self.GUARD,command='unity',required=True,resolved=False,alternative='',affected_criteria=['AC1'])
         self.verify_with(blocked_tools=[dict(cmd='unity',block='missing',needed_for='AC1',attempts=1)],tool_incidents=[needed],ac_results={'AC1':'unverified:environment'})
-        self.only('factory-retro');self.assertFalse(self.board.cards and [r for r in self.board.ready() if r['kind']=='review'])
+        self.no_retro();self.assertFalse(self.board.cards and [r for r in self.board.ready() if r['kind']=='review'])
 
     def test_unresolved_required_tool_blocks_even_when_the_verifier_claims_pass(self):
         needed=dict(self.GUARD,command='unity',required=True,resolved=False,alternative='',affected_criteria=['AC1'])
         self.verify_with(tool_incidents=[needed])
-        self.only('factory-retro')
+        self.no_retro()
 
     def test_legacy_blocked_tools_without_incidents_still_block(self):
         self.verify_with(blocked_tools=[dict(cmd='rm -rf scratch',block='dangerous',needed_for='none',attempts=1)])
-        self.only('factory-retro')
+        self.no_retro()
 
     BAD_INCIDENT = dict(tool_incidents=[dict(command='x')])
 
@@ -698,7 +703,7 @@ class ProjectControllerTests(unittest.TestCase):
         """The real incident: the artist refuses a repair that contradicts the plan and the controller stops for a human."""
         self.mixed(); self.review_round()
         self.stall('artist')
-        self.tick(); self.board.complete(self.only('factory-retro')); self.tick()
+        self.tick(); self.no_retro(); self.tick()
         self.assertEqual(self.state.read_root(self.conn, self.root)['phase'], 'blocked')
         return self.conn.execute('SELECT COUNT(*) FROM factory_workflow_stages').fetchone()[0]
 
@@ -742,7 +747,7 @@ class ProjectControllerTests(unittest.TestCase):
     def test_a_decision_with_reevaluate_rejudges_the_existing_review_evidence_without_new_cards(self):
         cid = self.with_palette()
         self.mixed(); self.review_round(art=False, ui_extra=self.spec_conflict(cid))
-        self.board.complete(self.only('factory-retro')); self.tick()
+        self.no_retro(); self.tick()
         self.assertEqual(self.state.read_root(self.conn, self.root)['phase'], 'blocked')
         count = lambda: self.conn.execute("SELECT COUNT(*) FROM factory_workflow_stages WHERE kind IN ('verify','review')").fetchone()[0]
         before = count()
@@ -819,7 +824,7 @@ class ProjectControllerTests(unittest.TestCase):
         self.malformed_until_stopped()
         verifier = self.conn.execute("SELECT task_id FROM factory_workflow_stages WHERE kind='verify' ORDER BY evidence_retry DESC").fetchone()[0]
         self.assertEqual(self.project()['terminal']['phase'], 'human_review')
-        self.board.complete(self.only('factory-retro')); self.tick()
+        self.no_retro(); self.tick()
         with self.assertRaises(ConfigurationError):
             self.controller.resume(self.conn, self.root, 'Plain resume must still refuse a human_review stop')
         # The evidence is corrected (or the controller rule is fixed); re-judge it instead of running the verifier again.
@@ -1030,7 +1035,7 @@ class ProjectControllerTests(unittest.TestCase):
         self.tick()
         self.assertEqual(self.project()['terminal']['phase'], 'blocked')
         before = developers()
-        self.tick(); self.board.complete(self.only('factory-retro')); self.tick()
+        self.tick(); self.no_retro(); self.tick()
         self.controller.resume(self.conn, self.root, 'Re-judge under the current rules', None, True)
         self.tick()
         self.assertEqual(self.project()['terminal']['phase'], 'blocked')
@@ -1042,7 +1047,7 @@ class ProjectControllerTests(unittest.TestCase):
         self.definition['max_repairs'] = 0
         self.conn.execute('UPDATE factory_workflow_roots SET definition=?', (json.dumps(self.definition),))
         self.plan(); self.fail_first_task()
-        self.board.complete(self.only('factory-retro'))
+        self.no_retro()
         self.assertEqual(self.tick()['phase'], 'human_review')
 
     def test_a_repair_limit_stop_resumes_with_extra_repairs_and_a_recorded_model_override(self):
@@ -1076,7 +1081,7 @@ class ProjectControllerTests(unittest.TestCase):
         findings = ['F1|HIGH|AC1|code.py|Real defect to repair', 'F2|MEDIUM|AC1|notes.md|Wording a human must confirm']
         self.board.complete(self.only('verifier'), verdict='FAIL', ac_results={'AC1': 'fail'}, findings=findings, repair_domains=['code']); self.tick()
         stalled = self.stall('fixer')                                                                         # the worker keeps calling kanban_block
-        self.tick(); self.board.complete(self.only('factory-retro')); self.tick()
+        self.tick(); self.no_retro(); self.tick()
         self.assertEqual(self.state.read_root(self.conn, self.root)['phase'], 'blocked')
         waiver = dict(waivers=[dict(ac='AC1', path='notes.md', source='verifier', reason='Human confirmed this wording is authoritative')])
         self.controller.resume(self.conn, self.root, 'Waive F2 only; F1 still needs repair', waiver)
@@ -1093,7 +1098,7 @@ class ProjectControllerTests(unittest.TestCase):
         first = self.only('developer')
         self.assertIn('BASELINE none', self.board.cards[first['task_id']]['body'])
         self.block(first, 'Could not finish', manifest_sha12='fedcba654321')  # it edited files and rebuilt the manifest
-        self.tick(); self.board.complete(self.only('factory-retro')); self.tick()
+        self.tick(); self.no_retro(); self.tick()
         self.controller.resume(self.conn, self.root, 'Retry the writer', dict(retry_stage=True))
         self.tick()
         card = self.board.cards[self.only('developer')['task_id']]['body']
@@ -1104,7 +1109,7 @@ class ProjectControllerTests(unittest.TestCase):
         self.plan()
         first = self.only('developer')
         self.block(first, 'Could not finish', manifest_sha12='none')
-        self.tick(); self.board.complete(self.only('factory-retro')); self.tick()
+        self.tick(); self.no_retro(); self.tick()
         self.controller.resume(self.conn, self.root, 'Retry the writer', dict(retry_stage=True)); self.tick()
         card = self.board.cards[self.only('developer')['task_id']]['body']
         self.assertIn('BASELINE none', card); self.assertNotIn('continues from the files', card)
@@ -1124,7 +1129,7 @@ class ProjectControllerTests(unittest.TestCase):
         self.assertEqual(set(rows), {'claude-reviewer', 'security-reviewer'})
         self.board.complete(rows['security-reviewer'])
         self.conn.execute("UPDATE tasks SET status='blocked' WHERE id=?", (rows['claude-reviewer']['task_id'],)); self.conn.commit()  # the worker blocked itself
-        self.tick(); self.board.complete(self.only('factory-retro')); self.tick()
+        self.tick(); self.no_retro(); self.tick()
         self.assertEqual(self.state.read_root(self.conn, self.root)['phase'], 'blocked')
         count = lambda: self.conn.execute('SELECT COUNT(*) FROM factory_workflow_stages').fetchone()[0]
         before = count()
@@ -1145,7 +1150,7 @@ class ProjectControllerTests(unittest.TestCase):
         self.board.complete(rows['claude-reviewer'])
         reviewer = rows['security-reviewer']  # the second reviewer stalls after the first was accepted, as in the live incident
         self.conn.execute("UPDATE tasks SET status='blocked' WHERE id=?", (reviewer['task_id'],)); self.conn.commit()
-        self.tick(); self.board.complete(self.only('factory-retro')); self.tick()
+        self.tick(); self.no_retro(); self.tick()
         project = self.project(); project.pop('last_node', None)  # as stored by a controller that did not record it
         self.conn.execute('UPDATE factory_project_execution SET document=?', (json.dumps(project),)); self.conn.commit()
         self.controller.resume(self.conn, self.root, 'The reviewer tool is back', dict(retry_stage=True)); self.tick()
@@ -1714,7 +1719,7 @@ class ProjectControllerTests(unittest.TestCase):
     def stopped_on_a_blocked_writer(self):
         self.plan()
         self.block(self.only('developer'), 'The linter cannot express the plan')
-        self.tick(); self.board.complete(self.only('factory-retro'))
+        self.tick(); self.no_retro()
         self.assertEqual(self.tick()['phase'], 'blocked')
 
     def developer_rows(self):
@@ -1748,7 +1753,7 @@ class ProjectControllerTests(unittest.TestCase):
         for attempt in range(2):
             self.controller.resume(self.conn, self.root, 'Tooling corrected', dict(retry_stage=True)); self.tick()
             self.block(self.only('developer'), 'Still blocked')
-            self.tick(); self.board.complete(self.only('factory-retro'))
+            self.tick(); self.no_retro()
             self.assertEqual(self.tick()['phase'], 'blocked')
         with self.assertRaisesRegex(ConfigurationError, 'human stage retries'):
             self.controller.resume(self.conn, self.root, 'One more', dict(retry_stage=True))
@@ -1935,3 +1940,11 @@ class ProjectControllerTests(unittest.TestCase):
 
 
 if __name__ == '__main__': unittest.main()
+
+
+class DeclaredDomainsTest(unittest.TestCase):
+    def test_empty_repair_domain_in_a_mapping_declares_nothing(self):
+        from factory_dashboard.project_policy import declared_domains
+        self.assertEqual(declared_domains({'code': ['F1'], 'art': ['F2'], 'audio': []}), ['code', 'art'])
+        self.assertEqual(declared_domains(['code']), ['code'])
+        self.assertEqual(declared_domains(None), [])

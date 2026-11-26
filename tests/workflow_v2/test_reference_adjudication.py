@@ -132,7 +132,7 @@ class PlanReviewRulingTests(AdjudicationFlow):
         identifier = self.candidate_ids()[0]
         self.rule(reviewer, 'ambiguous')
         self.assertIn('needs a human', self.terminal()['reason'])
-        self.assertEqual(self.board.ready()[0]['profile'], 'factory-retro')
+        self.assertNotIn('factory-retro', [r['profile'] for r in self.board.ready()])   # a stop waits for a human; the retro runs only after delivery
         while self.board.ready():
             self.board.complete(self.board.ready()[0])
             self.tick()

@@ -150,7 +150,7 @@ class ArtReviewerTests(ArtReviewFlow):
         stage = self.reach_art_review()
         self.review(stage, holistic='reject', outcome='pass', whole_outcome='pass')
         self.assertIn('HOLISTIC', self.terminal()['reason'])
-        self.assertEqual(self.board.ready()[0]['profile'], 'factory-retro')
+        self.assertNotIn('factory-retro', [r['profile'] for r in self.board.ready()])   # a stop waits for a human; the retro runs only after delivery
 
     def test_a_rejected_whole_without_a_blocking_finding_cannot_be_approved(self):
         stage = self.reach_art_review()
