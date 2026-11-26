@@ -12,6 +12,10 @@ REQUIRED_HOOKS = ('resolve_kanban_worker_model', 'before_kanban_task_create', 'b
 REMEDY = 'run `python3 runtime/hermes-patches/hermes_patches.py apply` (or the installed copy in ~/.hermes/hermes-patches), then restart the Hermes gateway'
 
 
+class HermesUnpatched(RuntimeError):
+    """Hermes lacks the Factory patches. Never turned into a project stop: the whole controller transaction rolls back."""
+
+
 def _has_module(name):
     try:
         return importlib.util.find_spec(name) is not None
@@ -30,3 +34,10 @@ def compat_report():
     ok = not missing_modules and not missing_hooks
     message = '' if ok else ('missing modules: ' + (', '.join(missing_modules) or 'none') + '; hook names Hermes does not know: ' + (', '.join(missing_hooks) or 'none'))
     return dict(ok=ok, missing_modules=missing_modules, missing_hooks=missing_hooks, message=message, remedy=REMEDY)
+
+
+def require_patched(action):
+    """Refuse `action` on a Hermes without the Factory patches: a run continues only where the Factory stopped, never with untracked cards."""
+    report = compat_report()
+    if not report['ok']:
+        raise HermesUnpatched('Cannot ' + action + ': Hermes lacks patches the Factory needs (' + report['message'] + '). ' + REMEDY[0].upper() + REMEDY[1:] + ', then try again.')

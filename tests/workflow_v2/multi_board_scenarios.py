@@ -237,6 +237,12 @@ class Scenarios(unittest.TestCase):
         self.assertEqual(self.f.dispatch(p.board_id), [])  # nothing dispatchable while paused
         self.f.tick(p.board_id)  # a paused board is not reconciled
         self.assertGreater(len(self.f.dispatch(q.board_id)) + 1, 0)  # the neighbour still dispatches
+        from unittest import mock
+        with mock.patch.object(self.f.mod('hermes_compat'), 'compat_report', return_value=dict(ok=False, message='hook names Hermes does not know: before_kanban_task_create')):
+            with self.assertRaisesRegex(self.f.mod('hermes_compat').HermesUnpatched, 'Cannot resume run board'):
+                self.f.run_boards.resume(p.board_id)   # without the Factory patches a paused run stays exactly where it stopped
+        self.assertEqual(self.f.registry.get(p.board_id).status, 'paused')
+        self.assertEqual(self.f.dispatch(p.board_id), [])
         restored = self.f.run_boards.resume(p.board_id)
         self.assertEqual(sorted(restored), sorted(parked))
         self.assertEqual(self.f.registry.get(p.board_id).status, 'active')

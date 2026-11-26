@@ -207,6 +207,7 @@ class ProjectController:
                 card['idempotency_key'] += '-r' + str(retry+1)
             with controller_scope(conn, root['root_id'], stage, cycle, retry):
                 tid = self._board.create_task(conn, **card)
+            self._controller._require_registered(conn, tid, key)
             if retry_requested:
                 project['retry_keys'].remove(token)
             self._state.event(conn, root['root_id'], 'stage_created', dict(task_id=tid, key=key, profile=profile, cycle=cycle, execution_version=2))

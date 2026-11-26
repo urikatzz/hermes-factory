@@ -154,6 +154,8 @@ class RunBoards:
 
     def resume(self, board_id):
         board = self._with_board(board_id, ('paused',), 'resume')
+        from .hermes_compat import require_patched
+        require_patched('resume run board ' + board_id)
         kb = self.hermes.board_api()
         meta = dict(board.meta)
         restored = []

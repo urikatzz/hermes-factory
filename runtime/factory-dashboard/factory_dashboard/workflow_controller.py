@@ -9,6 +9,13 @@ from .workflow_cards import build_stage_card
 from .workflow_gate import evaluate_cycle
 from .workflow_guards import controller_scope
 from .workflow_handoffs import StageResult, normalize_handoff
+
+
+def _remedy():
+    from .hermes_compat import REMEDY
+    return REMEDY[0].upper() + REMEDY[1:] + ', then resume.'
+
+
 from .workflow_types import WorkflowDefinition
 
 
@@ -19,6 +26,10 @@ class WorkflowController:
         self._projects = Path(new_project_root)
 
     def reconcile(self, conn, root_id):
+        from .hermes_compat import compat_report
+        if not compat_report()['ok']:
+            # Without the patches nothing may move: evidence is judged and stages advance only on the Hermes the Factory was built for.
+            return self._state.read_root(conn, root_id)
         with self._board.write_txn(conn, allow_nested=True):
             root = self._state.read_root(conn, root_id)
             if not root or root['phase'] in ('delivered','human_review','blocked'):
@@ -81,6 +92,7 @@ class WorkflowController:
             card['idempotency_key'] += f'-r{retry+1}'
         with controller_scope(conn,root['root_id'],stage,root['cycle'],retry):
             task_id = self._board.create_task(conn,**card)
+        self._require_registered(conn,task_id,stage.key)
         self._state.event(conn,root['root_id'],'stage_created',dict(task_id=task_id,key=stage.key,cycle=root['cycle'],retry=retry))
 
     def _accept(self,conn,stage,result):
@@ -190,7 +202,16 @@ class WorkflowController:
         self._state.event(conn,root['root_id'],phase,dict(reason=str(reason),resume_phase=root['phase']))
         return self._state.read_root(conn,root['root_id'])
 
+    def _require_registered(self,conn,task_id,key):
+        # Without the Factory's Hermes patches the creation hook never runs: the card exists but is not a stage, and the controller would
+        # later judge an older attempt in its place. Refuse (the enclosing transaction rolls the card back) instead of continuing blind.
+        if self._state.stage_for_task(conn,task_id) is None:
+            from .hermes_compat import HermesUnpatched
+            raise HermesUnpatched('Stage %s was created as %s but not registered: Hermes is missing the Factory patches. %s' % (key, task_id, _remedy()))
+
     def resume(self,conn,root_id,note,decisions=None,reevaluate=False):
+        from .hermes_compat import require_patched
+        require_patched('resume')
         if not isinstance(note,str) or not note.strip() or len(note)>2000:
             raise ConfigurationError('A short recovery decision is required')
         with self._board.write_txn(conn):

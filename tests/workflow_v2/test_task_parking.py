@@ -5,6 +5,7 @@ import unittest
 
 import test_project_controller as base
 from factory_dashboard.model_policy import ConfigurationError
+from factory_dashboard.hermes_compat import HermesUnpatched
 from factory_dashboard.project_controller import ProjectController
 
 CODE, NEEDS = base.CODE, base.NEEDS
@@ -197,3 +198,36 @@ class ParkingTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class MissingPatchTests(ParkingTests):
+    """A resume continues only where the Factory stopped: never on a Hermes whose creation hook would leave a card the controller does not track."""
+    def test_a_resume_is_refused_while_hermes_lacks_the_factory_patches(self):
+        from unittest import mock
+        self.park_x(); self.pass_task(); self.stop_for_good()
+        before = (self.project(), self.stages('x'))
+        report = dict(ok=False, message='hook names Hermes does not know: before_kanban_task_create')
+        with mock.patch('factory_dashboard.hermes_compat.compat_report', return_value=report):
+            with self.assertRaisesRegex(HermesUnpatched, 'Cannot resume: Hermes lacks patches'):
+                self.controller.resume(self.conn, self.root, 'Repaired by hand', {'task': 'x'})
+        self.assertEqual((self.project(), self.stages('x')), before)                       # nothing moved
+
+    def test_a_card_that_was_not_registered_as_a_stage_is_rolled_back(self):
+        from unittest import mock
+        self.park_x(); self.pass_task(); self.stop_for_good()
+        before = self.project()
+        with mock.patch('board_fixture.WorkflowState.register_stage', lambda *a, **k: None):
+            with self.assertRaisesRegex(HermesUnpatched, 'not registered: Hermes is missing the Factory patches'):
+                self.controller.resume(self.conn, self.root, 'Repaired by hand', {'task': 'x'})
+        self.assertEqual(self.project(), before)
+
+    def test_reconcile_moves_nothing_while_hermes_lacks_the_factory_patches(self):
+        from unittest import mock
+        self.plan(tasks=[X, Y, Z])
+        self.board.complete(self.only('developer'))                                     # finished evidence waiting to be judged
+        before = (self.project(), self.stages('x'))
+        with mock.patch('factory_dashboard.hermes_compat.compat_report', return_value=dict(ok=False, message='missing')):
+            self.tick()
+        self.assertEqual((self.project(), self.stages('x')), before)
+        self.tick()                                                                     # patched again: the controller picks up where it stopped
+        self.assertNotEqual(self.project(), before[0])
