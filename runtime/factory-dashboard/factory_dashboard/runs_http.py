@@ -13,6 +13,16 @@ def route_runs(handler, path):
             return handler._send(200, runs.overview())
         if len(parts) == 3 and parts[:2] == ['api', 'runs']:
             return handler._send(200, runs.board(parts[2]))
+    elif handler.command == 'POST' and len(parts) == 4 and parts[:2] == ['api', 'runs'] and parts[3] == 'recover':
+        body = handler._body()  # same local-origin and token protection as every other mutation
+        if set(body) - {'action', 'note', 'task', 'count'}:
+            raise RequestError(400, 'A recovery takes only action, note, task and count')
+        return handler._send(200, runs.recover(parts[2], body))
+    elif handler.command == 'POST' and len(parts) == 4 and parts[:2] == ['api', 'runs'] and parts[3] == 'archive-cards':
+        body = handler._body()
+        if set(body) - {'cards'}:
+            raise RequestError(400, 'Only a list of cards may be archived')
+        return handler._send(200, runs.archive_cards(parts[2], body.get('cards')))
     elif handler.command == 'POST' and len(parts) == 4 and parts[:2] == ['api', 'runs'] and parts[3] in OPERATIONS:
         body = handler._body()  # same local-origin and token protection as every other mutation
         if set(body) - {'reason'}:

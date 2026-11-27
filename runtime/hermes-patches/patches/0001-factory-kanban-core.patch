@@ -301,10 +301,10 @@ index 4e61aeece34..296c9350f4d 100644
 +
 +from hermes_cli.kanban_db_graph import _parents_satisfied, unsatisfied_parents
 diff --git a/hermes_cli/kanban_db_dispatch.py b/hermes_cli/kanban_db_dispatch.py
-index dc3eab65e99..b24f07c49bd 100644
+index c3066fa2e32..060be709f28 100644
 --- a/hermes_cli/kanban_db_dispatch.py
 +++ b/hermes_cli/kanban_db_dispatch.py
-@@ -2036,19 +2036,6 @@ def dispatch_once(
+@@ -2037,19 +2037,6 @@ def dispatch_once(
      return result
  
  
@@ -324,7 +324,7 @@ index dc3eab65e99..b24f07c49bd 100644
  def _dispatch_lane_task(
      conn: sqlite3.Connection,
      row: sqlite3.Row,
-@@ -2148,7 +2135,9 @@ def _dispatch_lane_task(
+@@ -2149,7 +2136,9 @@ def _dispatch_lane_task(
          # worker's system prompt via KANBAN_GUIDANCE.
          claimed.skills = list(dict.fromkeys([*(claimed.skills or []), "sdlc-review"]))
      try:
@@ -616,7 +616,7 @@ index cd1dca4c138..7e7693e31bd 100644
      conn.execute(
          """
 diff --git a/hermes_cli/plugins.py b/hermes_cli/plugins.py
-index ca0e2623d03..0822d95fdaf 100644
+index 8dfe4b6d3d7..98fe3295ca4 100644
 --- a/hermes_cli/plugins.py
 +++ b/hermes_cli/plugins.py
 @@ -137,6 +137,8 @@ VALID_HOOKS: set[str] = {

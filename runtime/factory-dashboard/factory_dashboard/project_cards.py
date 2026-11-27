@@ -276,6 +276,15 @@ def project_card(definition, stage, cycle, context, inputs, project, task=None):
     if project.get('waivers'):
         # Reviewers keep reporting the true result; the gate applies the human's scoped waiver and keeps the original finding.
         details['human_waivers'] = [{k: w[k] for k in ('id', 'ac', 'path', 'source', 'reason')} for w in project['waivers']]
+    if task:
+        from .finding_rulings import card_view
+        rulings = card_view(project, task['id'])
+        if rulings:
+            # The gate enforces these itself; reviewers are shown them so they report new evidence instead of repeating a decided claim.
+            details['human_rulings'] = rulings
+            details['human_rulings_rule'] = ('A finding on these files and this criterion that makes the same claim was already decided by a human, '
+                                             'with the evidence shown. Do not re-raise it unless you cite evidence the ruling did not consider; '
+                                             'report genuinely different defects as usual. A reopened ruling no longer applies because its files changed.')
     if project.get('constraints'):
         details['human_constraints'] = [{k: c[k] for k in ('preserve', 'reason')} for c in project['constraints']]
     text = '\nPROJECT_WORKFLOW_VERSION 2\nPROJECT_CONTEXT ' + json.dumps(details, sort_keys=True)

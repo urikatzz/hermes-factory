@@ -102,6 +102,20 @@ class ParkingTests(unittest.TestCase):
         self.assertIn('Wire the scene', self.board.cards[self.only('developer')['task_id']]['body'])   # a fresh card for the same task, retried
         self.assertTrue(any(e['kind'] == 'task_unparked' for e in project['orchestration_log']))
 
+    def test_a_restored_task_starts_from_the_manifest_the_tree_has_now_not_its_own_blocked_attempt(self):
+        self.plan(tasks=[X, Y, Z])
+        self.block(self.only('developer'), reason='AC3 cannot be completed: the scene builder does not compile', manifest_sha12='aaaaaaaaaaaa')
+        self.tick()
+        self.pass_task()                                                                   # z is accepted and the tree moves on
+        self.stop_for_good()
+        latest = self.project()['completed'][-1]['manifest']
+        self.assertNotEqual(latest, 'aaaaaaaaaaaa')
+        self.controller.resume(self.conn, self.root, 'Repaired by hand', {'task': 'x'})
+        card = self.board.cards[self.only('developer')['task_id']]['body']
+        self.assertIn('BASELINE ' + latest, card)                                          # the start check passes on the tree as it is now
+        self.assertNotIn('aaaaaaaaaaaa', card)
+        self.assertTrue(any(e['kind'] == 'task_rebased' for e in self.project()['orchestration_log']))
+
     def test_a_plain_resume_of_a_stall_restores_the_first_parked_task(self):
         self.park_x()
         self.pass_task()

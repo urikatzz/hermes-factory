@@ -181,6 +181,13 @@ def _is_code_file(finding):
     return path.endswith(CODE_SUFFIXES)
 
 
+def declared_domains(value):
+    """The repair domains a reader declared: a list of names, or a mapping of name to findings where an empty entry declares nothing."""
+    if isinstance(value, dict):
+        return [d for d, items in value.items() if items]
+    return list(value) if isinstance(value, (list, tuple)) else []
+
+
 def route_findings(findings, owner, repair_domains=(), ac_owners=None):
     """Map each repair profile to only the blocking findings it must fix, in repair order.
 

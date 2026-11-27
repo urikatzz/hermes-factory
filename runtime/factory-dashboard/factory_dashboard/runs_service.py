@@ -17,6 +17,14 @@ from .model_policy import ConfigurationError
 from .run_boards import RunBoards, describe_root
 
 OPERATIONS = ('pause', 'resume', 'cancel', 'archive')
+def _last_error(output):
+    """The last line a script printed, without a `package.module.SomeError: ` prefix."""
+    import re
+    line = output.strip().splitlines()[-1] if output.strip() else ''
+    return re.sub(r'^[\w.]*(Error|Exception): ', '', line)[:600]
+
+
+RECOVERY_ACTIONS = ('resume', 'retry_stage', 'reevaluate', 'park', 'resume_task', 'extra_repairs')
 
 
 class RunsService:
@@ -84,6 +92,71 @@ class RunsService:
         if done.returncode != 0:
             raise ConfigurationError((done.stderr or done.stdout).strip().splitlines()[-1][:400] if (done.stderr or done.stdout).strip() else '%s failed' % operation)
         return {'board_id': board_id, 'operation': operation, 'status': self._registry.get(board_id).status}
+
+    def archive_cards(self, board_id, cards):
+        """Remove replaced attempts from a run board, through `factory_boards.py archive-cards` (plugin loaded, controller scope)."""
+        if board_id == DEFAULT_BOARD or self._registry.get(board_id) is None:
+            raise ConfigurationError('Only registered run boards can be tidied from this page')
+        if not isinstance(cards, list) or not 1 <= len(cards) <= 50 or any(not isinstance(c, str) or not c.replace('_', '').isalnum() for c in cards):
+            raise ConfigurationError('Name 1 to 50 card ids')
+        done = subprocess.run([self._python, str(self._script), 'archive-cards', board_id, *cards], capture_output=True, text=True, timeout=120, env=self._env())
+        output = (done.stderr or done.stdout).strip()
+        if done.returncode != 0:
+            raise ConfigurationError(_last_error(output) or 'Archive failed')
+        return {'board_id': board_id, 'archived': json.loads(done.stdout.strip().splitlines()[-1])}
+
+    def recover(self, board_id, body):
+        """A human recovery decision for a run's controller, applied through `resume_factory_workflow.py` (the same path an operator uses).
+        Never touches cards directly: unblocking a card behind the controller's back is what leaves a run stalled."""
+        action = body.get('action')
+        note = body.get('note')
+        if action not in RECOVERY_ACTIONS:
+            raise ConfigurationError('Unknown recovery action; use one of: ' + ', '.join(RECOVERY_ACTIONS))
+        if not isinstance(note, str) or len(note.strip()) < 10:
+            raise ConfigurationError('Write a note (at least 10 characters) saying what you decided and why; it is recorded with the run')
+        record = self._registry.get(board_id)
+        if record is None or board_id == DEFAULT_BOARD:
+            raise ConfigurationError('Only registered run boards can be recovered from this page')
+        if record.status != 'active':
+            raise ConfigurationError('Run board %s is %s; resume it first' % (board_id, record.status))
+        if not record.root_id:
+            raise ConfigurationError('Run board %s has no root yet' % board_id)
+        command = [self._python, str(self._script.with_name('resume_factory_workflow.py')), '--hermes-source', str(self._home / 'hermes-agent'),
+                   '--board-db', str(record.db_path), '--board', board_id, '--new-project-root', str(Path.home() / 'factory'),
+                   '--root', record.root_id, '--note', note.strip()[:2000]]
+        decision = None
+        if action == 'retry_stage':
+            command.append('--retry-stage')
+        elif action == 'reevaluate':
+            command.append('--reevaluate')
+        elif action == 'park':
+            command.append('--park')
+        elif action == 'resume_task':
+            task = body.get('task')
+            if not isinstance(task, str) or not task.replace('-', '').isalnum():
+                raise ConfigurationError('Name the parked task to resume')
+            command += ['--task', task]
+        elif action == 'extra_repairs':
+            count = body.get('count', 1)
+            if type(count) is not int or not 1 <= count <= 2:
+                raise ConfigurationError('Extra repairs must be 1 or 2')
+            decision = {'extra_repairs': count}
+        import tempfile, os
+        path = None
+        try:
+            if decision:
+                fd, path = tempfile.mkstemp(suffix='.json', prefix='factory-decision-')
+                with os.fdopen(fd, 'w') as handle:
+                    json.dump(decision, handle)
+                command += ['--decision-file', path]
+            done = subprocess.run(command, capture_output=True, text=True, timeout=300, env=self._env())
+        finally:
+            if path:
+                os.unlink(path)
+        output = (done.stderr or done.stdout).strip()
+        if done.returncode != 0:
+            raise ConfigurationError(_last_error(output) or 'Recovery failed')
+        return {'board_id': board_id, 'action': action, 'result': done.stdout.strip()[-400:]}
 
     def _env(self):
         import os

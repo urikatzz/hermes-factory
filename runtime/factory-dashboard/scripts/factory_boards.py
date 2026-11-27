@@ -64,6 +64,7 @@ def main(argv=None):
         prov.add_argument('--' + name, default='')
     for name in ('pause', 'resume', 'cancel', 'archive'):
         op = sub.add_parser(name);op.add_argument('board');op.add_argument('--reason', default=name + ' by operator')
+    tidy = sub.add_parser('archive-cards');tidy.add_argument('board');tidy.add_argument('cards', nargs='+')
     bind = sub.add_parser('bind-root');bind.add_argument('board');bind.add_argument('root')
     rst = sub.add_parser('reset');rst.add_argument('board')
     res = sub.add_parser('resolve');res.add_argument('--db', required=True);res.add_argument('--label')
@@ -98,6 +99,8 @@ def main(argv=None):
         method = getattr(service, args.command)
         result = method(args.board) if args.command in ('resume', 'archive') else method(args.board, args.reason)
         print(json.dumps(result, default=str))
+    elif args.command == 'archive-cards':
+        print(json.dumps(service.archive_replaced(args.board, args.cards)))
     elif args.command == 'reset':
         print(registry.reset_failed(args.board).status)
     elif args.command == 'resolve':

@@ -657,7 +657,7 @@ class ProjectControllerTests(unittest.TestCase):
         self.board.complete(self.only('developer')); self.tick()
         self.board.complete(self.only('verifier'), **verify); self.tick()
 
-    def review_round(self, art=True, ui=True, ui_extra=None):
+    def review_round(self, art=True, ui=True, ui_extra=None, art_finding='F2|HIGH|AC1|sprite.png|[visual] the sprite is square where the reference is round'):
         """The panel of the FINAL INTEGRATION: the only place the art reviewer runs."""
         folder = Path(self.temp.name) / f'gate-{len(list(Path(self.temp.name).iterdir()))}'
         folder.mkdir()
@@ -669,7 +669,7 @@ class ProjectControllerTests(unittest.TestCase):
                 report.write_text(json.dumps(dict(schema='factory-comparison/v1', plan_sha256=director['sha256'], manifest_sha12='abcdef123456', mode='rendered_in_engine', source='tool', outcome='fail',
                                                   criteria=[dict(rule='S1', expected='Round', observed='Square', outcome='fail')], evidence=[str(image)])))
                 self.board.complete(row, verdict='CHANGES_REQUIRED', artifacts=[str(report), str(image)],
-                                    findings=['F2|HIGH|AC1|sprite.png|[visual] the sprite is square where the reference is round'])
+                                    findings=[art_finding])
             elif row['profile'] == 'ui-reviewer' and ui:
                 self.board.complete(row, verdict='CHANGES_REQUIRED', findings=['F1|MEDIUM|AC1|Assets/Scripts/Builder.cs:HealthBar|Bar inside the ceiling band'], **(ui_extra or {}))
             else:
@@ -720,6 +720,44 @@ class ProjectControllerTests(unittest.TestCase):
         self.assertIn('square where the reference is round', stored['applied'][0]['finding'])  # the original result stays in the audit trail
         self.assertEqual(self.project()['constraints'][0]['preserve'], ['sprite.png'])
         self.assertTrue(any('waived by human decision' in w for h in self.project()['history'] for w in h.get('waived', [])))
+
+    def ruling_decision(self):
+        (Path(self.temp.name) / 'sprite.png').write_bytes(b'approved primitive')
+        return dict(rulings=[dict(task='integration', ac='AC1', paths=['sprite.png'], source='art-reviewer', claim=['square'], verdict='accepted',
+                                  reason='Runtime-tinted square primitive is the approved placeholder for this milestone',
+                                  evidence=[dict(kind='inspection', ref='sprite.png', summary='Owner inspected the render and accepted the square primitive')])])
+
+    def test_resume_with_a_ruling_dismisses_the_finding_and_repairs_only_the_rest(self):
+        before = self.stalled_artist()
+        self.controller.resume(self.conn, self.root, 'Ruling: square primitive accepted', self.ruling_decision())
+        self.only('fixer')
+        self.assertEqual(self.conn.execute('SELECT COUNT(*) FROM factory_workflow_stages').fetchone()[0], before + 1)
+        ruling = self.project()['rulings'][0]
+        self.assertEqual(ruling['applied'][0]['finding'].split('|')[0], 'art-reviewer:F2')
+        kinds = [r[0] for r in self.conn.execute('SELECT kind FROM factory_workflow_events')]
+        self.assertIn('human_ruling', kinds); self.assertIn('project_ruling_applied', kinds)
+
+    def test_a_ruling_holds_across_a_restart_and_a_renumbered_rephrased_rereview(self):
+        self.stalled_artist()
+        self.controller.resume(self.conn, self.root, 'Ruling: square primitive accepted', self.ruling_decision())
+        self.controller = WorkflowController(self.board, self.state, self.temp.name)  # a gateway restart: only the database survives
+        self.board.complete(self.only('fixer')); self.tick()
+        self.board.complete(self.only('verifier')); self.tick()
+        self.review_round(ui=False, art_finding='F7|BLOCKER|AC1|sprite.png:0|Still a square shape; the reference is a circle')
+        self.assertEqual(self.project()['terminal']['phase'], 'delivered')
+        self.assertEqual(len(self.project()['rulings'][0]['applied']), 2)
+
+    def test_a_ruling_reopens_when_its_file_changes_and_the_finding_blocks_again(self):
+        self.stalled_artist()
+        self.controller.resume(self.conn, self.root, 'Ruling: square primitive accepted', self.ruling_decision())
+        (Path(self.temp.name) / 'sprite.png').write_bytes(b'repainted by someone')
+        self.board.complete(self.only('fixer')); self.tick()
+        self.board.complete(self.only('verifier')); self.tick()
+        self.review_round(ui=False, art_finding='F2|HIGH|AC1|sprite.png|the sprite is square where the reference is round')
+        self.assertEqual(self.project()['rulings'][0]['state'], 'reopened')
+        self.assertNotEqual(self.project().get('terminal', {}).get('phase'), 'delivered')
+        kinds = [r[0] for r in self.conn.execute('SELECT kind FROM factory_workflow_events')]
+        self.assertIn('project_ruling_reopened', kinds)
 
     def test_after_the_waiver_the_milestone_is_accepted_only_once_the_ui_finding_is_repaired(self):
         self.stalled_artist()
@@ -1093,6 +1131,21 @@ class ProjectControllerTests(unittest.TestCase):
         card = self.board.cards[fresh['task_id']]['body']
         self.assertIn('F1|HIGH|AC1|code.py', card); self.assertNotIn('F2|MEDIUM', card)
 
+    def test_a_decision_after_one_repair_of_the_cycle_finished_reverifies_that_tree(self):
+        self.plan(art=True); self.board.complete(self.only('developer')); self.tick()
+        findings = ['F1|HIGH|AC1|code.py|Placement contradicts the plan', 'F2|MEDIUM|AC1|sprite.png|Edge touches canvas']
+        self.board.complete(self.only('verifier'), verdict='FAIL', ac_results={'AC1': 'fail'}, findings=findings,
+                            repair_domains={'code': ['F1'], 'art': ['F2'], 'audio': []}); self.tick()
+        self.board.complete(self.only('artist')); self.tick()                  # the first repair of the cycle changes the tree
+        self.stall('fixer')
+        self.tick(); self.no_retro(); self.tick()
+        self.assertIn(self.state.read_root(self.conn, self.root)['phase'], ('blocked', 'human_review'))
+        waiver = dict(waivers=[dict(ac='AC1', path='code.py', source='verifier', reason='Specification ambiguity, no gameplay effect')])
+        self.controller.resume(self.conn, self.root, 'Waive F1; verify the repaired tree', waiver, True)
+        self.tick()
+        self.assertEqual(self.project()['work']['step'], 'verifying')
+        self.only('verifier')
+
     def test_a_retried_writer_starts_from_the_manifest_its_failed_predecessor_left_on_disk(self):
         self.plan()
         first = self.only('developer')
@@ -1462,6 +1515,52 @@ class ProjectControllerTests(unittest.TestCase):
                 self.finish_repair(row, record)
                 self.assertFalse(any(e['kind'] == 'start_check_owned' for e in self.project().get('orchestration_log', [])))
                 self.tearDown(); self.setUp()
+
+    def test_a_clean_start_check_with_fws_plain_field_names_is_reconciled_not_stopped(self):
+        # run-t_38517326 attempt 7: the fixer copied sha12/differed/ok instead of baseline_sha12/accepted_owned; nothing differed and the baseline matched
+        row = self.routed_repair('F1|HIGH|AC1|code.py|Real defect to repair')
+        base = self.project()['work']['manifest'][:12]
+        self.finish_repair(row, dict(ok=True, files=3, sha12=base, differed=[], manifest_rebuilt_since_baseline=False, owned=['code.py'], rejected_outside_scope=[]))
+        project = self.project()
+        self.assertNotIn('terminal', project)
+        entry = next(e for e in project['orchestration_log'] if e['kind'] == 'start_check_owned')
+        self.assertEqual((entry['baseline'], entry['accepted']), (base, []))
+        self.assertEqual(sorted(entry['reconciled']), ['accepted_owned', 'baseline_sha12'])
+        self.assertEqual(project['work']['step'], 'verifying')
+
+    def test_reconciliation_never_widens_what_a_start_check_accepts(self):
+        for record in (dict(ok=True, sha12='SAME', differed=[], manifest_rebuilt_since_baseline=True, owned=['code.py'], rejected_outside_scope=[]),  # rebuilt: sha12 is not the baseline
+                       dict(ok=True, sha12='SAME', differed=['other.py'], owned=['code.py'], rejected_outside_scope=[]),                              # a difference outside scope
+                       dict(ok=False, sha12='SAME', differed=[], owned=['code.py'], rejected_outside_scope=[]),
+                       dict(sha12='SAME', differed=[], owned=['code.py'], mismatched=['other.py'])):
+            with self.subTest(record=record):
+                row = self.routed_repair('F1|HIGH|AC1|code.py|Real defect to repair')
+                base = self.project()['work']['manifest'][:12]
+                self.finish_repair(row, {k: (base if v == 'SAME' else v) for k, v in record.items()})
+                self.assertFalse(any(e['kind'] == 'start_check_owned' for e in self.project().get('orchestration_log', [])))
+                self.tearDown(); self.setUp()
+
+    def test_a_reevaluate_after_a_rejected_start_check_rejudges_the_accepted_repair_without_a_new_attempt(self):
+        from factory_dashboard import project_controller as pc
+        row = self.routed_repair('F1|HIGH|AC1|code.py|Real defect to repair')
+        base = self.project()['work']['manifest'][:12]
+        record = dict(ok=True, sha12=base, differed=[], owned=['code.py'], rejected_outside_scope=[])
+        real = pc.reconcile_start_check
+        pc.reconcile_start_check = lambda check, owned: (dict(check), [])      # the controller before the fix
+        try:
+            self.finish_repair(row, record)
+        finally:
+            pc.reconcile_start_check = real
+        self.assertEqual(self.project()['terminal']['phase'], 'human_review')
+        self.no_retro(); self.tick()
+        self.controller.resume(self.conn, self.root, 'Re-judge the accepted repair under the reconciled audit', None, True)
+        project = self.project()
+        self.assertNotIn('terminal', project)
+        self.assertEqual(project['work']['step'], 'verifying')
+        self.assertTrue(any(e['kind'] == 'start_check_owned' for e in project['orchestration_log']))
+        fixers = self.conn.execute("SELECT COUNT(*) FROM factory_workflow_stages WHERE profile='fixer'").fetchone()[0]
+        self.assertEqual(fixers, 1)                                             # no identical retry of the repair
+        self.assertEqual([r['profile'] for r in self.board.ready()], ['verifier'])   # the accepted repair goes on to verification
 
     def test_a_start_check_on_a_card_without_owned_paths_is_rejected(self):
         row = self.routed_repair('F1|HIGH|AC1||Real defect with no file')

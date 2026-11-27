@@ -14,10 +14,11 @@ from .project_cards import (ART_PLAN, ROLE_FINDINGS, APPROVED_COMPARISON, APPROV
                             PLAN_REVIEW, REPLAN, RETRO, SCOPE, SPEC_CONSTRAINTS, TOOL_INCIDENTS, project_card)
 from .project_decisions import (MAX_STAGE_RETRIES, constraint_view, constraints_of, normalize_decisions, preserved_conflict, record_applied, relevant_constraints,
                                 validate_plan_constraints, validate_spec_conflicts)
+from . import finding_rulings
 from . import scene_loop
 from .project_evidence import dedupe_artifacts, plan_evidence, retained_json, validate_comparison, validate_scene_similarity
 from . import project_references as refs
-from .project_policy import (MAX_ORCHESTRATION_RECOVERIES, MAX_PLAN_CORRECTIONS, MAX_REPLANS, blocking_findings, budget_used, finding_id,
+from .project_policy import (MAX_ORCHESTRATION_RECOVERIES, MAX_PLAN_CORRECTIONS, MAX_REPLANS, blocking_findings, declared_domains, budget_used, finding_id,
                              missing_baseline_tokens, plan_architecture_diff, repair_origin, finding_ac, planning_profiles, route_findings, rereview_profiles,
                              review_profiles, scope_additions, uncovered_acs, describe_acs, validate_plan, validate_scope)
 
@@ -96,6 +97,21 @@ def owned_paths(findings):
                 if path not in chosen:
                     chosen.append(path)
     return chosen
+
+
+def reconcile_start_check(check, owned):
+    """fw's start_check as the worker reported it, with the fields a worker left out or renamed derived from the rest of fw's own output.
+    Workers have copied the plain `fw.py check` fields (sha12, differed) instead of the start_check object, so a clean check was refused for a
+    missing key. Only values fw itself prints are used, and only when they cannot widen what is accepted: the baseline comes from sha12 only when
+    the on-disk manifest was not rebuilt since the baseline, and accepted_owned is the owned part of differed. Returns (check, reconciled names)."""
+    check, done = dict(check), []
+    if 'baseline_sha12' not in check and isinstance(check.get('sha12'), str) and not check.get('manifest_rebuilt_since_baseline'):
+        check['baseline_sha12'] = check['sha12'][:12]; done.append('baseline_sha12')
+    if 'accepted_owned' not in check and isinstance(check.get('differed'), list):
+        check['accepted_owned'] = sorted(d for d in check['differed'] if d in set(owned or ())); done.append('accepted_owned')
+    if 'rejected_outside_scope' not in check and isinstance(check.get('mismatched'), list):
+        check['rejected_outside_scope'] = list(check['mismatched']); done.append('rejected_outside_scope')
+    return check, done
 
 
 class ProjectBlocked(ConfigurationError):
@@ -195,12 +211,15 @@ class ProjectController:
                 instructions += '\n' + SUPERSEDED.format(ids=', '.join(r['task_id'] for r in reversed(rows)))
                 prior = self._controller._result(conn, rows[0]) if kind in ('implement', 'repair') else None
                 left = prior.metadata.get('manifest_sha12') if prior is not None and prior.valid else None
-                if left and left != context.get('manifest') and getattr(self, '_owned_baseline', None) != key:
+                moved = bool((project.get('work') or {}).get('tree_moved'))   # a restored task whose tree changed while it was parked: the attempt's manifest is stale
+                if left and left != context.get('manifest') and getattr(self, '_owned_baseline', None) != key and not moved:
                     # A writer that failed or blocked may have edited files and rebuilt the manifest. Its successor starts from that state,
                     # not from the last verified one, or its own start check would reject the tree the predecessor left.
                     context = {**context, 'manifest': left, 'baseline': left}
                     instructions += '\n' + CONTINUES
             stage = StageSpec(key, kind, profile, instructions)
+            if project.get('work'):
+                project['work'].pop('tree_moved', None)   # the restored card is built from the tree as it is now; a later retry continues from its own attempt again
             self._save(conn, root, project)
             card = project_card(definition, stage, cycle, context, list(dict.fromkeys(inputs)), project, task)
             if retry:
@@ -952,7 +971,12 @@ class ProjectController:
         """The gate decision with the product repair budget only: orchestration recoveries never count against it."""
         product_used, _ = budget_used(work)
         limit = definition.max_repairs + work.get('extra_repairs', 0)
-        args = dict(context={**context, 'unity_ci': False, 'waivers': project.get('waivers', []), 'visual_final_only': True})
+        task_id = self._current(project)['id']
+        if context.get('project_dir'):
+            # A ruling binds the exact files it judged: any change reopens it before this gate, so the finding blocks again.
+            project.setdefault('pending_ruling_events', []).extend(finding_rulings.refresh(project, context['project_dir']))
+        args = dict(context={**context, 'unity_ci': False, 'waivers': project.get('waivers', []), 'visual_final_only': True,
+                             'task_id': task_id, 'rulings': project.get('rulings', [])})
         decision = evaluate_cycle(writer, readers, work.get('last_gate'), limit, product_used, **args)
         if decision.decision == 'human_review' and decision.reason == REPAIR_LIMIT and repair_origin(decision.blocking) == 'orchestration':
             decision = evaluate_cycle(writer, readers, work.get('last_gate'), 10 ** 6, 0, **args)  # not a product defect: the product budget does not apply
@@ -1011,6 +1035,10 @@ class ProjectController:
         project['history'].append(record)
         for audit in record_applied(project, decision.waived, task['id'], work['cycle']):
             self._state.event(conn, root['root_id'], 'project_waiver_applied', audit)
+        for reopened in project.pop('pending_ruling_events', []):
+            self._state.event(conn, root['root_id'], 'project_ruling_reopened', reopened)
+        for audit in finding_rulings.record_applied(project, decision.waived, task['id'], work['cycle']):
+            self._state.event(conn, root['root_id'], 'project_ruling_applied', audit)
         if decision.decision == 'pass':
             verifier = next(r for r in readers if r.kind == 'verify')
             project['completed'].append(dict(id=task['id'], evidence_task=next(r['task_id'] for r in rows if r['kind'] == 'verify'),
@@ -1036,7 +1064,7 @@ class ProjectController:
         if decision.decision == 'repair':
             # Only readers that reported a failure ask for repair domains; a passing verifier's leftover domain must not summon an agent.
             domains = [d for reader in readers if reader.metadata.get('verdict') not in ('PASS', 'NO_BLOCKING_FINDINGS')
-                       for d in reader.metadata.get('repair_domains', [])]
+                       for d in declared_domains(reader.metadata.get('repair_domains'))]
             integration = task['id'] == 'integration'
             # Integration failures belong to whoever produced the failing acceptance criterion, not to a default fixer.
             ac_owners = {ac: sorted({t['owner'] for t in project['tasks'] if ac in t['acceptance']}) for ac in project['ac_ids']} if integration else None
@@ -1116,7 +1144,8 @@ class ProjectController:
         return True
 
     def _store_parked(self, conn, root, project, task_id, phase, reason):
-        project.setdefault('parked', {})[task_id] = dict(phase=phase, reason=reason, work=project.pop('work'), last_node=project.get('last_node'), at=int(time.time()))
+        tree = project['completed'][-1].get('manifest') if project.get('completed') else None   # the tree this task left behind when it parked
+        project.setdefault('parked', {})[task_id] = dict(phase=phase, reason=reason, work=project.pop('work'), last_node=project.get('last_node'), at=int(time.time()), tree=tree)
         project.pop('active_task', None)
         project.setdefault('orchestration_log', []).append(dict(kind='task_parked', task=task_id, phase=phase, reason=reason[:400], at=int(time.time())))
         self._state.event(conn, root['root_id'], 'task_parked', dict(task=task_id, phase=phase, reason=reason[:1000]))
@@ -1315,12 +1344,16 @@ class ProjectController:
             return
         if not repair or not owned or not isinstance(check, dict):
             raise ConfigurationError('start_check is only valid on a repair task that was given OWNED_PATHS')
+        check, reconciled = reconcile_start_check(check, owned)
         accepted, differed = check.get('accepted_owned'), check.get('differed')
-        if (not isinstance(accepted, list) or not isinstance(differed, list) or not set(accepted) <= set(owned) or not set(accepted) <= set(differed)
-                or check.get('baseline_sha12') != baseline or check.get('rejected_outside_scope')):
+        if (check.get('ok') is False or not isinstance(accepted, list) or not isinstance(differed, list) or not set(accepted) <= set(owned)
+                or not set(accepted) <= set(differed) or not set(differed) <= set(owned)
+                or check.get('baseline_sha12') != baseline or check.get('rejected_outside_scope') or check.get('added_outside_scope')):
             raise ConfigurationError('start_check rejected: accepted files must be owned by this repair and the baseline must be ' + baseline)
         entry = dict(kind='start_check_owned', task=row['task_id'], baseline=baseline, owned=sorted(owned), differed=sorted(differed), accepted=sorted(accepted),
                      at=int(time.time()))
+        if reconciled:
+            entry['reconciled'] = reconciled   # fields the worker left out or renamed, derived from fw's own record: nothing outside scope is accepted
         project.setdefault('orchestration_log', []).append(entry)
         self._state.event(conn, root['root_id'], 'project_start_check_owned', entry)
 
@@ -1390,7 +1423,16 @@ class ProjectController:
             return
         pick = wanted or next(t['id'] for t in project['tasks'] if t['id'] in parked)
         entry = parked.pop(pick)
-        project.update(work=entry['work'], active_task=pick, last_node=entry.get('last_node'), resume_mode='tasks')
+        work = entry['work']
+        latest = project['completed'][-1].get('manifest') if project.get('completed') else None
+        if latest and entry.get('tree') != latest:
+            # Other tasks were accepted while this one was parked, so the tree is theirs now, not this task's own blocked attempt. Its card starts
+            # from the manifest the tree has now. Records parked before `tree` was stored have no tree, so they are treated as moved.
+            project.setdefault('orchestration_log', []).append(dict(kind='task_rebased', task=pick, was=work.get('manifest'), now=latest, tree=entry.get('tree'), at=int(time.time())))
+            work['manifest'] = latest
+            work.pop('snapshot', None)
+            work['tree_moved'] = True
+        project.update(work=work, active_task=pick, last_node=entry.get('last_node'), resume_mode='tasks')
         if not parked:
             project.pop('parked')
         project.setdefault('orchestration_log', []).append(dict(kind='task_unparked', task=pick, at=int(time.time())))
@@ -1477,6 +1519,15 @@ class ProjectController:
                                              'Recovery alone never re-approves references.')
                 project.pop('references_digest', None)
         project.pop('terminal', None);project.pop('retro', None)
+        new_rulings = []
+        if decided['rulings']:
+            task = self._board.get_task(conn, root['root_id'])
+            project_dir = self._controller._context(task)['project_dir']
+            if not project_dir:
+                raise ConfigurationError('A ruling binds project files, but this run has no project directory')
+            new_rulings = finding_rulings.normalize_rulings(decided['rulings'], note, project_dir)
+            finding_rulings.merge(project, new_rulings)
+            self._state.event(conn, root['root_id'], 'human_ruling', dict(note=note.strip()[:500], rulings=new_rulings, execution_version=2))
         known = {w['id'] for w in project.setdefault('waivers', [])}
         project['waivers'].extend(w for w in decided['waivers'] if w['id'] not in known)
         stored = [constraint_view(c) for c in project.setdefault('constraints', [])]  # decisions recorded before ids existed get one now
@@ -1493,7 +1544,7 @@ class ProjectController:
             # Granted to the task in progress only: it lives in that task's work record and disappears with it.
             project['work']['extra_repairs'] = project['work'].get('extra_repairs', 0) + decided['extra_repairs']
         if decisions:
-            self._state.event(conn, root['root_id'], 'human_decision', dict(note=note, waivers=[w['id'] for w in decided['waivers']],
+            self._state.event(conn, root['root_id'], 'human_decision', dict(note=note, waivers=[w['id'] for w in decided['waivers']], rulings=[r['id'] for r in new_rulings],
                               constraints=decided['constraints'], extra_repairs=decided['extra_repairs'],
                               extra_replans=decided['extra_replans'], extra_handoff_retries=decided['extra_handoff_retries'], on_exhaustion=decided['on_exhaustion'], plan_correction=decided['plan_correction'],
                               execution_version=2))
@@ -1507,13 +1558,22 @@ class ProjectController:
                 # judge the evidence that already exists again, instead of repeating verification or review work. The stalled card is left
                 # on the board (blocked, harmless): archiving needs its own transaction, which this one already holds.
                 stalled = [f'{prefix}-repair-{profile}:{work["cycle"]}' for profile in work['repairs']]
-                work.update(step='reviewing', cycle=work['cycle'] - 1, repairs=[])
-                if work.get('charges'):
-                    work['charges'].pop()  # the repair that never ran was never spent
-                work.pop('repair_findings', None)
-                # A repair that is still needed for the same profile reuses the stage key of the card that stalled (possibly one the worker
-                # blocked itself); it must start as a new attempt, not stop on that card again.
-                project['retry_keys'] = stalled
+                done = self._controller._rows(conn, root, work['writer_key'], work['cycle']) if work.get('writer_key') else []
+                if done and done[0]['accepted_run_id'] is not None:
+                    # An earlier repair of this cycle already changed the tree: verify that tree again instead of rolling the cycle back
+                    # to a writer that cycle never had.
+                    work.update(step='verifying', repairs=[])
+                    work.pop('repair_findings', None)
+                    project['retry_keys'] = stalled
+                    stalled = None
+                if stalled is not None:
+                    work.update(step='reviewing', cycle=work['cycle'] - 1, repairs=[])
+                    if work.get('charges'):
+                        work['charges'].pop()  # the repair that never ran was never spent
+                    work.pop('repair_findings', None)
+                    # A repair that is still needed for the same profile reuses the stage key of the card that stalled (possibly one the worker
+                    # blocked itself); it must start as a new attempt, not stop on that card again.
+                    project['retry_keys'] = stalled
             elif reevaluate:
                 # Judge the evidence that already exists again under the current rules: no stage is retried or repeated.
                 project['retry_keys'] = []

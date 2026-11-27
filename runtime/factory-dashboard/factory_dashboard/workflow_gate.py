@@ -1,6 +1,7 @@
 """Pure policy for same-manifest review, bounded repairs and human escalation."""
 from dataclasses import dataclass
 
+from .finding_rulings import dismissed_entry, fingerprint, ruling_for
 from .project_decisions import waiver_for
 from .tool_incidents import tool_blockers
 
@@ -63,8 +64,13 @@ def evaluate_cycle(writer, readers, previous_cycle, max_repairs, repairs_used, c
                 # How an image asset looks is judged once, by the final art review of the complete game, never by another reviewer and never per asset.
                 waived.append(finding+': non-blocking, visual quality of an asset is judged only by the final art review')
             elif severity in ('BLOCKER','HIGH') or (severity=='MEDIUM' and ac!='-'):
-                waiver=waiver_for(finding,context.get('waivers'))
-                if waiver:
+                ruling=ruling_for(finding,context.get('task_id'),context.get('rulings'))
+                waiver=None if ruling else waiver_for(finding,context.get('waivers'))
+                if ruling:
+                    # A human already ruled on this finding (matched by fingerprint and claim, not by the reviewer's F-number or wording)
+                    # and the files it judged are unchanged: it does not block and does not spend repair budget. Its text is kept.
+                    waived.append(dismissed_entry(finding,ruling,fingerprint(finding,context.get('task_id'))))
+                elif waiver:
                     # A scoped human waiver: the finding keeps its original text and is never counted as passed.
                     waived.append(f"{finding}: waived by human decision {waiver['id']}: {waiver['reason']}")
                 else:

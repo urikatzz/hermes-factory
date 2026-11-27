@@ -122,11 +122,11 @@ def validate_plan_constraints(value):
 
 def normalize_decisions(decisions, note, now=None):
     """Validate a human decision document; return it ready to store."""
-    empty = dict(waivers=[], constraints=[], extra_repairs=0, extra_replans=0, extra_handoff_retries=0, on_exhaustion=None, plan_correction=[], retry_stage=False, model_overrides={}, park=False, task=None)
+    empty = dict(waivers=[], constraints=[], extra_repairs=0, extra_replans=0, extra_handoff_retries=0, on_exhaustion=None, plan_correction=[], retry_stage=False, model_overrides={}, park=False, task=None, rulings=[])
     if decisions in (None, {}):
         return empty
-    if not isinstance(decisions, dict) or set(decisions) - {'waivers', 'constraints', 'extra_repairs', 'extra_replans', 'extra_handoff_retries', 'on_exhaustion', 'plan_correction', 'retry_stage', 'model_overrides', 'park', 'task'}:
-        raise ConfigurationError('A decision may only contain waivers, constraints, extra_repairs, extra_replans, extra_handoff_retries, on_exhaustion, plan_correction, retry_stage, model_overrides, park and task')
+    if not isinstance(decisions, dict) or set(decisions) - {'waivers', 'constraints', 'extra_repairs', 'extra_replans', 'extra_handoff_retries', 'on_exhaustion', 'plan_correction', 'retry_stage', 'model_overrides', 'park', 'task', 'rulings'}:
+        raise ConfigurationError('A decision may only contain waivers, rulings, constraints, extra_repairs, extra_replans, extra_handoff_retries, on_exhaustion, plan_correction, retry_stage, model_overrides, park and task')
     stamp = int(time.time() if now is None else now)
     waivers = []
     for item in decisions.get('waivers') or []:
@@ -182,7 +182,19 @@ def normalize_decisions(decisions, note, now=None):
         raise ConfigurationError('task must be the id of one parked task')
     if (extra or extra_replans or extra_handoff or on_exhaustion or correction or retry_stage or model_overrides or park or task) and not note.strip():
         raise ConfigurationError('Granting repairs or changing exhaustion handling requires a recorded note')
-    return dict(waivers=waivers, constraints=constraints, extra_repairs=extra, extra_replans=extra_replans, extra_handoff_retries=extra_handoff, on_exhaustion=on_exhaustion, plan_correction=sorted(set(correction)), retry_stage=retry_stage, model_overrides=model_overrides, park=park, task=task)
+    return dict(waivers=waivers, constraints=constraints, extra_repairs=extra, extra_replans=extra_replans, extra_handoff_retries=extra_handoff, on_exhaustion=on_exhaustion, plan_correction=sorted(set(correction)), retry_stage=retry_stage, model_overrides=model_overrides, park=park, task=task,
+                rulings=_ruling_list(decisions.get('rulings'), note))
+
+
+def _ruling_list(value, note):
+    """Rulings are validated and bound to file digests by finding_rulings when the controller records them (it knows the project dir)."""
+    if value in (None, []):
+        return []
+    if not isinstance(value, list) or len(value) > 20 or any(not isinstance(item, dict) for item in value):
+        raise ConfigurationError('rulings must be a list of at most 20 entries')
+    if not note.strip():
+        raise ConfigurationError('A ruling requires a recorded note')
+    return value
 
 
 def finding_file(finding):

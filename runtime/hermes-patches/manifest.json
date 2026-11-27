@@ -1,6 +1,7 @@
 {
  "format": 1,
  "verified_with": [
+  "8fc0374447313e276f6b9a2764bfc750190c966a",
   "caafe5389ae585ef77387a962aee05b1bcf17029"
  ],
  "patches": [
@@ -18,7 +19,7 @@
     {
      "path": "hermes_cli/kanban_db_dispatch.py",
      "new": false,
-     "sha256": "bf508282a9325281848b56cd687e6935a3f383d16c015fe0da97ec38f3923068"
+     "sha256": "89142c37f007f622cf6bd8e63123bf28e8a090ca0fa882335f587f573014eace"
     },
     {
      "path": "hermes_cli/kanban_db_graph.py",
@@ -53,7 +54,7 @@
     {
      "path": "hermes_cli/plugins.py",
      "new": false,
-     "sha256": "9f04cc4b20976040c0ddf027debdd69729dce5320ef81b0b7d8c9137f59ceadf"
+     "sha256": "65008d07628c9eb590754ba7226b0ef98cd2f410b8a8b8f953b00b0d49150bdf"
     }
    ],
    "description": "Kanban mutation guard, task-creation and worker-model hooks, dispatch/graph/swarm/transfer wiring, and the hook names the Factory plugin registers"
@@ -91,7 +92,7 @@
     {
      "path": "gateway/session_kanban.py",
      "new": false,
-     "sha256": "c0294b00bc9310f01f7e8e4e27ddf65b15ac36cf52a421c1b279dcb897533b7e"
+     "sha256": "cbe4d5faf06887048186a452db628e217371194e5c9145209d8913a042343d1c"
     }
    ],
    "description": "The profile owner applies the model the dispatcher captured for the attempt (worker_model_selection) instead of re-reading the task row, which does not carry it"

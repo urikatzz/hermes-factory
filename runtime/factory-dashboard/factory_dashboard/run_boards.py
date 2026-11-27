@@ -18,6 +18,36 @@ class ProvisionError(ConfigurationError):
     pass
 
 
+def _project_document(conn, root_id):
+    try:
+        row = conn.execute('SELECT document FROM factory_project_execution WHERE root_id=?', (root_id,)).fetchone()
+        return json.loads(row[0]) if row and row[0] else {}
+    except (sqlite3.Error, ValueError):
+        return {}
+
+
+def _plan_task(stage_key):
+    """`task-style-bible.g16-repair-artist` -> `style-bible`; project-level stages have no plan task."""
+    if not stage_key or not stage_key.startswith('task-'):
+        return ''
+    return stage_key[len('task-'):].split('.', 1)[0]
+
+
+def _describe_card(conn, card, completed):
+    """A blocked card with the reason its last attempt gave, and whether a later attempt already finished its plan task."""
+    try:
+        stage = conn.execute('SELECT stage_key FROM factory_workflow_stages WHERE task_id=?', (card['id'],)).fetchone()
+    except sqlite3.Error:
+        stage = None
+    run = conn.execute('SELECT outcome, summary, error FROM task_runs WHERE task_id=? ORDER BY id DESC LIMIT 1', (card['id'],)).fetchone()
+    card['stage_key'] = stage[0] if stage else ''
+    card['plan_task'] = _plan_task(card['stage_key'])
+    card['superseded'] = bool(card['plan_task']) and card['plan_task'] in completed
+    card['outcome'] = run['outcome'] if run else ''
+    card['reason'] = ((run['summary'] or run['error']) if run else '') or card.get('result') or ''
+    return card
+
+
 def describe_root(conn, root_id):
     """Workflow phase and approval state of one root on a read-only board connection; {} when the board has no workflow state."""
     conn.row_factory = sqlite3.Row
@@ -117,11 +147,20 @@ class RunBoards:
                 result.update(describe_root(conn, root['id']))
             # The root card is always "blocked" while the controller owns it; only other blocked cards, or a stopped phase, are blockers.
             root_id = root['id'] if root else ''
-            result['blockers'] = [dict(r) for r in conn.execute("SELECT id, title, block_kind, result FROM tasks WHERE status='blocked' AND id != ? ORDER BY created_at LIMIT 20", (root_id,))]
+            project = _project_document(conn, root_id)
+            completed = {t.get('id') for t in project.get('completed') or [] if isinstance(t, dict)}
+            result['blockers'] = [_describe_card(conn, dict(r), completed) for r in conn.execute(
+                "SELECT id, title, block_kind, result, assignee, created_at FROM tasks WHERE status='blocked' AND id != ? ORDER BY created_at LIMIT 50", (root_id,))]
             if result['phase'] in ('blocked', 'human_review') and root:
-                result['blockers'].insert(0, dict(id=root_id, title=root['title'], block_kind='needs_input', result=result['reason']))
-            result['needs_intervention'] = bool(result['blockers']) and not result['awaiting'] and not (root and root['status'] == 'done')
-            result['stages'] = [dict(r) for r in conn.execute("SELECT id, title, status, assignee FROM tasks WHERE status IN ('ready','running','review','scheduled') ORDER BY created_at LIMIT 20")]
+                result['blockers'].insert(0, dict(id=root_id, title=root['title'], block_kind='needs_input', result=result['reason'], reason=result['reason'], superseded=False, plan_task=''))
+            result['parked'] = [dict(task=k, phase=v.get('phase', ''), reason=v.get('reason', ''), at=v.get('at')) for k, v in (project.get('parked') or {}).items() if isinstance(v, dict)]
+            result['active_task'] = project.get('active_task') or ''
+            result['stages'] = [dict(r) for r in conn.execute("SELECT id, title, status, assignee FROM tasks WHERE status IN ('todo','ready','running','review','scheduled') ORDER BY created_at LIMIT 20")]
+            open_blockers = [b for b in result['blockers'] if not b.get('superseded')]
+            settled = bool(root and root['status'] == 'done') or result['phase'] in ('delivered', 'done')
+            # Working phase with no card queued or running: the controller is not advancing (e.g. its last card was created outside its record).
+            result['stalled'] = bool(root) and not settled and not result['awaiting'] and result['phase'] == 'project' and not result['stages'] and board.status == 'active'
+            result['needs_intervention'] = (bool(open_blockers) or result['stalled']) and not result['awaiting'] and not settled
         return result
 
     # ---- lifecycle
@@ -151,6 +190,22 @@ class RunBoards:
                         parked.append(row['id'])
         self.registry.set_status(board_id, 'paused', paused_cards=parked, pause_reason=reason)
         return parked
+
+    def archive_replaced(self, board_id, card_ids):
+        """Archive blocked cards that are history only: failed attempts whose plan task a later attempt completed. Anything else is refused
+        and nothing is changed. Archived cards stay in the database with their runs, events and stage rows; they just leave the board."""
+        board = self._with_board(board_id, ('active', 'paused'), 'tidy')
+        wanted = list(dict.fromkeys(card_ids or []))
+        if not wanted or len(wanted) > 50:
+            raise ConfigurationError('Name 1 to 50 cards to archive')
+        replaceable = {b['id'] for b in self.summary(board)['blockers'] if b.get('superseded')}
+        refused = [c for c in wanted if c not in replaceable]
+        if refused:
+            raise ConfigurationError('Only failed attempts already replaced by a later success can be removed; refused: ' + ', '.join(map(str, refused)))
+        kb = self.hermes.board_api()
+        with closing(self.hermes.connect(board.db_path, board.board_id)) as conn:
+            with self._scoped(conn, board):
+                return [c for c in wanted if kb.archive_task(conn, c)]
 
     def resume(self, board_id):
         board = self._with_board(board_id, ('paused',), 'resume')
